@@ -13,12 +13,12 @@ The local application database is the source of truth. Health Connect is an opti
 
 ### 1.1 Product scope decisions
 
-- **MVP:** F-01, F-02, F-03, F-10, F-11, F-16, F-19, F-20, F-23, F-30 (account-free access, no registration), F-32 (90-picture free AI trial, paywall as a screen only), and F-33 (minimal internal admin console, not part of the app UI).
+- **MVP:** F-01, F-02, F-03, F-05 (AI chat: text, photo, gallery), F-16, F-19, F-20, F-23, F-30 (account-free access, no registration), F-32 (90-picture free AI trial, paywall as a screen only), and F-33 (minimal internal admin console, not part of the app UI).
 - **App access:** no registration or sign-in anywhere. AI access is obtained silently on the first AI action. The MVP pilot is capped at 5 users; further users are waitlisted for AI but can log manually.
 - **MVP flow:** one captured or gallery-selected image, LogMeal recognition, editable food and grams, local save, and optional Health Connect sync.
 - **Fallback:** manual text search first, then quick calorie/macro entry. A failed request is retried once, then the preserved draft is routed to fallback.
 - **Health Connect:** never blocks local logging. It is offered contextually at the first save and managed later from Settings.
-- **AI Chat conflict:** the feature index marks F-05 as MVP, while the charter and AI analysis defer chat. This specification follows the charter and treats F-05 as decision-required/post-MVP; F-06 remains post-MVP.
+- **AI Chat (decision of 2026-11-15):** F-05 is in the MVP (text, photo, gallery; food logging only). F-06 voice remains post-MVP. F-10 manual search and F-11 quick add move to post-MVP. Screens and fallbacks below still need to be aligned; see [04 WBS and MVP Implementation Plan](../04_wbs_and_mvp_implementation_plan.md) §8–9.
 - **Deferred:** mixed plates, barcode, recipes, copy previous, adaptive targets, micronutrients, advanced statistics, body/water/fasting tracking, recap, Wear OS, and profile configuration beyond MVP access and integration settings.
 
 ### 1.2 Design principles
@@ -539,12 +539,12 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 |---|---|---|
 | F-01, F-02, F-03 | S-03 to S-08 recognition and correction | MVP |
 | F-04 | Future multi-item review variant of S-07 | Post-MVP |
-| F-05 | Chat entry variant; conflict with charter | Decision required / post-MVP |
+| F-05 | Chat as the start screen; text, photo, and gallery input | MVP |
 | F-06 | Voice input variant of chat | Post-MVP |
 | F-07 | Photo guidance from S-03 and the background validation path | Post-MVP, lightweight copy may ship in MVP |
 | F-08 | Product recognition variant of S-07 | Post-MVP |
 | F-09 | S-04 Gallery picker | Post-MVP in master list; supported as a low-cost MVP capture fallback |
-| F-10, F-11 | S-09 and S-10 manual fallbacks | MVP |
+| F-10, F-11 | S-08 and S-09 manual fallbacks | Post-MVP |
 | F-12, F-13, F-14 | Future input extensions from S-09/S-15 | Post-MVP or deferred |
 | F-15, F-16 | S-02, S-13, S-14 totals and macro views | F-16 MVP; F-15 post-MVP target comparison |
 | F-17, F-18 | Future nutrition and target extensions | Deferred |

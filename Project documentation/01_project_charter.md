@@ -3,8 +3,8 @@
 **Snackshot: AI-Powered Nutrition & Calorie Tracker**
 
 **Status:** APPROVED
-**Document Version:** 1.2
-**Date:** August 23, 2026 (v1.2: November 14, 2026)
+**Document Version:** 1.3
+**Date:** August 23, 2026 (v1.2: November 14, 2026; v1.3: November 15, 2026)
 
 ## 1. Project Purpose & Justification
 
@@ -17,14 +17,14 @@ The primary differentiator of this application is that it has **no backend for u
 * **Objective 1:** Implement an accurate AI vision integration that minimizes manual food entry.
 * **Objective 2:** Achieve seamless read/write synchronization with Google Health Connect (specifically the `NutritionRecord` data type).
 * **Objective 3:** Build a cross-platform UI ensuring high responsiveness and low-friction logging.
-* **Objective 4:** Deliver a functioning Minimum Viable Product (MVP) within a one-month development window.
+* **Objective 4:** Deliver a functioning Minimum Viable Product (MVP) with the full MVP scope; the timeline is extended as needed (decision of November 15, 2026).
 
 ## 3. High-Level Requirements
 
 * Camera integration and UI workflow for capturing and cropping food images.
 * Integration with a third-party AI image recognition API for food identification and volume estimation.
 * Local data storage and synchronization engine interfacing directly with Google Health Connect APIs.
-* Fallback mechanisms for manual entry and barcode scanning.
+* AI chat for logging meals by text, photo, or gallery image, with food lookup through LogMeal localized by the user's country and language.
 * Daily macro dashboard (Calories, Protein, Fat, Carbs) reading directly from local device history.
 
 ## 4. Scope & Architecture Constraints
@@ -40,21 +40,22 @@ The MVP scope is limited to the features that are necessary for the product to v
 * AI food identification from a camera photo.
 * Visual estimate of food portion size or weight.
 * Fast in-app correction flow for recognized food items and portion estimates.
-* Manual fallback for food lookup by text search.
-* Quick manual calorie entry as a backup when AI recognition is uncertain.
+* AI chat as the main logging screen: text, photo, and gallery input (food logging only; text lookup through LogMeal, localized by country and language).
 * Macronutrient dashboard showing Calories, Protein, Fat, and Carbs.
 * Mandatory Android Health Connect integration for local read/write nutrition logging.
 * No registration or sign-in: the app and AI recognition are usable immediately; identity is a silent anonymous ID tied to the device.
 * Free AI trial of 90 recognized pictures per user, followed by a subscription paywall (paywall screen only in the MVP; payments post-MVP).
 * LogMeal Access Broker (Firebase) with a basic admin console to manage per-user LogMeal access.
 * Meal history feed showing logged meals and their macro totals.
+* Anonymous north-star metrics sent through the LogMeal Access Broker (daily aggregates, no personal data).
 
 ### 5.2 Out of Scope for MVP
 
 The following features are explicitly deferred beyond the MVP phase and are not required for the initial release:
 
 * Mixed plate breakdown with multiple distinct food items in one photo.
-* AI chat or voice-based meal logging.
+* Voice-based meal logging.
+* Manual text search screen and quick manual calorie entry.
 * Barcode scanning for packaged goods.
 * Custom recipes and reusable meal templates.
 * Calorie target algorithms and adaptive health coaching.
@@ -79,9 +80,9 @@ The primary success indicators for the MVP are the following metrics, which conn
 | **Monetization & API Cost Control** | The MVP phase is a closed pilot for friends and family, capped at **5 users**. Each user gets **90 free AI-recognized pictures** in total; after that a subscription paywall is shown (MVP: screen only, "subscriptions coming soon"). Manual logging stays free. Post-MVP, subscriptions are sold through Google Play Billing. Per-user AI usage, pause, and cancellation are managed by the LogMeal Access Broker. |
 | **Development Timeline & Effort** | **Start Date:** Monday, August 24, 2026<br>
 
-<br>**Target MVP Release:** Late September 2026 (1 Month duration)<br>
+<br>**Target MVP Release:** February 10, 2027 (pilot release). Extended by the decision of November 15, 2026: the full MVP scope is kept and the timeline is extended. See [04 WBS and MVP Implementation Plan](04_wbs_and_mvp_implementation_plan.md).<br>
 
-<br>**Available Capacity:** 7 hours per week (Mon: 2h, Wed: 2h, Sun: 3h). Total estimated MVP effort: ~28 hours. |
+<br>**Available Capacity:** 7 hours per week (Mon: 2h, Wed: 2h, Sun: 3h). Total estimated MVP effort: ~78.5 hours plus ~8 hours contingency. |
 | **Target Audience** | Adults of all genders, approximately 40 years old, who are motivated to lose weight, improve general health, and prefer a privacy-centric, low-friction tracking solution. |
 
 ## 8. Development Roadmap & Action Plan

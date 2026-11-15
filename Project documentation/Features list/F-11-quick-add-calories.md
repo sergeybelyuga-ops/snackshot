@@ -12,4 +12,4 @@ As a user, I want to add calories quickly when I know the meal value already so 
 - This path works as a fallback when AI or search routes are not useful.
 
 ## MVP status
-Necessary for MVP: Yes
+Necessary for MVP: No
