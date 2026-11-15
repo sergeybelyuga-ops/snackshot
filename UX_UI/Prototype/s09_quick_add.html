@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-09 | Quick add - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, macro and status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-09 Quick add (Manual add) — UX spec §4.8, F-11:
+         * Scaffold -> TopAppBar (back) -> optional recognition-fallback card
+         * -> Meal: name, meal type, time -> Nutrition: calories, Carbs, Fat, Protein
+         * -> macro-implied kcal hint -> Optional: serving size, save as custom food
+         * -> sticky bottom bar (status line, Cancel, FilledButton Save).
+         * Validation: non-negative numbers, at least one nutrition value, inline errors with text + icon.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar h1 {
+            flex: 1;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 0 16px 24px;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+        .intro { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+
+        /* ---------- Recognition fallback card (prefilled draft) ---------- */
+        .draft-card {
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 12px;
+            background: var(--surface-container-high);
+            display: grid;
+            grid-template-columns: 56px 1fr;
+            gap: 4px 16px;
+        }
+        .draft-thumb {
+            grid-row: span 2;
+            width: 56px; height: 56px;
+            border-radius: 12px;
+            background: color-mix(in srgb, var(--primary) 18%, var(--surface-container));
+            color: var(--primary);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .draft-title { font: 500 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .draft-text { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .draft-card .text-btn { grid-column: 2; justify-self: start; margin-left: -12px; }
+
+        /* ---------- Sections ---------- */
+        .section-title {
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 500;
+        }
+        .section-title small {
+            margin-left: 6px;
+            font: 400 14px/20px var(--font-text);
+            color: var(--on-surface-variant);
+        }
+        .stack { display: flex; flex-direction: column; gap: 16px; }
+
+        /* ---------- M3 Outlined text field ---------- */
+        .field { display: flex; flex-direction: column; min-width: 0; }
+        .outlined {
+            position: relative;
+            min-height: 56px;
+            padding: 0 12px 0 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid var(--outline);
+            border-radius: 4px;
+            transition: border-color 120ms ease, box-shadow 120ms ease;
+        }
+        .outlined:hover { border-color: var(--on-surface); }
+        .outlined:focus-within { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+        .field-label {
+            position: absolute;
+            top: -9px;
+            left: 12px;
+            max-width: calc(100% - 24px);
+            padding: 0 4px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--surface);
+            color: var(--on-surface-variant);
+            font: 400 12px/16px var(--font-text);
+            letter-spacing: 0.4px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        .outlined:focus-within .field-label { color: var(--primary); }
+        .field-input {
+            flex: 1;
+            min-width: 0;
+            height: 54px;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: var(--on-surface);
+            font: 400 16px/24px var(--font-text);
+            letter-spacing: 0.5px;
+            font-variant-numeric: tabular-nums;
+        }
+        .field-input::placeholder { color: var(--on-surface-variant); opacity: 1; }
+        .field-input:focus-visible { outline: none; } /* focus shown by the 2dp container border */
+        .field-input[type="time"] { color-scheme: inherit; }
+        .field-input:read-only { cursor: default; }
+        .suffix { color: var(--on-surface-variant); font: 400 16px/24px var(--font-text); white-space: nowrap; }
+        .err-icon { display: none; color: var(--error); font-size: 22px; }
+        .support {
+            min-height: 16px;
+            margin-top: 4px;
+            padding: 0 16px;
+            display: flex;
+            gap: 4px;
+            color: var(--on-surface-variant);
+            font: 400 12px/16px var(--font-text);
+            letter-spacing: 0.4px;
+        }
+        .support:empty { display: none; }
+        .support .material-symbols-rounded { font-size: 16px; flex-shrink: 0; }
+
+        /* Error: thicker error border + error icon + error text (never color alone) */
+        .field[data-invalid="true"] .outlined { border-color: var(--error); box-shadow: inset 0 0 0 1px var(--error); }
+        .field[data-invalid="true"] .field-label,
+        .field[data-invalid="true"] .support { color: var(--error); }
+        .field[data-invalid="true"] .err-icon { display: inline-block; }
+
+        /* Calories is the primary value: larger input */
+        .field-kcal .outlined { min-height: 64px; }
+        .field-kcal .field-input { height: 62px; font: 400 24px/32px var(--font-display); letter-spacing: 0; }
+
+        /* Macro fields: Carbs, Fat, Protein (in that order); wrap under text scaling */
+        .macro-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(104px, 1fr));
+            gap: 16px 8px;
+        }
+        .macro-grid .outlined { padding-left: 12px; padding-right: 8px; }
+        .macro-grid .support { padding: 0 4px; }
+        .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .dot-carbs { background: var(--macro-carbs); }
+        .dot-fat { background: var(--macro-fat); }
+        .dot-protein { background: var(--macro-protein); }
+
+        /* Group-level error: all nutrition fields blank */
+        .group-error {
+            margin-bottom: 16px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            background: var(--error-container, color-mix(in srgb, var(--error) 12%, var(--surface)));
+            color: var(--on-error-container, var(--error));
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+        }
+        .group-error .material-symbols-rounded { font-size: 20px; }
+
+        /* ---------- Macro-implied kcal hint (gentle, not an error) ---------- */
+        .kcal-hint {
+            margin-top: 16px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            background: var(--surface-container-high);
+            display: grid;
+            grid-template-columns: 20px 1fr;
+            gap: 4px 12px;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .kcal-hint .material-symbols-rounded { font-size: 20px; color: var(--on-surface-variant); }
+        .kcal-hint strong { color: var(--on-surface); font-weight: 500; }
+        .kcal-hint .text-btn { grid-column: 2; justify-self: start; margin-left: -12px; margin-bottom: -8px; }
+
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 20px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .text-btn .material-symbols-rounded { font-size: 18px; }
+
+        /* ---------- Meal type (exposed dropdown) + time, side by side; stack under text scaling ---------- */
+        .row-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 16px 12px; }
+        select.field-input { appearance: none; -webkit-appearance: none; padding-right: 4px; cursor: pointer; }
+        select.field-input option { background: var(--surface-container); color: var(--on-surface); }
+        .select-arrow { color: var(--on-surface-variant); pointer-events: none; }
+        .field-input:disabled { opacity: 1; cursor: default; }
+
+        /* ---------- Switch row ---------- */
+        .switch-row {
+            width: 100%;
+            min-height: 72px;
+            padding: 8px 0;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .switch-text { flex: 1; display: flex; flex-direction: column; }
+        .switch-title { font: 400 16px/24px var(--font-text); letter-spacing: 0.5px; }
+        .switch-sub { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .switch-track {
+            width: 52px; height: 32px;
+            flex-shrink: 0;
+            border-radius: 16px;
+            border: 2px solid var(--outline);
+            background: var(--surface-container-high);
+            position: relative;
+            transition: background-color 150ms ease, border-color 150ms ease;
+        }
+        .switch-thumb {
+            position: absolute;
+            top: 50%; left: 6px;
+            width: 16px; height: 16px;
+            border-radius: 50%;
+            background: var(--outline);
+            transform: translateY(-50%);
+            display: flex; justify-content: center; align-items: center;
+            transition: left 150ms ease, width 150ms ease, height 150ms ease;
+        }
+        .switch-thumb .material-symbols-rounded { font-size: 16px; display: none; color: var(--primary); }
+        .switch-row[aria-checked="true"] .switch-track { background: var(--primary); border-color: var(--primary); }
+        .switch-row[aria-checked="true"] .switch-thumb { left: 22px; width: 24px; height: 24px; background: var(--on-primary); }
+        .switch-row[aria-checked="true"] .switch-thumb .material-symbols-rounded { display: inline-block; }
+        .switch-row:focus-visible { outline: none; }
+        .switch-row:focus-visible .switch-track { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Sticky bottom action bar (Save always reachable) ---------- */
+        .bottom-bar {
+            flex-shrink: 0;
+            padding: 12px 16px 28px;
+            background: var(--surface-container);
+            border-top: 1px solid var(--outline-variant);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .save-status {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .save-status .material-symbols-rounded { font-size: 20px; flex-shrink: 0; }
+        .save-status[data-tone="error"] { color: var(--error); }
+        .save-status[data-tone="ready"] .material-symbols-rounded { color: var(--tertiary); }
+        .save-status strong { color: var(--on-surface); font-weight: 500; }
+        .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .btn {
+            flex: 1 1 120px;
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            text-align: center;
+        }
+        .btn-outlined { border: 1px solid var(--outline); color: var(--primary); }
+        .btn-outlined:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .btn-filled { background: var(--primary); color: var(--on-primary); }
+        .btn-filled:hover:not([aria-disabled="true"]) { box-shadow: 0 1px 3px rgba(0,0,0,.3); background: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        /* Soft-disabled: stays focusable so pressing explains what is missing */
+        .btn-filled[aria-disabled="true"] {
+            background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 50%, transparent);
+            cursor: pointer;
+        }
+        .btn .material-symbols-rounded { font-size: 18px; }
+        .spinner {
+            width: 18px; height: 18px;
+            border-radius: 50%;
+            border: 2px solid currentColor;
+            border-right-color: transparent;
+            animation: spin 800ms linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-09 states (spec §4.1 / §4.8) -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Empty form</button>
+        <button type="button" data-state-choice="prefilled">From photo</button>
+        <button type="button" data-state-choice="error">Error</button>
+        <button type="button" data-state-choice="blank">Blank save</button>
+        <button type="button" data-state-choice="ready">Ready</button>
+        <button type="button" data-state-choice="saving">Saving</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <header class="top-app-bar">
+            <button type="button" class="icon-btn" aria-label="Back to Home" data-route="home">
+                <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            </button>
+            <h1>Quick add</h1>
+        </header>
+
+        <main class="scaffold-content" id="content">
+            <form id="quickAddForm" novalidate>
+                <p class="intro">Log calories and macros you already know. No photo or search needed.</p>
+
+                <!-- Recognition fallback: the draft (photo, time, meal type) is preserved -->
+                <section class="draft-card" id="draftCard" aria-labelledby="draftTitle" hidden>
+                    <span class="draft-thumb" aria-hidden="true"><span class="material-symbols-rounded">image</span></span>
+                    <h2 class="draft-title" id="draftTitle">Your photo is kept with this meal</h2>
+                    <p class="draft-text">Recognition couldn't finish. Time and meal type come from your photo; enter the values you know.</p>
+                    <button type="button" class="text-btn" data-route="search">
+                        <span class="material-symbols-rounded" aria-hidden="true">search</span>Search foods instead
+                    </button>
+                </section>
+
+                <!-- Meal -->
+                <h2 class="section-title">Meal</h2>
+                <div class="stack">
+                    <div class="field" data-field="name">
+                        <div class="outlined">
+                            <label class="field-label" for="name">Name</label>
+                            <input class="field-input" id="name" type="text" autocomplete="off" maxlength="80"
+                                   placeholder="Quick add" aria-describedby="name-support">
+                        </div>
+                        <p class="support" id="name-support">Optional. Saved as “Quick add” if left blank.</p>
+                    </div>
+
+                    <div class="row-2">
+                        <div class="field" data-field="type">
+                            <div class="outlined">
+                                <label class="field-label" for="mealType">Meal type</label>
+                                <select class="field-input" id="mealType" aria-describedby="type-support">
+                                    <option>Breakfast</option>
+                                    <option>Lunch</option>
+                                    <option>Dinner</option>
+                                    <option>Snack</option>
+                                </select>
+                                <span class="material-symbols-rounded select-arrow" aria-hidden="true">arrow_drop_down</span>
+                            </div>
+                            <p class="support" id="type-support"></p>
+                        </div>
+                        <div class="field" data-field="time">
+                            <div class="outlined">
+                                <label class="field-label" for="time">Time</label>
+                                <input class="field-input" id="time" type="time" max="23:59" aria-describedby="time-support">
+                            </div>
+                            <p class="support" id="time-support">Today, Thu, Sep 24</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Nutrition -->
+                <h2 class="section-title" id="nutritionTitle">Nutrition</h2>
+                <div class="group-error" id="groupError" role="alert" hidden>
+                    <span class="material-symbols-rounded icon-filled" aria-hidden="true">error</span>
+                    <span>Enter calories or at least one macro to save this meal.</span>
+                </div>
+                <div class="stack" role="group" aria-labelledby="nutritionTitle">
+                    <div class="field field-kcal" data-field="kcal">
+                        <div class="outlined">
+                            <label class="field-label" for="kcal">Calories<span class="sr-only"> in kcal</span></label>
+                            <input class="field-input" id="kcal" type="text" inputmode="decimal" autocomplete="off"
+                                   aria-describedby="kcal-support">
+                            <span class="suffix" aria-hidden="true">kcal</span>
+                            <span class="material-symbols-rounded icon-filled err-icon" aria-hidden="true">error</span>
+                        </div>
+                        <p class="support" id="kcal-support"></p>
+                    </div>
+
+                    <div class="macro-grid">
+                        <div class="field" data-field="carbs">
+                            <div class="outlined">
+                                <label class="field-label" for="carbs"><span class="dot dot-carbs" aria-hidden="true"></span>Carbs<span class="sr-only"> in grams</span></label>
+                                <input class="field-input" id="carbs" type="text" inputmode="decimal" autocomplete="off"
+                                       aria-describedby="carbs-support">
+                                <span class="suffix" aria-hidden="true">g</span>
+                                <span class="material-symbols-rounded icon-filled err-icon" aria-hidden="true">error</span>
+                            </div>
+                            <p class="support" id="carbs-support"></p>
+                        </div>
+                        <div class="field" data-field="fat">
+                            <div class="outlined">
+                                <label class="field-label" for="fat"><span class="dot dot-fat" aria-hidden="true"></span>Fat<span class="sr-only"> in grams</span></label>
+                                <input class="field-input" id="fat" type="text" inputmode="decimal" autocomplete="off"
+                                       aria-describedby="fat-support">
+                                <span class="suffix" aria-hidden="true">g</span>
+                                <span class="material-symbols-rounded icon-filled err-icon" aria-hidden="true">error</span>
+                            </div>
+                            <p class="support" id="fat-support"></p>
+                        </div>
+                        <div class="field" data-field="protein">
+                            <div class="outlined">
+                                <label class="field-label" for="protein"><span class="dot dot-protein" aria-hidden="true"></span>Protein<span class="sr-only"> in grams</span></label>
+                                <input class="field-input" id="protein" type="text" inputmode="decimal" autocomplete="off"
+                                       aria-describedby="protein-support">
+                                <span class="suffix" aria-hidden="true">g</span>
+                                <span class="material-symbols-rounded icon-filled err-icon" aria-hidden="true">error</span>
+                            </div>
+                            <p class="support" id="protein-support"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- kcal implied by macros (4 / 9 / 4 kcal per g) -->
+                <div class="kcal-hint" id="kcalHint" aria-live="polite" hidden></div>
+
+                <!-- Optional details -->
+                <h2 class="section-title">Details <small>Optional</small></h2>
+                <div class="stack">
+                    <div class="field" data-field="serving">
+                        <div class="outlined">
+                            <label class="field-label" for="serving">Serving size<span class="sr-only"> in grams</span></label>
+                            <input class="field-input" id="serving" type="text" inputmode="decimal" autocomplete="off"
+                                   aria-describedby="serving-support">
+                            <span class="suffix" aria-hidden="true">g</span>
+                            <span class="material-symbols-rounded icon-filled err-icon" aria-hidden="true">error</span>
+                        </div>
+                        <p class="support" id="serving-support"></p>
+                    </div>
+                    <button type="button" class="switch-row" role="switch" id="customFood" aria-checked="false" aria-labelledby="customFoodTitle" aria-describedby="customFoodSub">
+                        <span class="switch-text">
+                            <span class="switch-title" id="customFoodTitle">Save as custom food</span>
+                            <span class="switch-sub" id="customFoodSub">Keep the name and values to reuse later</span>
+                        </span>
+                        <span class="switch-track" aria-hidden="true"><span class="switch-thumb"><span class="material-symbols-rounded">check</span></span></span>
+                    </button>
+                </div>
+            </form>
+        </main>
+
+        <!-- Sticky action bar: stays visible at any text size; content scrolls above it -->
+        <div class="bottom-bar">
+            <p class="save-status" id="saveStatus"></p>
+            <div class="actions">
+                <button type="button" class="btn btn-outlined" data-route="home" id="cancelBtn">Cancel</button>
+                <button type="submit" form="quickAddForm" class="btn btn-filled" id="saveBtn">
+                    <span class="material-symbols-rounded" aria-hidden="true" id="saveIcon">check</span>
+                    <span id="saveLabel">Save</span>
+                </button>
+            </div>
+        </div>
+        <!-- Navigation target for a successful save (triggered from script) -->
+        <button type="button" id="saveRoute" data-route="savePrompt" hidden tabindex="-1"></button>
+
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Constants ---------------- */
+        const KCAL_PER_G = { carbs: 4, fat: 9, protein: 4 };
+        const NUTRITION = ['kcal', 'carbs', 'fat', 'protein'];
+        const NUMERIC = ['kcal', 'carbs', 'fat', 'protein', 'serving'];
+        const MAX = { kcal: 10000, carbs: 1000, fat: 1000, protein: 1000, serving: 5000 };
+        const UNIT = { kcal: 'kcal', carbs: 'g', fat: 'g', protein: 'g', serving: 'g' };
+        const LABEL = { kcal: 'Calories', carbs: 'Carbs', fat: 'Fat', protein: 'Protein', serving: 'Serving size' };
+
+        // Meal type suggested from the time of day (device locale time).
+        // 04:00-10:59 Breakfast, 11:00-15:59 Lunch, 16:00-17:59 Snack, 18:00-21:59 Dinner, otherwise Snack.
+        function suggestType(hhmm) {
+            const [h] = (hhmm || '11:17').split(':').map(Number);
+            if (h >= 4 && h < 11) return 'Breakfast';
+            if (h >= 11 && h < 16) return 'Lunch';
+            if (h >= 18 && h < 22) return 'Dinner';
+            return 'Snack';
+        }
+
+        /* Demo presets per prototype state */
+        const BLANK = { name: '', time: '11:17', type: null, kcal: '', carbs: '', fat: '', protein: '', serving: '', custom: false };
+        const PRESETS = {
+            default:   Object.assign({}, BLANK),
+            prefilled: Object.assign({}, BLANK, { time: '11:15', fromPhoto: true }),
+            error:     Object.assign({}, BLANK, { name: 'Protein bar', kcal: '-230', carbs: '24', fat: '8', protein: '2o', serving: '60', showErrors: true }),
+            blank:     Object.assign({}, BLANK, { showErrors: true }),
+            ready:     Object.assign({}, BLANK, { name: 'Protein bar', kcal: '230', carbs: '24', fat: '8', protein: '20', serving: '60' }),
+            saving:    Object.assign({}, BLANK, { name: 'Protein bar', kcal: '230', carbs: '24', fat: '8', protein: '20', serving: '60', saving: true })
+        };
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        let timers = [];
+        function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+        /* ---------------- Form state ---------------- */
+        let state = 'default';
+        let mealType = 'Lunch';
+        let typeTouched = false;     // user picked a type -> stop auto-suggesting from time
+        let submitted = false;       // show all errors after a save attempt
+        let saving = false;
+        const touched = new Set();   // fields validated on blur
+
+        // Parse one numeric field. Accepts "," as decimal separator. Returns { empty, value, error }.
+        function parseField(key) {
+            const raw = $(key).value.trim().replace(',', '.');
+            if (raw === '') return { empty: true, value: null, error: '' };
+            if (!/^-?\d*\.?\d+$/.test(raw) && !/^-?\d+\.$/.test(raw)) return { empty: false, value: null, error: 'Enter a number' };
+            const value = parseFloat(raw);
+            if (value < 0) return { empty: false, value, error: "Can't be negative" };
+            if (value > MAX[key]) return { empty: false, value, error: `Max ${fmt(MAX[key])} ${UNIT[key]}` };
+            return { empty: false, value, error: '' };
+        }
+
+        function evaluate() {
+            const fields = {};
+            NUMERIC.forEach((k) => { fields[k] = parseField(k); });
+            const allBlank = NUTRITION.every((k) => fields[k].empty);
+            const invalid = NUMERIC.filter((k) => fields[k].error);
+            return { fields, allBlank, invalid, valid: !allBlank && invalid.length === 0 };
+        }
+
+        function impliedKcal(f) {
+            const macros = ['carbs', 'fat', 'protein'].filter((k) => !f[k].empty && !f[k].error);
+            if (!macros.length) return null;
+            return macros.reduce((sum, k) => sum + f[k].value * KCAL_PER_G[k], 0);
+        }
+
+        /* ---------------- Render ---------------- */
+        function renderField(key, result) {
+            const show = (submitted || touched.has(key)) && result.error;
+            const field = document.querySelector(`[data-field="${key}"]`);
+            const support = $(`${key}-support`);
+            field.dataset.invalid = String(Boolean(show));
+            $(key).setAttribute('aria-invalid', String(Boolean(show)));
+            support.innerHTML = show
+                ? `<span class="sr-only">Error: </span>${result.error}`
+                : (key === 'serving' ? 'Used for history; values above are for the whole serving' : '');
+        }
+
+        function renderHint(ev) {
+            const hint = $('kcalHint');
+            const f = ev.fields;
+            const implied = impliedKcal(f);
+            if (implied === null) { hint.hidden = true; hint.innerHTML = ''; return; }
+            const kcal = f.kcal;
+            const imp = Math.round(implied);
+            let icon = 'calculate', body, action = '';
+            if (kcal.empty) {
+                body = `Macros add up to <strong>${fmt(imp)} kcal</strong> (4 kcal per g carbs and protein, 9 per g fat). Calories will be saved as ${fmt(imp)} kcal.`;
+            } else if (kcal.error) {
+                body = `Macros add up to <strong>${fmt(imp)} kcal</strong>.`;
+                action = `<button type="button" class="text-btn" data-use-kcal="${imp}">Use ${fmt(imp)} kcal</button>`;
+            } else {
+                const diff = kcal.value - implied;
+                const tolerance = Math.max(50, kcal.value * 0.15);
+                if (Math.abs(diff) <= tolerance) {
+                    icon = 'check_circle';
+                    body = `Matches your macros (about <strong>${fmt(imp)} kcal</strong>).`;
+                } else {
+                    icon = 'info';
+                    body = `Macros add up to <strong>${fmt(imp)} kcal</strong>, ${fmt(Math.abs(diff))} kcal ${diff > 0 ? 'less' : 'more'} than entered. That's fine if a value is unknown; otherwise check the numbers.`;
+                    action = `<button type="button" class="text-btn" data-use-kcal="${imp}">Use ${fmt(imp)} kcal</button>`;
+                }
+            }
+            hint.hidden = false;
+            hint.innerHTML = `<span class="material-symbols-rounded" aria-hidden="true">${icon}</span><span>${body}</span>${action}`;
+        }
+
+        function renderStatus(ev) {
+            const status = $('saveStatus');
+            const save = $('saveBtn');
+            let icon, text, tone;
+            if (saving) {
+                icon = 'hourglass_top'; tone = 'neutral'; text = 'Saving on this device…';
+            } else if (ev.invalid.length && (submitted || ev.invalid.some((k) => touched.has(k)))) {
+                const n = ev.invalid.length;
+                icon = 'error'; tone = 'error';
+                text = `Fix ${n} ${n === 1 ? 'field' : 'fields'} to save: ${ev.invalid.map((k) => LABEL[k]).join(', ')}`;
+            } else if (ev.allBlank) {
+                icon = submitted ? 'error' : 'edit'; tone = submitted ? 'error' : 'neutral';
+                text = 'Enter calories or at least one macro to save';
+            } else if (ev.invalid.length) {
+                icon = 'error'; tone = 'error'; text = 'Check the highlighted values';
+            } else {
+                const kcal = ev.fields.kcal.empty ? impliedKcal(ev.fields) : ev.fields.kcal.value;
+                icon = 'check_circle'; tone = 'ready';
+                text = `Ready to save <strong>${fmt(kcal)} kcal</strong> · ${mealType}, ${$('time').value || '11:17'}`;
+            }
+            status.dataset.tone = tone;
+            status.innerHTML = `<span class="material-symbols-rounded icon-filled" aria-hidden="true">${icon}</span><span>${text}</span>`;
+
+            save.setAttribute('aria-disabled', String(!ev.valid || saving));
+            save.setAttribute('aria-busy', String(saving));
+            $('saveLabel').textContent = saving ? 'Saving…' : 'Save';
+            $('saveIcon').outerHTML = saving
+                ? '<span class="spinner" aria-hidden="true" id="saveIcon"></span>'
+                : '<span class="material-symbols-rounded" aria-hidden="true" id="saveIcon">check</span>';
+        }
+
+        function renderType() {
+            $('mealType').value = mealType;
+            $('type-support').textContent = typeTouched ? '' : `Suggested for ${$('time').value || '11:17'}`;
+        }
+
+        function update() {
+            const ev = evaluate();
+            NUMERIC.forEach((k) => renderField(k, ev.fields[k]));
+            $('groupError').hidden = !(submitted && ev.allBlank);
+            renderHint(ev);
+            renderStatus(ev);
+            return ev;
+        }
+
+        function setReadOnly(on) {
+            document.querySelectorAll('#quickAddForm input').forEach((i) => { i.readOnly = on; });
+            $('mealType').disabled = on;
+            document.querySelectorAll('#quickAddForm button').forEach((b) => { b.disabled = on; });
+        }
+
+        /* ---------------- Events ---------------- */
+        NUMERIC.concat(['name']).forEach((key) => {
+            $(key).addEventListener('input', update);
+            $(key).addEventListener('blur', () => {
+                if (key !== 'name' && $(key).value.trim() !== '') touched.add(key);
+                update();
+            });
+        });
+
+        $('time').addEventListener('input', () => {
+            if (!typeTouched) mealType = suggestType($('time').value);
+            renderType();
+            update();
+        });
+
+        $('mealType').addEventListener('change', () => {
+            mealType = $('mealType').value;
+            typeTouched = true;
+            renderType();
+            update();
+        });
+
+        $('customFood').addEventListener('click', () => {
+            const on = $('customFood').getAttribute('aria-checked') !== 'true';
+            $('customFood').setAttribute('aria-checked', String(on));
+        });
+
+        $('kcalHint').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-use-kcal]');
+            if (!btn) return;
+            $('kcal').value = btn.dataset.useKcal;
+            touched.add('kcal');
+            update();
+            announce(`Calories set to ${fmt(Number(btn.dataset.useKcal))} kcal`);
+            $('kcal').focus();
+        });
+
+        $('quickAddForm').addEventListener('submit', (e) => {
+            e.preventDefault();
+            if (saving) return;
+            submitted = true;
+            const ev = update();
+            if (!ev.valid) {
+                if (ev.allBlank) {
+                    announce('Enter calories or at least one macro to save this meal.');
+                    $('kcal').focus();
+                } else {
+                    const first = ev.invalid[0];
+                    announce(`${ev.invalid.length} ${ev.invalid.length === 1 ? 'field needs' : 'fields need'} fixing. ${LABEL[first]}: ${ev.fields[first].error}.`);
+                    $(first).focus();
+                }
+                return;
+            }
+            // Local save first (never blocked by network/Health Connect), then S-10 prompt
+            saving = true;
+            setReadOnly(true);
+            update();
+            announce('Saving meal');
+            later(() => { announce('Meal saved on this device'); $('saveRoute').click(); }, 700);
+        });
+
+        /* ---------------- Prototype states ---------------- */
+        function render(next) {
+            state = Object.prototype.hasOwnProperty.call(PRESETS, next) ? next : 'default';
+            clearTimers();
+            const p = PRESETS[state];
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            ['name', 'time', 'kcal', 'carbs', 'fat', 'protein', 'serving'].forEach((k) => { $(k).value = p[k]; });
+            $('customFood').setAttribute('aria-checked', String(p.custom));
+            $('draftCard').hidden = !p.fromPhoto;
+            mealType = p.type || suggestType(p.time);
+            typeTouched = Boolean(p.type);
+            submitted = Boolean(p.showErrors);
+            saving = Boolean(p.saving);
+            touched.clear();
+            setReadOnly(saving);
+            renderType();
+            update();
+            $('content').scrollTop = 0;
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(location.search).get('state') || 'default');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

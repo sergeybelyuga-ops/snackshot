@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-01 | Welcome - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens (light/dark color roles, chart colors, typography) -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-01 Welcome / app access — implements UX spec §4.2:
+         * Scaffold -> theme surface -> Column -> abstract brand mark -> heading
+         * -> privacy summary text -> FilledButton Continue -> TextButton Privacy details.
+         * No Google sign-in or Health Connect step here: local logging never waits for them.
+         * Color tokens come from prototype-theme.css; this file only adds layout.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label {
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+            margin-right: 4px;
+        }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Pixel 9 Pro device frame: 412x892 ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px;
+            height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Scaffold ---------- */
+        /* Scrolls only when very large text no longer fits; actions stay reachable. */
+        .scaffold {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            padding: 24px 24px 40px;
+            scrollbar-width: none;
+        }
+        .scaffold::-webkit-scrollbar { display: none; }
+
+        .content-column {
+            flex: 1 0 auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            gap: 24px;
+            padding-bottom: 24px;
+        }
+
+        /* Abstract brand mark (decorative; the heading names the app) */
+        .brand-icon {
+            width: 88px;
+            height: 88px;
+            flex-shrink: 0;
+            background-color: var(--primary);
+            border-radius: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .brand-icon svg {
+            width: 48px;
+            height: 48px;
+            fill: var(--on-primary);
+        }
+
+        /* HeadlineSmall in the spec maps to HeadlineLarge (32/40) per §3.3 */
+        .welcome-title {
+            font-family: var(--font-display);
+            font-size: 32px;
+            line-height: 40px;
+            font-weight: 400;
+            letter-spacing: 0;
+            color: var(--on-surface);
+            overflow-wrap: anywhere;
+        }
+        .welcome-copy {
+            max-width: 34ch;
+            color: var(--on-surface-variant);
+            overflow-wrap: anywhere;
+        }
+
+        /* ---------- State surfaces (loading / error) ---------- */
+        .state-surface {
+            width: 100%;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 16px;
+            border-radius: 12px;
+            text-align: left;
+            background: var(--surface-container-high);
+        }
+        .state-surface .material-symbols-rounded { font-size: 24px; flex-shrink: 0; }
+        .state-surface:focus { outline: none; }
+        .state-surface-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+        .state-title {
+            font: 500 16px/24px var(--font-text);
+            letter-spacing: 0.15px;
+            color: var(--on-surface);
+        }
+        .state-text {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+
+        .error-surface {
+            background: color-mix(in srgb, var(--error) 10%, var(--surface));
+            border: 1px solid var(--error);
+        }
+        .error-surface .material-symbols-rounded { color: var(--error); }
+
+        .loading-surface { flex-direction: column; gap: 12px; }
+        .loading-row { display: flex; gap: 12px; align-items: flex-start; }
+        .loading-row .material-symbols-rounded { color: var(--primary); }
+
+        /* M3 indeterminate LinearProgressIndicator */
+        .linear-progress {
+            position: relative;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            overflow: hidden;
+            background: color-mix(in srgb, var(--primary) 22%, transparent);
+        }
+        .linear-progress::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            width: 40%;
+            border-radius: 2px;
+            background: var(--primary);
+            animation: indeterminate 1.4s cubic-bezier(.4, 0, .2, 1) infinite;
+        }
+        @keyframes indeterminate {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(260%); }
+        }
+
+        /* ---------- Actions ---------- */
+        .action-column {
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .btn {
+            min-height: 48px;
+            padding: 12px 24px;
+            border-radius: 24px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            text-align: center;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            transition: background-color 150ms ease, opacity 150ms ease;
+        }
+        .btn .material-symbols-rounded { font-size: 18px; }
+
+        .btn-filled {
+            background-color: var(--primary);
+            color: var(--on-primary);
+        }
+        .btn-filled:hover:not(:disabled) { background-color: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        .btn-filled:active:not(:disabled) { background-color: color-mix(in srgb, var(--on-primary) 12%, var(--primary)); }
+        /* M3 disabled: on-surface at 12% container / 38% content */
+        .btn-filled:disabled {
+            background-color: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 38%, transparent);
+        }
+
+        .btn-text { color: var(--primary); }
+        .btn-text:hover { background-color: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .btn-text:active { background-color: color-mix(in srgb, var(--primary) 12%, transparent); }
+
+        /* ---------- System navigation pill ---------- */
+        .nav-bar {
+            height: 24px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 8px;
+        }
+        .nav-pill {
+            width: 108px;
+            height: 4px;
+            background-color: var(--on-surface);
+            border-radius: 2px;
+            opacity: 0.8;
+        }
+
+        /* ---------- Prototype-only: simulate ~200% system font scale ---------- */
+        .device-frame.large-text .welcome-title { font-size: 56px; line-height: 64px; }
+        .device-frame.large-text .welcome-copy { font-size: 28px; line-height: 40px; max-width: none; }
+        .device-frame.large-text .btn { font-size: 26px; line-height: 34px; min-height: 64px; border-radius: 32px; }
+        .device-frame.large-text .content-column { gap: 20px; }
+        .device-frame.large-text .brand-icon { width: 72px; height: 72px; border-radius: 24px; }
+        .device-frame.large-text .brand-icon svg { width: 40px; height: 40px; }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            /* Static partial bar instead of a sweeping one */
+            .linear-progress::before { animation: none; width: 60%; transform: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-01 states required by spec §4.1 / §4.2.
+         Empty is not applicable (spec §4.2): the first-run state is the default. -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="error">Error</button>
+        <button type="button" data-state-choice="large-text">Large text</button>
+    </div>
+
+    <!-- Pixel 9 UI Board -->
+    <div class="device-frame" id="frame">
+        <!-- Status Bar -->
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <!-- S-01 Scaffold -->
+        <main class="scaffold" id="scaffold">
+            <div class="content-column">
+                <!-- Abstract brand mark: minimalist fruit -->
+                <div class="brand-icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" focusable="false">
+                        <path d="M12 3c-4.97 0-9 4.03-9 9 0 4.5 3.32 8.22 7.65 8.87-.1-.31-.15-.65-.15-1.01 0-2.48 2.02-4.5 4.5-4.5 1.05 0 2.01.37 2.77 1 .28-.78.43-1.62.43-2.48 0-4.97-4.03-9-9-9zm0 2c3.87 0 7 3.13 7 7 0 .61-.08 1.2-.22 1.76-.84-.46-1.83-.76-2.88-.76-3.04 0-5.5 2.46-5.5 5.5 0 .53.07 1.05.21 1.54C6.89 19.34 5 15.91 5 12c0-3.87 3.13-7 7-7zm-4.5 9.5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3z"/>
+                    </svg>
+                </div>
+
+                <h1 class="welcome-title">Welcome to Snackshot</h1>
+
+                <!-- Required copy, spec §4.2 -->
+                <p class="welcome-copy body-large">
+                    Your AI recognition and privacy-first nutrition tracker. No registration needed. We do not store your personal health data on external servers. Your first 90 AI pictures are free.
+                </p>
+
+                <!-- Loading: restoring an unfinished meal draft and access state from local storage -->
+                <div class="state-surface loading-surface" id="loadingSurface" tabindex="-1" hidden>
+                    <div class="loading-row">
+                        <span class="material-symbols-rounded" aria-hidden="true">restore</span>
+                        <div class="state-surface-body">
+                            <p class="state-title">Getting things ready</p>
+                            <p class="state-text">Restoring your settings and any unfinished meal on this device.</p>
+                        </div>
+                    </div>
+                    <div class="linear-progress" role="progressbar" aria-label="Restoring app data"></div>
+                </div>
+
+                <!-- Error: local initialization failed -->
+                <div class="state-surface error-surface" id="errorSurface" role="alert" hidden>
+                    <span class="material-symbols-rounded icon-filled" aria-hidden="true">error</span>
+                    <div class="state-surface-body">
+                        <p class="state-title">Couldn't open local storage</p>
+                        <p class="state-text">Snackshot couldn't start its on-device database. Nothing was deleted or sent anywhere. Try again, or restart the app.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action area: primary first, alternatives after (focus order §5.1) -->
+            <div class="action-column">
+                <button type="button" class="btn btn-filled" id="continueBtn" data-route="home">Continue</button>
+                <button type="button" class="btn btn-filled" id="retryBtn" hidden>
+                    <span class="material-symbols-rounded" aria-hidden="true">refresh</span>
+                    Try again
+                </button>
+                <button type="button" class="btn btn-text" data-route="privacy">Privacy details</button>
+            </div>
+        </main>
+
+        <!-- System Navigation Bar -->
+        <div class="nav-bar" aria-hidden="true">
+            <div class="nav-pill"></div>
+        </div>
+
+        <!-- Screen-reader announcements -->
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        const $ = (id) => document.getElementById(id);
+        const frame = $('frame');
+        const announcer = $('announcer');
+
+        function announce(msg) {
+            announcer.textContent = '';
+            window.setTimeout(() => { announcer.textContent = msg; }, 50);
+        }
+
+        let state = 'default';
+        let timers = [];
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+        function later(fn, ms) { timers.push(window.setTimeout(fn, ms)); }
+
+        /* ---------------- States ---------------- */
+        // opts.retrying: loading was started by "Try again" and resolves to default.
+        function render(next, opts) {
+            opts = opts || {};
+            state = next;
+            clearTimers();
+
+            const isLoading = state === 'loading';
+            const isError = state === 'error';
+
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            frame.classList.toggle('large-text', state === 'large-text');
+            $('loadingSurface').hidden = !isLoading;
+            $('errorSurface').hidden = !isError;
+            $('scaffold').setAttribute('aria-busy', String(isLoading));
+
+            // Loading disables duplicate entry but keeps the copy and Privacy details available.
+            // Error swaps Continue for Retry: Home can't open until local storage is ready.
+            $('continueBtn').hidden = isError;
+            $('continueBtn').disabled = isLoading;
+            $('retryBtn').hidden = !isError;
+
+            switch (state) {
+                case 'loading':
+                    announce('Restoring your settings and unfinished meal');
+                    if (opts.retrying) {
+                        later(() => {
+                            render('default');
+                            announce('Ready. Continue opens Home.');
+                            $('continueBtn').focus();
+                        }, 1600);
+                    }
+                    break;
+                case 'error':
+                    // role="alert" on the surface announces the failure.
+                    break;
+                case 'large-text':
+                    break;
+                default:
+                    state = 'default';
+            }
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state');
+            else url.searchParams.set('state', state);
+            try { window.history.replaceState(null, '', url); } catch (e) { /* file:// in some browsers */ }
+        }
+
+        $('retryBtn').addEventListener('click', () => {
+            render('loading', { retrying: true });
+            // Retry is hidden and Continue disabled while loading: move focus to the progress surface.
+            $('loadingSurface').focus();
+        });
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(window.location.search).get('state') || 'default');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

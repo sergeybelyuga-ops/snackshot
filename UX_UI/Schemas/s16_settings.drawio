@@ -1,0 +1,40 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Settings" id="s16">
+    <mxGraphModel dx="2077" dy="1657" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="2856" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="phone" parent="1" style="rounded=1;arcSize=6;strokeWidth=18;fillColor=#ffffff;" value="" vertex="1">
+          <mxGeometry height="2820" width="1260" x="11" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="camera" parent="1" style="ellipse;fillColor=#000000;strokeColor=none;" value="" vertex="1">
+          <mxGeometry height="60" width="60" x="610" y="61" as="geometry" />
+        </mxCell>
+        <mxCell id="time" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;" value="&lt;font face=&quot;Roboto&quot; style=&quot;font-size:36px&quot;&gt;11:17&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="240" y="11" as="geometry" />
+        </mxCell>
+        <mxCell id="title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;" value="&lt;font face=&quot;Google Sans Flex&quot; style=&quot;font-size:72px&quot;&gt;Settings&lt;/font&gt;" vertex="1">
+          <mxGeometry height="100" width="1100" x="75" y="420" as="geometry" />
+        </mxCell>
+        <mxCell id="a" parent="1" style="rounded=1;arcSize=14;fillColor=none;strokeColor=none;fontFamily=Roboto;fontSize=48;align=left;spacingLeft=45;verticalAlign=middle;" value="Google Health connection" vertex="1">
+          <mxGeometry height="150" width="1180" x="50" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="b" parent="1" style="rounded=1;arcSize=14;fillColor=none;strokeColor=none;fontFamily=Roboto;fontSize=48;align=left;spacingLeft=45;verticalAlign=middle;" value="Image retention policy" vertex="1">
+          <mxGeometry height="150" width="1180" x="50" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="c" parent="1" style="rounded=1;arcSize=14;fillColor=none;strokeColor=none;fontFamily=Roboto;fontSize=48;align=left;spacingLeft=45;verticalAlign=middle;" value="Nutrition preferences" vertex="1">
+          <mxGeometry height="150" width="1180" x="50" y="1050" as="geometry" />
+        </mxCell>
+        <mxCell id="d" parent="1" style="rounded=1;arcSize=14;fillColor=none;strokeColor=none;fontFamily=Roboto;fontSize=48;align=left;spacingLeft=45;verticalAlign=middle;" value="Theme" vertex="1">
+          <mxGeometry height="150" width="1180" x="50" y="1250" as="geometry" />
+        </mxCell>
+        <mxCell id="e" parent="1" style="rounded=1;arcSize=14;fillColor=none;strokeColor=none;fontFamily=Roboto;fontSize=48;align=left;spacingLeft=45;verticalAlign=middle;" value="Privacy details" vertex="1">
+          <mxGeometry height="155" width="1180" x="50" y="1450" as="geometry" />
+        </mxCell>
+        <mxCell id="XoCoj9RSRZWHVr2wRw-r-1" parent="1" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/assets/material-symbols/1/Arrow_Back.svg" value="" vertex="1">
+          <mxGeometry height="96" width="96" x="75" y="220" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

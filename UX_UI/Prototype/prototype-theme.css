@@ -1,0 +1,350 @@
+:root {
+    color-scheme: light;
+    --font-display: "Google Sans", "Google Sans Flex", sans-serif;
+    --font-text: "Google Sans Text", Roboto, sans-serif;
+    --font-family: var(--font-text);
+
+    --md-sys-color-primary-light: #075985;
+    --md-sys-color-on-primary-light: #FFFFFF;
+    --md-sys-color-primary-container-light: #C9E9FA;
+    --md-sys-color-on-primary-container-light: #202124;
+    --md-sys-color-secondary-light: #5D6165;
+    --md-sys-color-surface-light: #F8F9FA;
+    --md-sys-color-surface-container-light: #FFFFFF;
+    --md-sys-color-surface-container-high-light: #F1F3F4;
+    --md-sys-color-on-surface-light: #202124;
+    --md-sys-color-on-surface-variant-light: #5F6368;
+    --md-sys-color-tertiary-light: #356B45;
+    --md-sys-color-error-light: #B3261E;
+    --md-sys-color-outline-light: #74777A;
+    --md-sys-color-outline-variant-light: #C4C7C5;
+
+    --primary: var(--md-sys-color-primary-light);
+    --on-primary: var(--md-sys-color-on-primary-light);
+    --primary-container: var(--md-sys-color-primary-container-light);
+    --surface: var(--md-sys-color-surface-light);
+    --surface-container: var(--md-sys-color-surface-container-light);
+    --surface-container-high: var(--md-sys-color-surface-container-high-light);
+    --on-surface: var(--md-sys-color-on-surface-light);
+    --on-surface-variant: var(--md-sys-color-on-surface-variant-light);
+    --tertiary: var(--md-sys-color-tertiary-light);
+    --outline: var(--md-sys-color-outline-light);
+    --outline-variant: var(--md-sys-color-outline-variant-light);
+    --secondary: var(--md-sys-color-secondary-light);
+    --error: var(--md-sys-color-error-light);
+    --chart-intake: #32C5F0;
+    --chart-in-range: #6FD77C;
+    --chart-above-range: #FF9A68;
+    --chart-below-range: #8CB5FF;
+    --chart-warning: #FFC15A;
+    --prototype-canvas: #E8EAED;
+    --prototype-frame: #202124;
+
+    /* Google Health macro-split colors (dark values match GoogleHealth (5)/(6) references;
+       light values are deeper tones of the same hues for 3:1 graphic contrast). */
+    --macro-carbs: #2D9CDB;
+    --macro-fat: #E5675C;
+    --macro-protein: #C77700; /* ≈3.3:1 on light surfaces (was #E8941A ≈2.4:1) */
+    --macro-track: #E3E5E8;
+
+    /* Range status badges: always paired with a text label, never color alone. */
+    --status-below-bg: #FFF0C7;
+    --status-below-fg: #6B4E00;
+    --status-in-bg: #D6F5DA;
+    --status-in-fg: #1E5B2A;
+    --status-above-bg: #FFE1D2;
+    --status-above-fg: #8A3A10;
+    --status-under-target-bg: #D3EEF8;
+    --status-under-target-fg: #0B4F63;
+
+    --error-container: #F9DEDC;
+    --on-error-container: #410E0B;
+}
+
+:root[data-theme="dark"] {
+    color-scheme: dark;
+    --md-sys-color-primary-dark: #79C8F5;
+    --md-sys-color-on-primary-dark: #073B58;
+    --md-sys-color-primary-container-dark: #075985;
+    --md-sys-color-on-primary-container-dark: #FFFFFF;
+    --md-sys-color-secondary-dark: #C8C9CB;
+    --md-sys-color-surface-dark: #121314;
+    --md-sys-color-surface-container-dark: #1E2022;
+    --md-sys-color-surface-container-high-dark: #292B2E;
+    --md-sys-color-on-surface-dark: #F1F3F4;
+    --md-sys-color-on-surface-variant-dark: #C5C7C9;
+    --md-sys-color-tertiary-dark: #79D889;
+    --md-sys-color-error-dark: #FFB4AB;
+    --md-sys-color-outline-dark: #8E918F;
+    --md-sys-color-outline-variant-dark: #444746;
+
+    --primary: var(--md-sys-color-primary-dark);
+    --on-primary: var(--md-sys-color-on-primary-dark);
+    --primary-container: var(--md-sys-color-primary-container-dark);
+    --surface: var(--md-sys-color-surface-dark);
+    --surface-container: var(--md-sys-color-surface-container-dark);
+    --surface-container-high: var(--md-sys-color-surface-container-high-dark);
+    --on-surface: var(--md-sys-color-on-surface-dark);
+    --on-surface-variant: var(--md-sys-color-on-surface-variant-dark);
+    --tertiary: var(--md-sys-color-tertiary-dark);
+    --outline: var(--md-sys-color-outline-dark);
+    --outline-variant: var(--md-sys-color-outline-variant-dark);
+    --secondary: var(--md-sys-color-secondary-dark);
+    --error: var(--md-sys-color-error-dark);
+    --prototype-canvas: #202124;
+    --prototype-frame: #090A0B;
+
+    --macro-carbs: #8FD3FF;
+    --macro-fat: #FF8A85;
+    --macro-protein: #FFBA66;
+    --macro-track: #2A2C2F;
+
+    --status-below-bg: #5A4300;
+    --status-below-fg: #FFD27A;
+    --status-in-bg: #1E4A27;
+    --status-in-fg: #8EE29A;
+    --status-above-bg: #5A2A12;
+    --status-above-fg: #FFB38A;
+    --status-under-target-bg: #0B4A5C;
+    --status-under-target-fg: #8FDDF5;
+
+    --error-container: #8C1D18;
+    --on-error-container: #F9DEDC;
+}
+
+body {
+    background-color: var(--prototype-canvas);
+    color: var(--on-surface);
+    font-family: var(--font-text);
+    transition: background-color 180ms ease, color 180ms ease;
+}
+
+button,
+input,
+select,
+textarea {
+    font-family: var(--font-text);
+}
+
+button:not(:disabled),
+a[href],
+[onclick],
+[data-route],
+[data-confirm-route],
+[role="button"],
+.switch,
+.switch .slider {
+    cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+    cursor: not-allowed;
+}
+
+h1,
+h2,
+.brand-title,
+.headline-large,
+.headline-medium,
+.headline-small,
+.display-large,
+.display-small,
+.title-large {
+    font-family: var(--font-display);
+}
+
+.display-large {
+    font-size: 57px;
+    font-weight: 700;
+    line-height: 64px;
+    letter-spacing: -0.25px;
+}
+
+.display-small {
+    font-size: 36px;
+    font-weight: 500;
+    line-height: 44px;
+    letter-spacing: 0;
+}
+
+.headline-large,
+.headline-small {
+    font-size: 32px;
+    font-weight: 500;
+    line-height: 40px;
+    letter-spacing: 0;
+}
+
+.date-section-header {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 28px;
+    letter-spacing: 0;
+}
+
+.headline-medium,
+.title-large {
+    font-size: 22px;
+    font-weight: 500;
+    line-height: 28px;
+    letter-spacing: 0;
+}
+
+.title-medium {
+    font-family: var(--font-text);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+    letter-spacing: 0.15px;
+}
+
+.body-large {
+    font-family: var(--font-text);
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 24px;
+    letter-spacing: 0.5px;
+}
+
+.body-medium {
+    font-family: var(--font-text);
+    font-size: 14px;
+    font-weight: 400;
+    line-height: 20px;
+    letter-spacing: 0.25px;
+}
+
+.label-large,
+button {
+    font-family: var(--font-text);
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 20px;
+    letter-spacing: 0.1px;
+}
+
+.label-small {
+    font-family: var(--font-text);
+    font-size: 11px;
+    font-weight: 400;
+    line-height: 16px;
+    letter-spacing: 0.5px;
+}
+
+.device-frame {
+    background-color: var(--surface) !important;
+    color: var(--on-surface);
+    border-color: var(--prototype-frame) !important;
+    transition: background-color 180ms ease, color 180ms ease;
+}
+
+.theme-switcher {
+    flex: 0 0 38px;
+    width: min(412px, calc(100vw - 32px));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px 12px;
+    background-color: var(--surface-container);
+    border-bottom: 1px solid var(--outline-variant);
+}
+
+.theme-switcher[role="group"]::before {
+    content: "Theme";
+    margin-right: 10px;
+    color: var(--on-surface-variant);
+    font: 500 12px/16px var(--font-text, Roboto, sans-serif);
+}
+
+.theme-switcher button {
+    min-width: 72px;
+    height: 30px;
+    padding: 0 12px;
+    border: 1px solid var(--outline-variant);
+    background: transparent;
+    color: var(--on-surface-variant);
+    font: 500 12px/16px var(--font-text, Roboto, sans-serif);
+    cursor: pointer;
+}
+
+.theme-switcher button:first-of-type {
+    border-radius: 8px 0 0 8px;
+}
+
+.theme-switcher button:last-of-type {
+    margin-left: -1px;
+    border-radius: 0 8px 8px 0;
+}
+
+.theme-switcher button[aria-pressed="true"] {
+    position: relative;
+    border-color: var(--primary);
+    background-color: var(--primary-container);
+    color: var(--on-surface);
+}
+
+.theme-switcher button:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    z-index: 1;
+}
+
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .status-bar,
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .icon-btn,
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .photo-tips-chip:not([aria-expanded="true"]),
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .gallery-thumb {
+    color: var(--on-surface);
+}
+
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .photo-tips-chip,
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .shutter-outer {
+    border-color: var(--primary);
+}
+
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .photo-tips-chip {
+    border-color: var(--outline);
+}
+
+body[data-prototype-screen="camera"] .shutter-outer {
+    border-color: var(--primary);
+}
+
+body[data-prototype-screen="camera"] .shutter-inner {
+    background-color: var(--primary);
+}
+
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .viewfinder-card {
+    border-color: rgb(32 33 36 / 40%);
+    background: transparent;
+}
+
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .viewfinder-graphic .sun-circle {
+    border-color: var(--on-surface);
+}
+
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .gallery-thumb {
+    border-color: var(--outline-variant);
+    background-color: var(--surface-container-high);
+}
+
+:root:not([data-theme="dark"]) body[data-prototype-screen="camera"] .nav-pill {
+    background-color: var(--on-surface);
+}
+/* Meal-row macro line: colored dots replace "·" separators (S-02, S-08, S-12, S-14).
+   Markup: <span class="macro-dots"><span><i data-m="carbs"></i>Carbs 14</span>
+           <span><i data-m="fat"></i>Fat 26</span><span><i data-m="protein"></i>Protein 38 g</span></span> */
+.macro-dots {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    column-gap: 10px;
+    row-gap: 2px;
+    font-variant-numeric: tabular-nums;
+}
+.macro-dots > span { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.macro-dots i { font-style: normal; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; }
+.macro-dots i[data-m="carbs"]   { background: var(--macro-carbs); }
+.macro-dots i[data-m="fat"]     { background: var(--macro-fat); }
+.macro-dots i[data-m="protein"] { background: var(--macro-protein); }

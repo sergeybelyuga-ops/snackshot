@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-11 | Health Connect Authorization - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-11 Health Connect authorization return — UX spec §4.9, §2.3 "Sync and recovery", F-19, F-20.
+         * Scaffold -> TopAppBar -> result header (icon + headline + explanation)
+         * -> permission rows (Nutrition write / read) -> first-sync card with LinearProgressIndicator
+         * -> local-first reassurance -> bottom actions (primary / alternative / system settings).
+         * The result is always stated with icon + text; color is only a secondary cue.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: default; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar h1 {
+            flex: 1;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 16px 24px;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+        .scaffold-content > * { flex-shrink: 0; }
+
+        /* ---------- Result header ---------- */
+        .result {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+            padding: 8px 8px 0;
+        }
+        .result-icon {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            margin-bottom: 4px;
+        }
+        .result-icon .material-symbols-rounded { font-size: 40px; font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 40; }
+        .result[data-tone="neutral"] .result-icon .material-symbols-rounded { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 40; }
+        .result[data-tone="positive"] .result-icon { background: var(--status-in-bg); color: var(--status-in-fg); }
+        .result[data-tone="caution"]  .result-icon { background: var(--status-below-bg); color: var(--status-below-fg); }
+        .result-title {
+            font-family: var(--font-display);
+            font-size: 32px;
+            line-height: 40px;
+            font-weight: 400;
+        }
+        .result-text {
+            font: 400 16px/24px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            max-width: 340px;
+        }
+
+        /* Indeterminate / determinate LinearProgressIndicator */
+        .linear-progress {
+            position: relative;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--primary-container);
+            overflow: hidden;
+        }
+        :root[data-theme="dark"] .linear-progress { background: var(--surface-container-high); }
+        .linear-progress-bar {
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 0;
+            border-radius: 2px;
+            background: var(--primary);
+            transition: width 600ms cubic-bezier(.2,0,0,1);
+        }
+        .linear-progress[data-indeterminate="true"] .linear-progress-bar {
+            width: 40%;
+            animation: indeterminate 1.4s cubic-bezier(.4,0,.2,1) infinite;
+        }
+        @keyframes indeterminate {
+            0%   { left: -40%; }
+            100% { left: 100%; }
+        }
+        .result .linear-progress { width: 100%; max-width: 280px; margin-top: 8px; }
+
+        /* ---------- Section ---------- */
+        .section-title {
+            margin: 28px 4px 12px;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 500;
+        }
+        .group {
+            background: var(--surface-container);
+            border-radius: 24px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        :root:not([data-theme="dark"]) .group { border: 1px solid var(--outline-variant); }
+
+        /* Permission / step rows (ListItem) */
+        .row {
+            min-height: 72px;
+            padding: 12px 16px 12px 16px;
+            display: grid;
+            grid-template-columns: 40px 1fr auto;
+            gap: 12px;
+            align-items: center;
+        }
+        .row + .row { border-top: 1px solid var(--outline-variant); }
+        :root[data-theme="dark"] .row + .row { border-top-color: var(--surface-container-high); }
+        .row-icon {
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .row-icon .material-symbols-rounded { font-size: 22px; }
+        .row-text { display: flex; flex-direction: column; min-width: 0; }
+        .row-title { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .row-sub { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+        .row-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+            color: var(--on-surface-variant);
+        }
+        .row-status .material-symbols-rounded { font-size: 20px; }
+        .row-status[data-status="allowed"] { color: var(--tertiary); }
+        .row-status[data-status="allowed"] .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 20; }
+
+        /* First-sync card */
+        .sync-card { padding: 16px 16px 8px; display: flex; flex-direction: column; gap: 4px; }
+        .sync-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+        .sync-head-title { font: 500 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .sync-head-status { font: 400 14px/20px var(--font-text); color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+        .sync-card .linear-progress { margin: 8px 0 4px; }
+        .step {
+            display: grid;
+            grid-template-columns: 24px 1fr;
+            gap: 12px;
+            padding: 10px 0;
+            align-items: start;
+        }
+        .step-icon { color: var(--on-surface-variant); padding-top: 2px; }
+        .step-icon .material-symbols-rounded { font-size: 22px; }
+        .step[data-step="done"] .step-icon { color: var(--tertiary); }
+        .step[data-step="done"] .step-icon .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .step[data-step="active"] .step-icon { color: var(--primary); }
+        .step[data-step="active"] .step-icon .material-symbols-rounded { animation: spin 1.2s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* Local-first reassurance */
+        .local-note {
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 16px;
+            background: var(--surface-container-high);
+            display: grid;
+            grid-template-columns: 24px 1fr;
+            gap: 12px;
+            align-items: start;
+        }
+        .local-note .material-symbols-rounded { color: var(--on-surface-variant); font-size: 22px; padding-top: 1px; }
+        .local-note p { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface); }
+        .hint { margin: 12px 4px 0; font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+
+        /* ---------- Bottom actions ---------- */
+        .actions {
+            flex-shrink: 0;
+            padding: 12px 16px 28px;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            gap: 8px;
+            background: var(--surface);
+        }
+        .btn {
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .btn .material-symbols-rounded { font-size: 18px; }
+        .btn-filled { min-height: 56px; border-radius: 28px; font-size: 16px; background: var(--primary); color: var(--on-primary); }
+        .btn-filled:hover:not(:disabled) { background: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        .btn-outlined { border: 1px solid var(--outline); color: var(--primary); }
+        .btn-outlined:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .btn-text { color: var(--primary); }
+        .btn-text:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .btn:disabled {
+            background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 38%, transparent);
+            border-color: transparent;
+        }
+
+        /* ---------- Snackbar (S-18) ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px; right: 16px; bottom: 32px;
+            min-height: 48px;
+            padding: 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+        }
+        .snackbar.show { transform: none; opacity: 1; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            .linear-progress[data-indeterminate="true"] .linear-progress-bar { left: 0; width: 100%; opacity: .5; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: authorization results returned by the system permission flow (spec §4.9) -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="granted">Granted</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="declined">Declined</button>
+        <button type="button" data-state-choice="partial">Partial</button>
+        <button type="button" data-state-choice="unavailable">Unavailable</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <header class="top-app-bar">
+            <button type="button" class="icon-btn" aria-label="Back to Settings" data-route="settings">
+                <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            </button>
+            <h1>Health Connect</h1>
+        </header>
+
+        <!-- Rendered per authorization result -->
+        <main class="scaffold-content" id="content"></main>
+
+        <div class="actions" id="actions"></div>
+
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite"></div>
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data (consistent with S-02 Home / S-12 Dashboard) ---------------- */
+        const GOALS = { kcal: 2300, carbs: 220, fat: 70, protein: 150 };
+        const TODAY_MEALS = [
+            { type: 'Breakfast', name: 'Oatmeal & berries', time: '07:12', g: 280, kcal: 320 },
+            { type: 'Lunch', name: 'Grilled chicken salad', time: '11:02', g: 350, kcal: 450 }
+        ];
+        const STATES = ['granted', 'loading', 'declined', 'partial', 'unavailable'];
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+        const mealsKcal = TODAY_MEALS.reduce((s, m) => s + m.kcal, 0);
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        let timers = [];
+        function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+        const icon = (name, extra) => `<span class="material-symbols-rounded${extra ? ' ' + extra : ''}" aria-hidden="true">${name}</span>`;
+
+        /* ---------------- State ---------------- */
+        let state = 'granted';
+        // First-sync progress: 0 = starting, 1 = goals imported, 2 = meals written (done)
+        let syncStep = 0;
+
+        /* ---------------- Render: pieces ---------------- */
+        function resultHtml(o) {
+            return `<section class="result" data-tone="${o.tone}" aria-labelledby="resultTitle">
+                <span class="result-icon" aria-hidden="true">${icon(o.icon)}</span>
+                <h2 class="result-title" id="resultTitle">${o.title}</h2>
+                <p class="result-text">${o.text}</p>
+                ${o.progress ? `<div class="linear-progress" data-indeterminate="true" role="progressbar" aria-label="${o.progress}"><span class="linear-progress-bar"></span></div>` : ''}
+            </section>`;
+        }
+
+        const PERM_STATUS = {
+            allowed: { icon: 'check_circle', text: 'Allowed' },
+            denied: { icon: 'block', text: 'Not allowed' },
+            checking: { icon: 'pending', text: 'Checking' }
+        };
+        function permRow(iconName, title, sub, status) {
+            const s = PERM_STATUS[status];
+            return `<div class="row" role="listitem" aria-label="${title}, ${sub}: ${s.text}">
+                <span class="row-icon" aria-hidden="true">${icon(iconName)}</span>
+                <span class="row-text" aria-hidden="true">
+                    <span class="row-title">${title}</span>
+                    <span class="row-sub">${sub}</span>
+                </span>
+                <span class="row-status" data-status="${status}" aria-hidden="true">${icon(s.icon)}${s.text}</span>
+            </div>`;
+        }
+        function permissionsHtml(write, read) {
+            return `<h3 class="section-title">Permissions</h3>
+                <div class="group" role="list" aria-label="Health Connect permissions">
+                    ${permRow('upload', 'Save meals', 'Calories and macros', write)}
+                    ${permRow('download', 'Read goals', 'Calorie and macro goals', read)}
+                </div>`;
+        }
+
+        function stepHtml(status, title, sub) {
+            const ic = { done: 'check_circle', active: 'progress_activity', waiting: 'radio_button_unchecked', skipped: 'block' }[status];
+            return `<div class="step" data-step="${status}">
+                <span class="step-icon">${icon(ic)}</span>
+                <span class="row-text">
+                    <span class="row-title">${title}</span>
+                    <span class="row-sub">${sub}</span>
+                </span>
+            </div>`;
+        }
+
+        // First sync: import goals (if read allowed), then write today's meals.
+        function syncCardHtml(readAllowed) {
+            const goalsSub = `${fmt(GOALS.kcal)} kcal · Carbs ${GOALS.carbs} g · Fat ${GOALS.fat} g · Protein ${GOALS.protein} g`;
+            const mealsSub = `${TODAY_MEALS.length} meals · ${fmt(mealsKcal)} kcal`;
+            const done = syncStep >= 2;
+            const pct = readAllowed ? [8, 50, 100][syncStep] : [8, 8, 100][syncStep];
+            const goalStep = !readAllowed
+                ? stepHtml('skipped', 'Goals not imported', `Reading isn't allowed. Your goals on this phone stay: ${fmt(GOALS.kcal)} kcal`)
+                : syncStep >= 1 ? stepHtml('done', 'Goals imported', goalsSub)
+                : stepHtml('active', 'Importing goals…', 'Calorie and macro goals');
+            const mealStep = done ? stepHtml('done', "Today's meals written", mealsSub)
+                : (syncStep >= 1 || !readAllowed) ? stepHtml('active', "Writing today's meals…", mealsSub)
+                : stepHtml('waiting', "Write today's meals", mealsSub);
+            return `<h3 class="section-title">First sync</h3>
+                <div class="group">
+                    <div class="sync-card">
+                        <div class="sync-head">
+                            <span class="sync-head-title">${done ? 'Done' : 'Syncing with Health Connect'}</span>
+                            <span class="sync-head-status">${done ? 'Today, 11:17' : pct + '%'}</span>
+                        </div>
+                        <div class="linear-progress" role="progressbar" aria-label="First sync" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${pct}">
+                            <span class="linear-progress-bar" style="width:${pct}%"></span>
+                        </div>
+                        ${goalStep}
+                        ${mealStep}
+                    </div>
+                </div>`;
+        }
+
+        function localNoteHtml(text) {
+            return `<div class="local-note">${icon('smartphone')}<p>${text}</p></div>`;
+        }
+
+        const btn = (kind, label, attrs, ic) =>
+            `<button type="button" class="btn btn-${kind}" ${attrs || ''}>${ic ? icon(ic) : ''}${label}</button>`;
+
+        /* ---------------- Render: per state ---------------- */
+        const VIEWS = {
+            loading() {
+                return {
+                    content: resultHtml({ tone: 'neutral', icon: 'health_and_safety', title: 'Checking access…',
+                            text: 'Snackshot is checking Health Connect and the permissions you chose.', progress: 'Checking Health Connect permissions' }) +
+                        permissionsHtml('checking', 'checking') +
+                        localNoteHtml('Your meal is already saved on this phone. Checking Health Connect never changes it.'),
+                    actions: btn('filled', 'Continue', 'disabled aria-disabled="true"') +
+                        btn('text', 'Continue on device only', 'data-route="homeSavedLocal"')
+                };
+            },
+            granted() {
+                const done = syncStep >= 2;
+                return {
+                    content: resultHtml({ tone: 'positive', icon: 'check', title: 'Connected',
+                            text: 'New meals will be saved to Health Connect automatically, and your goals will stay up to date.' }) +
+                        permissionsHtml('allowed', 'allowed') +
+                        syncCardHtml(true) +
+                        localNoteHtml('Your meals stay saved on this phone too. Disconnecting later never deletes them.'),
+                    actions: btn('filled', 'Continue', 'data-href="s02_home.html?state=saved"') +
+                        btn('text', "View today's dashboard", `data-route="dailyDashboard"${done ? '' : ' hidden'}`)
+                };
+            },
+            partial() {
+                return {
+                    content: resultHtml({ tone: 'caution', icon: 'rule', title: 'Partly connected',
+                            text: "Meals will be saved to Health Connect, but Snackshot can't read your goals from it." }) +
+                        permissionsHtml('allowed', 'denied') +
+                        syncCardHtml(false) +
+                        localNoteHtml('Your meals and goals stay saved on this phone. You can allow reading at any time.'),
+                    actions: btn('filled', 'Continue', 'data-href="s02_home.html?state=saved"') +
+                        btn('outlined', 'Allow goal reading', 'id="retryBtn"') +
+                        btn('text', 'Open system settings', 'data-route="googleHealthConnection"', 'open_in_new')
+                };
+            },
+            declined() {
+                return {
+                    content: resultHtml({ tone: 'neutral', icon: 'smartphone', title: 'Kept on this phone',
+                            text: "Health Connect access wasn't allowed, so nothing is shared. Snackshot works fully on this device." }) +
+                        permissionsHtml('denied', 'denied') +
+                        localNoteHtml('Your meal is saved on this phone. You can connect Health Connect later in Settings.') +
+                        `<p class="hint">If the permission screen doesn't open again, allow access in system settings.</p>`,
+                    actions: btn('filled', 'Try again', 'id="retryBtn"') +
+                        btn('outlined', 'Continue on device only', 'data-route="homeSavedLocal"') +
+                        btn('text', 'Open system settings', 'data-route="googleHealthConnection"', 'open_in_new')
+                };
+            },
+            unavailable() {
+                return {
+                    content: resultHtml({ tone: 'neutral', icon: 'extension_off', title: "Health Connect isn't available",
+                            text: "Health Connect isn't installed on this phone or needs an update. Snackshot keeps working on this device." }) +
+                        `<h3 class="section-title">What Health Connect needs</h3>
+                        <div class="group" role="list">
+                            <div class="row" role="listitem">
+                                <span class="row-icon" aria-hidden="true">${icon('android')}</span>
+                                <span class="row-text"><span class="row-title">Android 9 or later</span>
+                                <span class="row-sub">Built into Android 14 and later</span></span><span></span>
+                            </div>
+                            <div class="row" role="listitem">
+                                <span class="row-icon" aria-hidden="true">${icon('shop')}</span>
+                                <span class="row-text"><span class="row-title">Google Play app</span>
+                                <span class="row-sub">On Android 13 and earlier, install or update it from Google Play</span></span><span></span>
+                            </div>
+                            <div class="row" role="listitem">
+                                <span class="row-icon" aria-hidden="true">${icon('work_off')}</span>
+                                <span class="row-text"><span class="row-title">Personal profile</span>
+                                <span class="row-sub">Work profiles aren't supported</span></span><span></span>
+                            </div>
+                        </div>` +
+                        localNoteHtml('Your meal is saved on this phone. Nothing was lost or shared.'),
+                    actions: btn('filled', 'Continue on device only', 'data-route="homeSavedLocal"') +
+                        btn('outlined', 'Get Health Connect', 'id="getHcBtn"', 'open_in_new')
+                };
+            }
+        };
+
+        function renderView() {
+            const v = VIEWS[state]();
+            $('content').innerHTML = v.content;
+            $('actions').innerHTML = v.actions;
+        }
+
+        const ANNOUNCE = {
+            loading: 'Checking Health Connect permissions',
+            declined: 'Health Connect access not allowed. Your meal is kept on this phone.',
+            partial: "Partly connected. Meals will be saved to Health Connect; goals can't be read.",
+            unavailable: "Health Connect isn't available on this phone. Your meal is kept on this phone."
+        };
+
+        // Simulated first sync after permissions are granted (granted / partial)
+        function runSync() {
+            syncStep = 0;
+            renderView();
+            const step = reducedMotion ? 300 : 1100;
+            if (state === 'granted') {
+                later(() => { syncStep = 1; renderView(); }, step);
+                later(() => { syncStep = 2; renderView(); announce(`First sync done. Goals imported and ${TODAY_MEALS.length} meals written to Health Connect.`); }, step * 2);
+            } else {
+                later(() => { syncStep = 2; renderView(); announce(`${TODAY_MEALS.length} meals written to Health Connect.`); }, step * 1.6);
+            }
+        }
+
+        function showSnackbar(text) {
+            const bar = $('snackbar');
+            bar.textContent = text;
+            bar.classList.add('show');
+            later(() => bar.classList.remove('show'), 3000);
+        }
+
+        function render(next, opts) {
+            state = STATES.includes(next) ? next : 'granted';
+            clearTimers();
+            $('snackbar').classList.remove('show');
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            if (state === 'granted' || state === 'partial') {
+                runSync();
+                announce(state === 'granted' ? 'Connected to Health Connect. First sync started.' : ANNOUNCE.partial);
+            } else {
+                renderView();
+                announce(ANNOUNCE[state]);
+            }
+
+            if (!(opts && opts.keepUrl)) {
+                const url = new URL(window.location.href);
+                if (state === 'granted') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+                try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+            }
+        }
+
+        /* ---------------- Events ---------------- */
+        // "Try again" / "Allow goal reading" re-open the system permission screen;
+        // the prototype simulates a check followed by a full grant.
+        $('actions').addEventListener('click', (e) => {
+            if (e.target.closest('#retryBtn')) {
+                render('loading', { keepUrl: true });
+                later(() => {
+                    render('granted', { keepUrl: true });
+                    const first = document.querySelector('#actions .btn');
+                    if (first) first.focus({ preventScroll: true });
+                }, reducedMotion ? 300 : 1400);
+                return;
+            }
+            if (e.target.closest('#getHcBtn')) showSnackbar('Opens Health Connect in Google Play');
+            // Connected exits open Home with the just-saved meal syncing (S-02 ?state=saved)
+            const link = e.target.closest('[data-href]');
+            if (link) window.location.href = link.dataset.href;
+        });
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(location.search).get('state') || 'granted');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

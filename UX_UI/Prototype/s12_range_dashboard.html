@@ -1,0 +1,1176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-12 | Food & Drink Dashboard (M / 3M / Y) - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, chart, macro and status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-12 Dashboard range variants (M / 3M / Y) — UX spec §3.2 / §4.10,
+         * visual references GoogleHealth (4).png and (1).png.
+         * ?range=month|threeMonth|year selects the variant, ?state= the prototype state,
+         * ?month=YYYY-MM opens a specific calendar month in the M variant.
+         * TopAppBar -> D/W/M/3M/Y segments -> period label + prev/next/current -> metric insight header
+         * -> rounded bar chart with personal range band and right y-axis -> metric chips -> legend
+         * -> chronological value rows (weeks for M, months for 3M/Y) -> Macros goal (daily averages) -> History CTA.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        :root {
+            /* Local chart tokens: the shared --chart-intake cyan is too light on white (2:1),
+               so light mode uses a deeper tone of the same hue (>= 3:1 graphic contrast). */
+            --range-bar: #1A8FC9;
+            --range-band: color-mix(in srgb, var(--chart-in-range) 26%, transparent);
+            --range-band-edge: var(--tertiary);
+        }
+        :root[data-theme="dark"] {
+            --range-bar: var(--chart-intake);
+            --range-band: color-mix(in srgb, var(--chart-in-range) 20%, transparent);
+            --range-band-edge: var(--chart-in-range);
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: default; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar h1 {
+            flex: 1;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        /* ---------- D / W / M / 3M / Y segments (Google Health style) ---------- */
+        .segments {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+        }
+        .segment {
+            height: 48px;
+            border-radius: 12px;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            text-align: center;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            transition: background-color 200ms ease, border-radius 200ms ease;
+        }
+        .segment:first-child { border-radius: 24px 12px 12px 24px; }
+        .segment:last-child  { border-radius: 12px 24px 24px 12px; }
+        .segment[aria-pressed="true"] {
+            background: var(--primary);
+            color: var(--on-primary);
+            border-radius: 24px;
+        }
+        .segment:hover:not([aria-pressed="true"]) { background: color-mix(in srgb, var(--on-surface) 8%, var(--surface-container-high)); }
+
+        /* ---------- Period navigation ---------- */
+        .range-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .period { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .period-title {
+            font-family: var(--font-display);
+            font-size: 28px;
+            line-height: 36px;
+            font-weight: 400;
+        }
+        .period-sub {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+        .tonal-icon-btn {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .tonal-icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 10%, var(--surface-container-high)); }
+        .tonal-icon-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+
+        /* ---------- Metric insight header ---------- */
+        .insight { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .insight-value { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .insight-number {
+            font-family: var(--font-display);
+            font-size: 57px;
+            line-height: 64px;
+            font-weight: 400;
+            letter-spacing: -0.25px;
+            font-variant-numeric: tabular-nums;
+        }
+        .insight-unit { font-family: var(--font-display); font-size: 20px; line-height: 28px; font-weight: 500; }
+        .insight-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .insight-meta { font: 400 12px/16px var(--font-text); letter-spacing: 0.4px; color: var(--on-surface-variant); }
+
+        /* ---------- Bar chart (rounded bars, right y-axis, personal range band) ---------- */
+        .chart { margin-top: 20px; }
+        .chart-grid {
+            display: grid;
+            grid-template-columns: 1fr 44px;
+            grid-template-rows: 192px auto;
+        }
+        .plot {
+            position: relative;
+            border-bottom: 1px solid var(--outline-variant);
+        }
+        .band {
+            position: absolute;
+            left: 0; right: 0;
+            background: var(--range-band);
+            border-top: 1.5px dashed var(--range-band-edge);
+            border-bottom: 1.5px dashed var(--range-band-edge);
+            border-radius: 4px;
+        }
+        /* Dashed range edges drawn above the bars so the goal band stays readable when bars overlap it */
+        .band-edges {
+            position: absolute;
+            left: 0; right: 0;
+            z-index: 1;
+            border-top: 1.5px dashed var(--range-band-edge);
+            border-bottom: 1.5px dashed var(--range-band-edge);
+            pointer-events: none;
+        }
+        .gridline {
+            position: absolute;
+            left: 0; right: 0;
+            border-top: 1px dotted color-mix(in srgb, var(--on-surface) 14%, transparent);
+        }
+        .bars {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: minmax(0, 1fr);
+            align-items: end;
+            justify-items: center;
+            column-gap: 3px;
+        }
+        .bar {
+            width: min(100%, 40px);
+            background: var(--range-bar);
+            border-radius: 999px 999px 4px 4px;
+            transition: height 400ms cubic-bezier(.2,0,0,1);
+        }
+        .bars[data-dense="true"] .bar { width: min(100%, 8px); border-radius: 4px 4px 2px 2px; }
+        .bars[data-dense="false"] .bar { border-radius: 24px; }
+        .y-axis {
+            position: relative;
+            font: 400 11px/16px var(--font-text);
+            letter-spacing: 0.5px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+        .y-axis span { position: absolute; right: 0; transform: translateY(-50%); }
+        .x-axis {
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: minmax(0, 1fr);
+            column-gap: 3px;
+            padding-top: 6px;
+            font: 400 11px/16px var(--font-text);
+            letter-spacing: 0.3px;
+            color: var(--on-surface-variant);
+            text-align: center;
+            white-space: nowrap;
+        }
+        .x-axis span { overflow: visible; }
+
+        /* ---------- Metric chips ---------- */
+        .chips {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            margin-left: -16px;
+            margin-right: -16px;
+            padding: 0 16px;
+            scrollbar-width: none;
+        }
+        .chips::-webkit-scrollbar { display: none; }
+        .chip {
+            flex-shrink: 0;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+        }
+        .chip-inner {
+            height: 32px;
+            padding: 0 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--outline);
+            color: var(--on-surface);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .chip-inner .material-symbols-rounded { font-size: 18px; display: none; margin-left: -6px; }
+        .chip[aria-pressed="true"] .chip-inner {
+            border-color: transparent;
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+        :root[data-theme="dark"] .chip[aria-pressed="true"] .chip-inner { color: #FFFFFF; }
+        .chip[aria-pressed="true"] .chip-inner .material-symbols-rounded { display: inline-block; }
+
+        /* ---------- Legend ---------- */
+        .legend {
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px 20px;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+        .legend-item { display: inline-flex; align-items: center; gap: 8px; }
+        .swatch { width: 18px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+        .swatch-band { background: var(--range-band); border-top: 1.5px dashed var(--range-band-edge); border-bottom: 1.5px dashed var(--range-band-edge); }
+        .swatch-bar { width: 10px; height: 14px; border-radius: 5px; background: var(--range-bar); }
+
+        /* ---------- Section header ---------- */
+        .section-header {
+            margin-top: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 48px;
+        }
+        .section-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; }
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            margin-right: -12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 20px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .section-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); margin-bottom: 8px; }
+
+        /* ---------- Chronological value rows (grouped surface, 12dp inner corners) ---------- */
+        .rows { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+        .row {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px 12px 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--surface-container);
+            border-radius: 6px;
+        }
+        :root:not([data-theme="dark"]) .row { box-shadow: inset 0 0 0 1px var(--outline-variant); }
+        .row:first-child { border-radius: 24px 24px 6px 6px; }
+        .row:last-child  { border-radius: 6px 6px 24px 24px; }
+        .row:only-child  { border-radius: 24px; }
+        .row:hover { background: color-mix(in srgb, var(--on-surface) 5%, var(--surface-container)); }
+        .row-label { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+        .row-title { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .row-sub { font: 400 12px/16px var(--font-text); letter-spacing: 0.4px; color: var(--on-surface-variant); }
+        .row-value { display: flex; flex-direction: column; align-items: flex-end; }
+        .row-number {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-family: var(--font-display);
+            font-size: 32px;
+            line-height: 40px;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .row-number small { font-size: 16px; margin-left: -2px; }
+        .row-status { font: 500 12px/16px var(--font-text); letter-spacing: 0.4px; display: inline-flex; align-items: center; gap: 4px; }
+        .row-status .material-symbols-rounded { font-size: 16px; }
+        .row-status[data-status="in"]    { color: var(--status-in-fg); }
+        .row-status[data-status="below"] { color: var(--status-below-fg); }
+        .row-status[data-status="above"] { color: var(--status-above-fg); }
+        .row-status[data-status="none"]  { color: var(--on-surface-variant); font-weight: 400; }
+        .row .chev { color: var(--on-surface-variant); font-size: 24px; }
+
+        /* ---------- Macros goal (identical to the daily dashboard) ---------- */
+        .macros { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
+        .macro { display: flex; flex-direction: column; gap: 10px; }
+        .macro[data-macro="carbs"]   { --macro-color: var(--macro-carbs); }
+        .macro[data-macro="fat"]     { --macro-color: var(--macro-fat); }
+        .macro[data-macro="protein"] { --macro-color: var(--macro-protein); }
+        .macro-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .macro-label { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; font-variant-numeric: tabular-nums; }
+        .badge {
+            flex-shrink: 0;
+            padding: 4px 12px;
+            border-radius: 14px;
+            font: 500 13px/18px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .badge[data-status="below"] { background: var(--status-below-bg); color: var(--status-below-fg); }
+        .badge[data-status="in"]    { background: var(--status-in-bg);    color: var(--status-in-fg); }
+        .badge[data-status="above"] { background: var(--status-above-bg); color: var(--status-above-fg); }
+        .macro-bar { position: relative; height: 24px; display: flex; align-items: center; }
+        .macro-track {
+            position: absolute;
+            left: 0; right: 0;
+            height: 16px;
+            border-radius: 8px;
+            background: var(--macro-track);
+            overflow: hidden;
+        }
+        .macro-fill {
+            display: block;
+            height: 100%;
+            border-radius: 8px;
+            background: var(--macro-color);
+            transition: width 400ms cubic-bezier(.2,0,0,1);
+        }
+        .macro-fill[data-zero="false"] { min-width: 8px; }
+        .macro-range {
+            position: absolute;
+            top: 0;
+            height: 24px;
+            min-width: 12px;
+            border-radius: 12px;
+            border: 1.5px dashed color-mix(in srgb, var(--on-surface) 70%, transparent);
+            background: color-mix(in srgb, var(--macro-color) 22%, transparent);
+            pointer-events: none;
+        }
+
+        .history-cta {
+            width: 100%;
+            margin-top: 24px;
+            min-height: 48px;
+            border-radius: 24px;
+            border: 1px solid var(--outline);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+        }
+        .history-cta:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+
+        /* ---------- Empty state ---------- */
+        .empty {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+            padding: 0 12px;
+        }
+        .empty-title { font-family: var(--font-display); font-size: 36px; line-height: 44px; font-weight: 400; }
+        .empty-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .filled-btn {
+            margin-top: 12px;
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            background: var(--primary);
+            color: var(--on-primary);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+        }
+
+        /* ---------- Skeletons ---------- */
+        .sk { display: block; background: var(--surface-container-high); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: .5; } }
+
+        /* ---------- Snackbar ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px; right: 16px; bottom: 32px;
+            min-height: 48px;
+            padding: 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+        }
+        .snackbar.show { transform: none; opacity: 1; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-12 states required by spec §4.1 / §4.10 -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <button type="button" data-state-choice="local">No goals</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <header class="top-app-bar">
+            <button type="button" class="icon-btn" aria-label="Back to Home" data-route="home">
+                <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            </button>
+            <h1>Food &amp; drink</h1>
+            <button type="button" class="icon-btn" aria-label="Log a meal" data-route="camera">
+                <span class="material-symbols-rounded" aria-hidden="true">add</span>
+            </button>
+        </header>
+
+        <main class="scaffold-content" id="content">
+            <!-- Range segments: D and W open their own screens; M / 3M / Y switch in place -->
+            <div class="segments" role="group" aria-label="Time range">
+                <button type="button" class="segment" aria-pressed="false" aria-label="Day" data-route="dailyDashboard">D</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Week" data-route="weeklyDashboard">W</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Month" data-range="month">M</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Three months" data-range="threeMonth">3M</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Year" data-range="year">Y</button>
+            </div>
+
+            <!-- Period navigation -->
+            <div class="range-nav">
+                <div class="period">
+                    <h2 class="period-title" id="periodTitle">September</h2>
+                    <p class="period-sub" id="periodSub"></p>
+                </div>
+                <button type="button" class="tonal-icon-btn" id="prevPeriod" aria-label="Previous period">
+                    <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+                </button>
+                <button type="button" class="tonal-icon-btn" id="nextPeriod" aria-label="Next period">
+                    <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" class="tonal-icon-btn" id="currentPeriod" aria-label="Return to current period">
+                    <span class="material-symbols-rounded" aria-hidden="true">history</span>
+                </button>
+            </div>
+
+            <!-- Rendered per range, period, metric and state -->
+            <div id="slot"></div>
+        </main>
+
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite"></div>
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data ---------------- */
+        // Today is Thu Sep 24 2026. Long ranges aggregate completed days, so they end on Sep 23
+        // (matching the 3M / Y schemas); today joins the averages once the day ends.
+        const TODAY = new Date(2026, 8, 24);
+        const DATA_END = new Date(2026, 8, 23);
+        const DATA_START = new Date(2025, 2, 3); // first logged meal: Mon Mar 3 2025
+        const GOALS = { kcal: 2300, carbs: 220, fat: 70, protein: 150 };
+        const RANGE = 0.10; // personal range = goal ±10%
+
+        // Target monthly daily averages (kcal). Daily values are generated around these deterministically.
+        const MONTH_MEAN = {
+            '2025-03': 2460, '2025-04': 2400, '2025-05': 2360, '2025-06': 2340, '2025-07': 2310, '2025-08': 2420,
+            '2025-09': 2330, '2025-10': 2290, '2025-11': 2310, '2025-12': 2490,
+            '2026-01': 2270, '2026-02': 2240, '2026-03': 2260, '2026-04': 2210, '2026-05': 2230, '2026-06': 2190,
+            '2026-07': 2170, '2026-08': 2210, '2026-09': 2270
+        };
+        // Days already shown in detail on the daily dashboard (DAYS data in s12_daily_dashboard.html)
+        const FIXED = {
+            '2026-09-22': { kcal: 2135, c: 235, f: 83, p: 106 },
+            '2026-09-23': { kcal: 530, c: 77, f: 13, p: 25 }
+        };
+
+        const METRICS = {
+            kcal:    { name: 'Calories', unit: 'kcal', goal: GOALS.kcal },
+            carbs:   { name: 'Carbs', unit: 'g', goal: GOALS.carbs },
+            fat:     { name: 'Fat', unit: 'g', goal: GOALS.fat },
+            protein: { name: 'Protein', unit: 'g', goal: GOALS.protein }
+        };
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        let timers = [];
+        function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+        const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        const monthKey = (d) => iso(d).slice(0, 7);
+        const addDays = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+        const minDate = (a, b) => (a < b ? a : b);
+        const maxDate = (a, b) => (a > b ? a : b);
+        const monthShort = (d) => d.toLocaleDateString('en-US', { month: 'short' });
+        const monthLong = (d) => d.toLocaleDateString('en-US', { month: 'long' });
+        const lastOfMonth = (y, m) => new Date(y, m + 1, 0);
+        // "Sep 1 – 23", "Aug 25 – 31", "Jun 24 – Sep 23"
+        function spanLabel(a, b) {
+            if (a.getMonth() === b.getMonth() && a.getFullYear() === b.getFullYear()) {
+                return a.getDate() === b.getDate() ? `${monthShort(a)} ${a.getDate()}` : `${monthShort(a)} ${a.getDate()} – ${b.getDate()}`;
+            }
+            return `${monthShort(a)} ${a.getDate()} – ${monthShort(b)} ${b.getDate()}`;
+        }
+        function hash(str) { // deterministic 0..1
+            let h = 2166136261;
+            for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+            return ((h >>> 0) % 10000) / 10000;
+        }
+
+        // Build the daily log once: { 'YYYY-MM-DD': { kcal, c, f, p } } for logged days only.
+        const LOG = (function build() {
+            const log = {};
+            const byMonth = {};
+            for (let d = new Date(DATA_START); d <= DATA_END; d = addDays(d, 1)) {
+                const key = iso(d);
+                if (hash(key + 'skip') < 0.05 && !FIXED[key]) continue; // ~5% of days not logged
+                const weekend = d.getDay() === 0 || d.getDay() === 6 ? 160 : -60;
+                const raw = (hash(key) * 2 - 1) * 380 + weekend;
+                (byMonth[monthKey(d)] = byMonth[monthKey(d)] || []).push([key, raw]);
+            }
+            Object.entries(byMonth).forEach(([mk, list]) => {
+                const rawMean = list.reduce((s, [, r]) => s + r, 0) / list.length;
+                list.forEach(([key, raw]) => {
+                    const kcal = Math.round(MONTH_MEAN[mk] + raw - rawMean);
+                    log[key] = {
+                        kcal,
+                        c: Math.round(kcal * 0.094 * (1 + (hash(key + 'c') - 0.5) * 0.16)),
+                        f: Math.round(kcal * 0.0302 * (1 + (hash(key + 'f') - 0.5) * 0.2)),
+                        p: Math.round(kcal * 0.054 * (1 + (hash(key + 'p') - 0.5) * 0.2))
+                    };
+                });
+            });
+            Object.assign(log, FIXED);
+            return log;
+        })();
+
+        // Daily averages over logged days in [a, b]
+        function aggregate(a, b) {
+            let n = 0; const s = { kcal: 0, carbs: 0, fat: 0, protein: 0 };
+            for (let d = new Date(a); d <= b; d = addDays(d, 1)) {
+                const e = LOG[iso(d)];
+                if (!e) continue;
+                n++; s.kcal += e.kcal; s.carbs += e.c; s.fat += e.f; s.protein += e.p;
+            }
+            if (!n) return { n: 0 };
+            return { n, kcal: Math.round(s.kcal / n), carbs: Math.round(s.carbs / n), fat: Math.round(s.fat / n), protein: Math.round(s.protein / n) };
+        }
+        function statusOf(value, goal) {
+            if (value < goal * (1 - RANGE)) return 'below';
+            if (value > goal * (1 + RANGE)) return 'above';
+            return 'in';
+        }
+        const STATUS_TEXT = { below: 'Below range', in: 'In range', above: 'Above range' };
+        const STATUS_ICON = { below: 'arrow_downward', in: 'check_circle', above: 'arrow_upward' };
+
+        /* ---------------- State ---------------- */
+        const RANGES = ['month', 'threeMonth', 'year'];
+        let range = 'month';
+        let state = 'default';
+        let offset = 0;        // 0 = current period, negative = earlier
+        let metric = 'kcal';
+        const goals = () => (state === 'local' ? null : GOALS);
+
+        /* ---------------- Periods ---------------- */
+        // Each period: start/end of aggregated data, title + sub label, chart slots and value rows.
+        function periodFor(r, off) {
+            if (r === 'month') {
+                const first = new Date(TODAY.getFullYear(), TODAY.getMonth() + off, 1);
+                const last = lastOfMonth(first.getFullYear(), first.getMonth());
+                const start = maxDate(first, DATA_START);
+                const end = minDate(last, DATA_END);
+                // Chart: one slot per calendar day (a calendar-month aggregate is ~30 marks, still readable)
+                const slots = [];
+                for (let d = new Date(first); d <= last; d = addDays(d, 1)) {
+                    const e = d <= DATA_END ? LOG[iso(d)] : null;
+                    const day = d.getDate();
+                    slots.push({
+                        axis: [1, 8, 15, 22, 29].includes(day) ? String(day) : '',
+                        name: `${monthShort(d)} ${day}`,
+                        value: e ? { kcal: e.kcal, carbs: e.c, fat: e.f, protein: e.p } : null
+                    });
+                }
+                // Rows: Monday–Sunday weeks clipped to the month and to completed days, newest first
+                const rows = [];
+                let wStart = new Date(start);
+                while (wStart <= end) {
+                    const toSunday = (7 - wStart.getDay()) % 7;
+                    const wEnd = minDate(addDays(wStart, toSunday), end);
+                    const monday = addDays(wStart, -((wStart.getDay() + 6) % 7));
+                    rows.unshift({ title: spanLabel(wStart, wEnd), agg: aggregate(wStart, wEnd), target: { week: iso(monday) },
+                        action: `Open week of ${spanLabel(monday, addDays(monday, 6))}` });
+                    wStart = addDays(wEnd, 1);
+                }
+                const current = off === 0;
+                return {
+                    title: current ? monthLong(first) : `${monthLong(first)}${first.getFullYear() !== TODAY.getFullYear() ? ' ' + first.getFullYear() : ''}`,
+                    sub: `${spanLabel(start, end)}, ${first.getFullYear()}`,
+                    spoken: `${monthLong(first)} ${first.getFullYear()}`,
+                    start, end, slots, dense: true, rows, rowsTitle: 'Weeks', rowsUnit: 'week'
+                };
+            }
+
+            let start, end, title, spoken;
+            if (r === 'threeMonth') {
+                // Rolling three-month window ending on the last completed day (schema: Jun 24 – Sep 23, 2026)
+                end = new Date(DATA_END.getFullYear(), DATA_END.getMonth() + off * 3, DATA_END.getDate());
+                start = addDays(new Date(end.getFullYear(), end.getMonth() - 3, end.getDate()), 1);
+                title = off === 0 ? 'Last 3 months' : `${monthShort(start)} – ${monthShort(end)}`;
+                spoken = off === 0 ? 'Last 3 months' : `${monthLong(start)} to ${monthLong(end)}`;
+            } else {
+                const year = TODAY.getFullYear() + off;
+                start = new Date(year, 0, 1);
+                end = minDate(new Date(year, 11, 31), DATA_END);
+                title = off === 0 ? 'This year' : String(year);
+                spoken = off === 0 ? `This year, ${year}` : String(year);
+            }
+            const dataStart = maxDate(start, DATA_START);
+            // Chart slots and rows: one per calendar month intersecting the period (month-level aggregates)
+            const months = [];
+            for (let m = new Date(start.getFullYear(), start.getMonth(), 1); m <= end; m = new Date(m.getFullYear(), m.getMonth() + 1, 1)) {
+                const mFirst = maxDate(m, start), mLast = minDate(lastOfMonth(m.getFullYear(), m.getMonth()), end);
+                const partial = mFirst.getDate() !== 1 || mLast.getDate() !== lastOfMonth(m.getFullYear(), m.getMonth()).getDate();
+                const agg = aggregate(maxDate(mFirst, DATA_START), mLast);
+                months.push({ m, mFirst, mLast, partial, agg });
+            }
+            const slots = months.map((x) => ({
+                axis: r === 'threeMonth' && x.partial ? spanLabel(x.mFirst, x.mLast).replace(' – ', '–') : monthShort(x.m),
+                name: x.partial ? spanLabel(x.mFirst, x.mLast) : monthLong(x.m),
+                value: x.agg.n ? x.agg : null
+            }));
+            const rows = months.filter((x) => x.agg.n).reverse().map((x) => ({
+                title: monthLong(x.m) + (x.m.getFullYear() !== TODAY.getFullYear() && r === 'threeMonth' ? ' ' + x.m.getFullYear() : ''),
+                extra: x.partial ? spanLabel(x.mFirst, x.mLast) : '',
+                agg: x.agg,
+                target: { month: monthKey(x.m) },
+                action: `Open ${monthLong(x.m)} ${x.m.getFullYear()}`
+            }));
+            return {
+                title, spoken,
+                sub: start.getFullYear() === end.getFullYear()
+                    ? `${spanLabel(start, end)}, ${end.getFullYear()}`
+                    : `${monthShort(start)} ${start.getDate()}, ${start.getFullYear()} – ${monthShort(end)} ${end.getDate()}, ${end.getFullYear()}`,
+                start: dataStart, end, slots, dense: false, rows, rowsTitle: 'Months', rowsUnit: 'month'
+            };
+        }
+
+        function hasEarlier() {
+            const p = periodFor(range, offset - 1);
+            return p.end >= DATA_START;
+        }
+
+        /* ---------------- Render: insight header ---------------- */
+        const INSIGHT = {
+            kcal: {
+                below: 'Your average intake was below your target range. Make sure you’re fueling enough to support your daily activity.',
+                in: { month: 'Your average intake stayed in your target range this month.',
+                      threeMonth: 'Your average intake stayed in your target range over the last three months.',
+                      year: 'Your yearly average is close to your personal calorie target.' },
+                above: 'Your average intake was above your target range. Lighter portions on a few days can bring it back in range.'
+            },
+            macro: {
+                below: (n) => `Your ${n.toLowerCase()} intake averaged below your goal range.`,
+                in: (n) => `Your ${n.toLowerCase()} intake averaged within your goal range.`,
+                above: (n) => `Your ${n.toLowerCase()} intake averaged above your goal range.`
+            }
+        };
+
+        function insightHtml(p, agg, g) {
+            const M = METRICS[metric];
+            const value = agg[metric];
+            let text;
+            if (!g) {
+                text = metric === 'kcal'
+                    ? 'No calorie goal set, so your average can’t be compared with a target.'
+                    : `No ${M.name.toLowerCase()} goal set, so your average can’t be compared with a target.`;
+            } else {
+                const status = statusOf(value, M.goal);
+                if (metric === 'kcal') {
+                    const t = INSIGHT.kcal[status];
+                    text = typeof t === 'string' ? t : (offset === 0 ? t[range] : 'Your average intake stayed in your target range for this period.');
+                } else {
+                    text = INSIGHT.macro[status](M.name);
+                }
+            }
+            return `<div class="insight">
+                <div class="insight-value"><span class="insight-number">${fmt(value)}</span><span class="insight-unit">${M.unit} per day (avg)</span></div>
+                <p class="insight-text">${text}</p>
+                <p class="insight-meta">Average of ${agg.n} logged ${agg.n === 1 ? 'day' : 'days'}${offset === 0 ? ' · today is added once it ends' : ''}</p>
+            </div>`;
+        }
+
+        /* ---------------- Render: chart ---------------- */
+        function niceMax(v) {
+            const step = v > 1000 ? 1000 : v > 200 ? 100 : 50;
+            return Math.ceil(v / step) * step;
+        }
+
+        function chartHtml(p, g) {
+            const M = METRICS[metric];
+            const vals = p.slots.map((s) => (s.value ? s.value[metric] : 0));
+            const ref = g ? M.goal * (1 + RANGE) * 1.15 : 0;
+            const max = niceMax(Math.max(...vals, ref, metric === 'kcal' ? 3000 : 1));
+            const ticks = [0, 1, 2, 3].map((i) => Math.round(max * i / 3));
+            const pct = (v) => (v / max) * 100;
+            const band = g
+                ? `<span class="band" style="bottom:${pct(M.goal * (1 - RANGE))}%;height:${pct(M.goal * RANGE * 2)}%"></span>`
+                : '';
+            const lines = ticks.slice(1).map((t) => `<span class="gridline" style="bottom:${pct(t)}%"></span>`).join('');
+            const bars = p.slots.map((s) => {
+                if (!s.value) return '<span></span>';
+                return `<span class="bar" style="height:${Math.max(pct(s.value[metric]), 1.5)}%"></span>`;
+            }).join('');
+            const axis = p.slots.map((s) => `<span>${s.axis}</span>`).join('');
+
+            // Accessible tabular summary of every mark
+            const logged = p.slots.filter((s) => s.value);
+            const per = p.dense ? 'Day' : 'Month';
+            const table = `<table class="sr-only">
+                <caption>${M.name}, ${p.dense ? 'daily totals' : 'daily average by month'}, ${p.spoken}</caption>
+                <thead><tr><th scope="col">${per}</th><th scope="col">${M.name} (${M.unit})</th>${g ? '<th scope="col">Status</th>' : ''}</tr></thead>
+                <tbody>${logged.map((s) => `<tr><th scope="row">${s.name}</th><td>${fmt(s.value[metric])}</td>${g ? `<td>${STATUS_TEXT[statusOf(s.value[metric], M.goal)]}</td>` : ''}</tr>`).join('')}</tbody>
+            </table>`;
+
+            const summary = `${M.name} chart, ${p.spoken}. ${logged.length} ${p.dense ? 'logged days' : 'months'}` +
+                (g ? `. Personal range ${fmt(M.goal * (1 - RANGE))} to ${fmt(M.goal * (1 + RANGE))} ${M.unit === 'g' ? 'grams' : 'kilocalories'}` : '. No goal set');
+
+            return `<div class="chart">
+                <div class="chart-grid" role="img" aria-label="${summary}">
+                    <div class="plot" aria-hidden="true">
+                        ${band}${lines}
+                        <div class="bars" data-dense="${p.dense}" style="grid-template-columns:repeat(${p.slots.length},minmax(0,1fr))">${bars}</div>
+                        ${g ? band.replace('class="band"', 'class="band-edges"') : ''}
+                    </div>
+                    <div class="y-axis" aria-hidden="true">${ticks.map((t) => `<span style="bottom:${pct(t)}%;transform:translateY(50%)">${fmt(t)}</span>`).join('')}</div>
+                    <div class="x-axis" aria-hidden="true" style="grid-template-columns:repeat(${p.slots.length},minmax(0,1fr))">${axis}</div>
+                </div>
+                ${table}
+            </div>`;
+        }
+
+        function chipsHtml() {
+            return `<div class="chips" role="group" aria-label="Chart metric">
+                ${Object.entries(METRICS).map(([key, M]) => `
+                    <button type="button" class="chip" data-metric="${key}" aria-pressed="${metric === key}">
+                        <span class="chip-inner"><span class="material-symbols-rounded" aria-hidden="true">check</span>${key === 'kcal' ? 'Intake' : M.name}</span>
+                    </button>`).join('')}
+            </div>`;
+        }
+
+        function legendHtml(p, g) {
+            const M = METRICS[metric];
+            const barText = p.dense ? `Daily ${M.name.toLowerCase()}` : `Daily average per month`;
+            return `<div class="legend">
+                <span class="legend-item"><span class="swatch swatch-bar" aria-hidden="true"></span>${barText}</span>
+                ${g ? `<span class="legend-item"><span class="swatch swatch-band" aria-hidden="true"></span>Personal range ${fmt(M.goal * (1 - RANGE))}–${fmt(M.goal * (1 + RANGE))} ${M.unit}</span>` : ''}
+            </div>`;
+        }
+
+        /* ---------------- Render: value rows ---------------- */
+        function rowsHtml(p, g) {
+            const M = METRICS[metric];
+            return `<div class="section-header"><h2 class="section-title">${p.rowsTitle}</h2></div>
+                <div class="rows">${p.rows.map((row, i) => {
+                    const v = row.agg[metric];
+                    const status = g ? statusOf(v, M.goal) : 'none';
+                    const sub = [row.extra, `${row.agg.n} ${row.agg.n === 1 ? 'day' : 'days'} logged`].filter(Boolean).join(' · ');
+                    const statusHtml = g
+                        ? `<span class="row-status" data-status="${status}"><span class="material-symbols-rounded icon-filled" aria-hidden="true">${STATUS_ICON[status]}</span>${STATUS_TEXT[status]}</span>`
+                        : `<span class="row-status" data-status="none">${M.unit} per day (avg)</span>`;
+                    const aria = `${row.title}${row.extra ? ', ' + row.extra : ''}: ${fmt(v)} ${M.unit === 'g' ? 'grams' : 'kilocalories'} per day on average, ${row.agg.n} days logged${g ? '. ' + STATUS_TEXT[status] : ''}. ${row.action}`;
+                    return `<button type="button" class="row" data-row="${i}" aria-label="${aria}">
+                        <span class="row-label" aria-hidden="true">
+                            <span class="row-title">${row.title}</span>
+                            <span class="row-sub">${sub}</span>
+                        </span>
+                        <span class="row-value" aria-hidden="true">
+                            <span class="row-number">${fmt(v)}${M.unit === 'g' ? '<small>g</small>' : ''}</span>
+                            ${statusHtml}
+                        </span>
+                        <span class="material-symbols-rounded chev" aria-hidden="true">chevron_right</span>
+                    </button>`;
+                }).join('')}</div>`;
+        }
+
+        /* ---------------- Render: macros goal (daily averages) ---------------- */
+        function macroHtml(key, name, value, goal, totalGrams) {
+            if (!goal) {
+                const share = totalGrams ? Math.round(value / totalGrams * 100) : 0;
+                return `<div class="macro" data-macro="${key}" role="img" aria-label="${name}: ${value} grams per day on average, ${share}% of macros. No goal">
+                    <div class="macro-head" aria-hidden="true"><span class="macro-label">${name} · ${share}% · ${value} g</span></div>
+                    <div class="macro-bar" aria-hidden="true"><span class="macro-track"><span class="macro-fill" data-zero="${value === 0}" style="width:${share}%"></span></span></div>
+                </div>`;
+            }
+            const pct = Math.round(value / goal * 100);
+            const status = statusOf(value, goal);
+            const scale = goal * 2; // track spans 0..2x goal so the range sits mid-track
+            const fill = Math.min(value / scale, 1) * 100;
+            const lo = goal * (1 - RANGE) / scale * 100, hi = goal * (1 + RANGE) / scale * 100;
+            return `<div class="macro" data-macro="${key}" role="img"
+                    aria-label="${name}: ${value} of ${goal} grams per day on average, ${pct}% of goal. ${STATUS_TEXT[status]}">
+                <div class="macro-head" aria-hidden="true">
+                    <span class="macro-label">${name} · ${pct}% · ${value} of ${goal} g</span>
+                    <span class="badge" data-status="${status}">${STATUS_TEXT[status]}</span>
+                </div>
+                <div class="macro-bar" aria-hidden="true">
+                    <span class="macro-track"><span class="macro-fill" data-zero="${value === 0}" style="width:${fill}%"></span></span>
+                    <span class="macro-range" style="left:${lo}%;width:${hi - lo}%"></span>
+                </div>
+            </div>`;
+        }
+
+        function macrosHtml(agg, g) {
+            const grams = agg.carbs + agg.fat + agg.protein;
+            return `<div class="section-header">
+                    <h2 class="section-title">${g ? 'Macros goal' : 'Macros'}</h2>
+                    <button type="button" class="text-btn" id="fullNutrients">View full nutrients</button>
+                </div>
+                <p class="section-text">Daily averages for this period. Balancing carbs, protein, and fat is key for energy, recovery, and overall health.</p>
+                <div class="macros">
+                    ${macroHtml('carbs', 'Carbs', agg.carbs, g && g.carbs, grams)}
+                    ${macroHtml('fat', 'Fat', agg.fat, g && g.fat, grams)}
+                    ${macroHtml('protein', 'Protein', agg.protein, g && g.protein, grams)}
+                </div>`;
+        }
+
+        /* ---------------- Render: loading / empty ---------------- */
+        function skeletonHtml() {
+            return `<div aria-hidden="true">
+                <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+                    <span class="sk" style="width:62%;height:56px;border-radius:12px"></span>
+                    <span class="sk" style="width:90%;height:16px"></span>
+                    <span class="sk" style="width:70%;height:16px"></span>
+                </div>
+                <span class="sk" style="margin-top:24px;height:212px;border-radius:16px"></span>
+                <div style="margin-top:16px;display:flex;gap:8px">
+                    ${[72, 64, 52, 76].map((w) => `<span class="sk" style="width:${w}px;height:32px"></span>`).join('')}
+                </div>
+                <span class="sk" style="margin-top:40px;width:30%;height:24px"></span>
+                <div class="rows" style="margin-top:16px">
+                    ${[0, 1, 2].map(() => '<span class="sk" style="height:80px;border-radius:16px"></span>').join('')}
+                </div>
+            </div>
+            <p class="sr-only" role="status">Loading averages</p>`;
+        }
+
+        function emptyHtml() {
+            const scope = { month: 'this month', threeMonth: 'in the last 3 months', year: 'this year' }[range];
+            return `<div class="empty">
+                <span class="empty-title">No data</span>
+                <p class="empty-text">No meals logged ${scope}. Take a photo of your meal and Snackshot will estimate calories and macros.</p>
+                <button type="button" class="filled-btn" data-route="camera">
+                    <span class="material-symbols-rounded" aria-hidden="true">photo_camera</span> Take a photo
+                </button>
+                <button type="button" class="text-btn" data-route="search" style="margin-right:0">Search for a food</button>
+            </div>`;
+        }
+
+        /* ---------------- Main render ---------------- */
+        let currentPeriod = null;
+
+        function renderPeriod() {
+            document.querySelectorAll('.segment[data-range]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.range === range)));
+
+            const p = periodFor(range, offset);
+            currentPeriod = p;
+            const isEmpty = state === 'empty' && offset === 0;
+            $('periodTitle').textContent = p.title;
+            $('periodSub').textContent = p.sub;
+            $('nextPeriod').disabled = offset === 0;
+            $('currentPeriod').disabled = offset === 0;
+            $('prevPeriod').disabled = state === 'loading' || !hasEarlier();
+
+            if (state === 'loading') { $('slot').innerHTML = skeletonHtml(); return; }
+
+            const agg = aggregate(p.start, p.end);
+            if (isEmpty || !agg.n) { $('slot').innerHTML = emptyHtml(); return; }
+
+            const g = goals();
+            $('slot').innerHTML = insightHtml(p, agg, g) + chartHtml(p, g) + chipsHtml() + legendHtml(p, g) +
+                rowsHtml(p, g) + macrosHtml(agg, g) +
+                `<button type="button" class="history-cta" data-route="history">
+                    <span class="material-symbols-rounded" aria-hidden="true">history</span> See all meals in History
+                </button>`;
+        }
+
+        function spokenSummary() {
+            const p = currentPeriod;
+            if (state === 'loading') return `${p.spoken}. Loading`;
+            const agg = aggregate(p.start, p.end);
+            if (!agg.n || (state === 'empty' && offset === 0)) return `${p.spoken}. No data`;
+            const M = METRICS[metric];
+            return `${p.spoken}, ${p.sub}. ${M.name}: ${fmt(agg[metric])} ${M.unit === 'g' ? 'grams' : 'kilocalories'} per day on average`;
+        }
+
+        function syncUrl() {
+            const url = new URL(window.location.href);
+            url.searchParams.set('range', range);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            if (range === 'month' && offset !== 0) {
+                url.searchParams.set('month', monthKey(new Date(TODAY.getFullYear(), TODAY.getMonth() + offset, 1)));
+            } else url.searchParams.delete('month');
+            try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        function goTo(nextOffset) {
+            offset = Math.min(0, nextOffset);
+            renderPeriod();
+            syncUrl();
+            announce(spokenSummary());
+        }
+
+        /* ---------------- Events ---------------- */
+        $('prevPeriod').addEventListener('click', () => goTo(offset - 1));
+        $('nextPeriod').addEventListener('click', () => goTo(offset + 1));
+        $('currentPeriod').addEventListener('click', () => goTo(0));
+
+        document.querySelectorAll('.segment[data-range]').forEach((b) => b.addEventListener('click', () => {
+            if (b.dataset.range === range) return;
+            range = b.dataset.range;
+            offset = 0;
+            renderPeriod();
+            syncUrl();
+            announce(spokenSummary());
+        }));
+
+        $('slot').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-metric]');
+            if (chip) {
+                metric = chip.dataset.metric;
+                renderPeriod();
+                const again = document.querySelector(`[data-metric="${metric}"]`);
+                if (again) again.focus({ preventScroll: true });
+                announce(spokenSummary());
+                return;
+            }
+            const row = e.target.closest('[data-row]');
+            if (row) {
+                const target = currentPeriod.rows[Number(row.dataset.row)].target;
+                const stateParam = state === 'default' ? '' : `&state=${state}`;
+                if (target.month) {
+                    // Month row (3M / Y) -> M variant for that calendar month
+                    window.location.href = `s12_range_dashboard.html?range=month&month=${target.month}${stateParam}`;
+                } else {
+                    // Week row (M) -> S-13 weekly summary; ?week= is the Monday of the week (requested on S-13)
+                    window.location.href = `s12_weekly_dashboard.html?week=${target.week}`;
+                }
+                return;
+            }
+            if (e.target.closest('#fullNutrients')) showSnackbar('Full nutrients will be available in a later version');
+        });
+
+        function showSnackbar(text) {
+            const bar = $('snackbar');
+            bar.textContent = text;
+            bar.classList.add('show');
+            later(() => bar.classList.remove('show'), 3000);
+        }
+
+        function render(next) {
+            state = ['default', 'loading', 'empty', 'local'].includes(next) ? next : 'default';
+            clearTimers();
+            $('snackbar').classList.remove('show');
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+            offset = 0;
+            renderPeriod();
+            syncUrl();
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        /* ---------------- Init: ?range=, ?state=, optional ?month=YYYY-MM ---------------- */
+        const params = new URLSearchParams(location.search);
+        range = RANGES.includes(params.get('range')) ? params.get('range') : 'month';
+        state = ['default', 'loading', 'empty', 'local'].includes(params.get('state')) ? params.get('state') : 'default';
+        render(state);
+        const monthParam = /^(\d{4})-(\d{2})$/.exec(params.get('month') || '');
+        if (range === 'month' && monthParam) {
+            const diff = (Number(monthParam[1]) - TODAY.getFullYear()) * 12 + (Number(monthParam[2]) - 1 - TODAY.getMonth());
+            const earliest = (DATA_START.getFullYear() - TODAY.getFullYear()) * 12 + (DATA_START.getMonth() - TODAY.getMonth());
+            if (diff < 0 && diff >= earliest) { offset = diff; renderPeriod(); syncUrl(); }
+        }
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

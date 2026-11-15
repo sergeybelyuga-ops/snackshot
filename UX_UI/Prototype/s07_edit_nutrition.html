@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-07 | Edit Nutrition - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, macro and status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-07 Edit nutrition — UX spec §4.7, F-03 (fast fix), F-02 (portion):
+         * ModalBottomSheet over S-15 Meal review -> drag handle -> title + day impact line
+         * -> food name / meal / time -> weight stepper -> calories + Carbs, Fat, Protein
+         * -> sticky footer: status line, Reset (to AI estimate), Cancel, Apply.
+         * Sheet typography uses rem so the "Large text" state can emulate system font scaling.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- S-15 underlay (context behind the sheet) ---------- */
+        .underlay { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar .spacer { flex: 1; }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .review-content { padding: 4px 16px 24px; display: flex; flex-direction: column; gap: 16px; }
+        .review-title { font-family: var(--font-display); font-size: 32px; line-height: 40px; font-weight: 400; overflow-wrap: anywhere; }
+        .review-meta { margin-top: 4px; font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .review-image {
+            height: 180px;
+            border-radius: 24px;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .review-image .material-symbols-rounded { font-size: 56px; }
+        .review-rows { background: var(--surface-container); border-radius: 24px; overflow: hidden; }
+        :root:not([data-theme="dark"]) .review-rows { border: 1px solid var(--outline-variant); }
+        .review-row {
+            min-height: 56px;
+            padding: 0 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            font: 400 16px/24px var(--font-text);
+            font-variant-numeric: tabular-nums;
+        }
+        .review-row + .review-row { border-top: 1px solid var(--outline-variant); }
+        .review-row strong { font-weight: 500; }
+
+        /* ---------- Scrim + ModalBottomSheet ---------- */
+        .scrim {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            background: rgb(0 0 0 / 32%);
+            opacity: 1;
+            transition: opacity 200ms ease;
+        }
+        .scrim.closing { opacity: 0; }
+
+        .sheet {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            z-index: 21;
+            max-height: calc(100% - 64px);
+            display: flex;
+            flex-direction: column;
+            background: var(--surface-container);
+            border-radius: 28px 28px 0 0;
+            box-shadow: 0 -2px 12px rgb(0 0 0 / 18%);
+            transform: translateY(0);
+            transition: transform 250ms cubic-bezier(.2,0,0,1);
+            /* rem-based so the Large text state scales every label, value and button */
+            font-size: 1rem;
+        }
+        .sheet.closing { transform: translateY(105%); transition-timing-function: cubic-bezier(.3,0,1,1); }
+        .sheet.opening { transform: translateY(105%); transition: none; }
+
+        .drag-handle {
+            flex-shrink: 0;
+            height: 36px;
+            display: flex; justify-content: center; align-items: center;
+        }
+        .drag-handle span { width: 32px; height: 4px; border-radius: 2px; background: var(--on-surface-variant); opacity: .4; }
+
+        .sheet-body {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 0 24px 20px; /* insets stay in dp; only text scales */
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            scrollbar-width: none;
+        }
+        .sheet-body::-webkit-scrollbar { display: none; }
+
+        .sheet-head { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 0 8px; }
+        .sheet-head-text { flex: 1 1 12rem; }
+        .sheet-head .text-btn { margin: -0.25rem -12px 0 auto; }
+        .sheet-title {
+            font-family: var(--font-display);
+            font-size: 1.375rem;
+            line-height: 1.75rem;
+            font-weight: 400;
+        }
+        /* Programmatic focus target for screen readers; not interactive, so no focus ring */
+        .sheet-title:focus, .sheet-title:focus-visible { outline: none; }
+        .sheet-sub {
+            margin-top: 0.25rem;
+            font: 400 0.875rem/1.25rem var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+        .sheet-sub strong { color: var(--on-surface); font-weight: 500; }
+
+        .section-title {
+            margin-top: 0.5rem;
+            display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap;
+            font-family: var(--font-display);
+            font-size: 1rem;
+            line-height: 1.5rem;
+            font-weight: 500;
+        }
+        .section-title small {
+            font: 400 0.75rem/1rem var(--font-text);
+            letter-spacing: 0.4px;
+            color: var(--on-surface-variant);
+        }
+
+        /* ---------- M3 outlined text field ---------- */
+        .field { display: flex; flex-direction: column; min-width: 0; }
+        .field-box {
+            position: relative;
+            min-height: 3.5rem;
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--outline);
+            border-radius: 4px;
+            padding: 0 1rem;
+            gap: 0.5rem;
+        }
+        .field-box:hover { border-color: var(--on-surface); }
+        .field-box:focus-within { border: 2px solid var(--primary); padding: 0 calc(1rem - 1px); }
+        .field-input {
+            flex: 1;
+            min-width: 0;
+            height: 3.375rem;
+            border: none;
+            background: transparent;
+            color: var(--on-surface);
+            font: 400 1rem/1.5rem var(--font-text);
+            letter-spacing: 0.5px;
+            font-variant-numeric: tabular-nums;
+            outline: none;
+        }
+        .field-input::placeholder { color: transparent; }
+        /* Food name wraps instead of truncating (spec §3.3 / §4.7: long names wrap) */
+        .field-textarea {
+            height: auto;
+            min-height: 3.375rem;
+            padding: 0.9375rem 0;
+            resize: none;
+            overflow: hidden;
+            field-sizing: content;
+        }
+        select.field-input { appearance: none; -webkit-appearance: none; cursor: pointer; }
+        .field-label {
+            position: absolute;
+            left: 0.75rem;
+            top: 0;
+            transform: translateY(-50%);
+            padding: 0 4px;
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 400 0.75rem/1rem var(--font-text);
+            letter-spacing: 0.4px;
+            pointer-events: none;
+            white-space: nowrap;
+            max-width: calc(100% - 1.5rem);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: top 150ms ease, font-size 150ms ease;
+        }
+        /* Empty + unfocused: label rests inside the field (M3 behaviour) */
+        .field-input:placeholder-shown:not(:focus) ~ .field-label {
+            top: 50%;
+            font-size: 1rem;
+            line-height: 1.5rem;
+            letter-spacing: 0.5px;
+        }
+        .field-box:focus-within .field-label { color: var(--primary); }
+        .field-suffix {
+            flex-shrink: 0;
+            color: var(--on-surface-variant);
+            font: 400 1rem/1.5rem var(--font-text);
+        }
+        .field-trailing { flex-shrink: 0; color: var(--on-surface-variant); pointer-events: none; font-size: 1.5rem; margin-right: -0.5rem; }
+        .field-support {
+            min-height: 1.25rem;
+            padding: 0.25rem 1rem 0;
+            display: flex;
+            align-items: flex-start;
+            flex-wrap: wrap;
+            gap: 2px 6px;
+            font: 400 0.75rem/1rem var(--font-text);
+            letter-spacing: 0.4px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+        .field-support:empty { display: none; }
+        .field-support .material-symbols-rounded { font-size: 1rem; }
+
+        /* Edited vs AI estimate: text tag + icon, never color alone */
+        .edited-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 0 6px;
+            border-radius: 4px;
+            background: var(--primary-container);
+            color: var(--on-surface);
+            font-weight: 500;
+        }
+        :root[data-theme="dark"] .edited-tag { color: #FFFFFF; }
+        .ai-tag { display: inline-flex; align-items: center; gap: 2px; }
+        .field[data-edited="true"] .field-box:not(:focus-within) { border-color: var(--primary); }
+
+        /* Error: thicker border, error label, icon + message */
+        .field[data-invalid="true"] .field-box,
+        .field[data-invalid="true"] .field-box:hover { border: 2px solid var(--error); padding: 0 calc(1rem - 1px); }
+        .field[data-invalid="true"] .field-label { color: var(--error); }
+        .field[data-invalid="true"] .field-support { color: var(--error); }
+        .field-error { display: inline-flex; align-items: flex-start; gap: 4px; }
+
+        .row-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 0.75rem; }
+        .macro-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(6.25rem, 1fr)); gap: 0.75rem; }
+        .field-box .macro-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+        .field[data-macro="carbs"]   .macro-dot { background: var(--macro-carbs); }
+        .field[data-macro="fat"]     .macro-dot { background: var(--macro-fat); }
+        .field[data-macro="protein"] .macro-dot { background: var(--macro-protein); }
+        .macro-grid .field-box { padding: 0 0.75rem; }
+        .macro-grid .field-box:focus-within,
+        .macro-grid .field[data-invalid="true"] .field-box { padding: 0 calc(0.75rem - 1px); }
+        .macro-grid .field-label { left: 0.5rem; }
+        .macro-grid .field-support { padding: 0.25rem 0.5rem 0; }
+
+        /* Weight stepper */
+        .stepper { display: flex; align-items: flex-start; gap: 0.5rem; }
+        .stepper .field { flex: 1; }
+        .tonal-icon-btn {
+            width: 3.5rem;
+            height: 3.5rem;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            display: flex; justify-content: center; align-items: center;
+        }
+        :root:not([data-theme="dark"]) .tonal-icon-btn { background: var(--primary-container); }
+        .tonal-icon-btn .material-symbols-rounded { font-size: 1.5rem; }
+        .tonal-icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 10%, var(--surface-container-high)); }
+        .tonal-icon-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Sticky footer: Apply stays visible at any text size ---------- */
+        .sheet-footer {
+            flex-shrink: 0;
+            padding: 12px 24px 32px;
+            border-top: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+        .footer-status {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font: 400 0.875rem/1.25rem var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .footer-status .material-symbols-rounded { font-size: 1.125rem; }
+        .footer-status[data-tone="error"] { color: var(--error); font-weight: 500; }
+        .footer-status:empty { display: none; }
+        .footer-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 0.5rem; }
+        .text-btn,
+        .filled-btn {
+            min-height: 3rem;
+            padding: 0 12px;
+            border-radius: 1.5rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            font: 500 0.875rem/1.25rem var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn { color: var(--primary); }
+        .text-btn .material-symbols-rounded { font-size: 1.125rem; }
+        .text-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .text-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+        .filled-btn { min-width: 104px; padding: 0 24px; background: var(--primary); color: var(--on-primary); }
+        .filled-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        .filled-btn:disabled {
+            background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 38%, transparent);
+        }
+
+        /* ---------- Snackbar (S-18) ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px; right: 16px; bottom: 32px;
+            min-height: 48px;
+            padding: 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+        }
+        .snackbar.show { transform: none; opacity: 1; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .nowrap { white-space: nowrap; }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: S-07 states (spec §4.1 / §4.7). Loading and Empty are not applicable:
+         the sheet only opens over an existing result, prefilled locally. -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="edited">Edited</button>
+        <button type="button" data-state-choice="error">Error</button>
+        <button type="button" data-state-choice="large-text">Large text</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <!-- S-15 Meal review underlay: inert while the sheet is open -->
+        <div class="underlay" id="underlay">
+            <header class="top-app-bar">
+                <button type="button" class="icon-btn" aria-label="Back to Meal review" data-route="mealReview">
+                    <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+                </button>
+                <span class="spacer"></span>
+                <button type="button" class="icon-btn" id="openerBtn" aria-label="Edit nutrition" aria-haspopup="dialog" aria-controls="sheet">
+                    <span class="material-symbols-rounded" aria-hidden="true">edit</span>
+                </button>
+            </header>
+            <div class="review-content">
+                <div>
+                    <p class="review-title" id="uName">Grilled chicken salad</p>
+                    <p class="review-meta" id="uMeta">Today · 11:02 · Lunch</p>
+                </div>
+                <div class="review-image" aria-hidden="true">
+                    <span class="material-symbols-rounded">restaurant</span>
+                </div>
+                <div class="review-rows">
+                    <div class="review-row"><span>Portion</span><strong id="uGrams">350 g</strong></div>
+                    <div class="review-row"><span>Calories</span><strong id="uKcal">450 kcal</strong></div>
+                    <div class="review-row"><span>Carbs · Fat · Protein</span><strong id="uMacros">14 · 26 · 38 g</strong></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="scrim" id="scrim" aria-hidden="true"></div>
+
+        <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-describedby="sheetSub">
+            <div class="drag-handle" aria-hidden="true"><span></span></div>
+
+            <form class="sheet-body" id="editForm" novalidate>
+                <div class="sheet-head">
+                    <div class="sheet-head-text">
+                        <h1 class="sheet-title" id="sheetTitle" tabindex="-1">Edit nutrition</h1>
+                        <p class="sheet-sub" id="sheetSub">Today with this meal: <span class="nowrap"><strong id="dayTotal">770</strong> of 2,300 kcal</span></p>
+                    </div>
+                    <button type="button" class="text-btn" id="resetBtn" aria-label="Reset to AI estimate">
+                        <span class="material-symbols-rounded" aria-hidden="true">restart_alt</span>Reset
+                    </button>
+                </div>
+
+                <!-- Food -->
+                <div class="field" data-key="name">
+                    <div class="field-box">
+                        <textarea class="field-input field-textarea" id="f-name" rows="1" autocomplete="off" maxlength="80" placeholder=" " aria-describedby="s-name"></textarea>
+                        <label class="field-label" for="f-name">Food name</label>
+                    </div>
+                    <div class="field-support" id="s-name"></div>
+                </div>
+
+                <div class="row-2">
+                    <div class="field" data-key="meal">
+                        <div class="field-box">
+                            <select class="field-input" id="f-meal" aria-describedby="s-meal">
+                                <option>Breakfast</option>
+                                <option>Lunch</option>
+                                <option>Dinner</option>
+                                <option>Snack</option>
+                            </select>
+                            <label class="field-label" for="f-meal">Meal</label>
+                            <span class="material-symbols-rounded field-trailing" aria-hidden="true">arrow_drop_down</span>
+                        </div>
+                        <div class="field-support" id="s-meal"></div>
+                    </div>
+                    <div class="field" data-key="time">
+                        <div class="field-box">
+                            <input class="field-input" id="f-time" type="time" aria-describedby="s-time">
+                            <label class="field-label" for="f-time">Time</label>
+                        </div>
+                        <div class="field-support" id="s-time"></div>
+                    </div>
+                </div>
+
+                <!-- Portion (F-02) -->
+                <div class="stepper">
+                    <button type="button" class="tonal-icon-btn" id="gramsMinus" aria-label="Decrease weight by 10 g" aria-controls="f-grams">
+                        <span class="material-symbols-rounded" aria-hidden="true">remove</span>
+                    </button>
+                    <div class="field" data-key="grams">
+                        <div class="field-box">
+                            <input class="field-input" id="f-grams" type="text" inputmode="decimal" autocomplete="off" placeholder=" " aria-describedby="s-grams">
+                            <label class="field-label" for="f-grams">Weight<span class="sr-only"> in grams</span></label>
+                            <span class="field-suffix" aria-hidden="true">g</span>
+                        </div>
+                        <div class="field-support" id="s-grams"></div>
+                    </div>
+                    <button type="button" class="tonal-icon-btn" id="gramsPlus" aria-label="Increase weight by 10 g" aria-controls="f-grams">
+                        <span class="material-symbols-rounded" aria-hidden="true">add</span>
+                    </button>
+                </div>
+
+                <!-- Nutrition -->
+                <h2 class="section-title">Nutrition <small>Macros are optional</small></h2>
+
+                <div class="field" data-key="kcal">
+                    <div class="field-box">
+                        <input class="field-input" id="f-kcal" type="text" inputmode="decimal" autocomplete="off" placeholder=" " aria-describedby="s-kcal">
+                        <label class="field-label" for="f-kcal">Calories<span class="sr-only"> in kcal</span></label>
+                        <span class="field-suffix" aria-hidden="true">kcal</span>
+                    </div>
+                    <div class="field-support" id="s-kcal"></div>
+                </div>
+
+                <div class="macro-grid">
+                    <div class="field" data-key="carbs" data-macro="carbs">
+                        <div class="field-box">
+                            <span class="macro-dot" aria-hidden="true"></span>
+                            <input class="field-input" id="f-carbs" type="text" inputmode="decimal" autocomplete="off" placeholder=" " aria-describedby="s-carbs">
+                            <label class="field-label" for="f-carbs">Carbs<span class="sr-only"> in grams, optional</span></label>
+                            <span class="field-suffix" aria-hidden="true">g</span>
+                        </div>
+                        <div class="field-support" id="s-carbs"></div>
+                    </div>
+                    <div class="field" data-key="fat" data-macro="fat">
+                        <div class="field-box">
+                            <span class="macro-dot" aria-hidden="true"></span>
+                            <input class="field-input" id="f-fat" type="text" inputmode="decimal" autocomplete="off" placeholder=" " aria-describedby="s-fat">
+                            <label class="field-label" for="f-fat">Fat<span class="sr-only"> in grams, optional</span></label>
+                            <span class="field-suffix" aria-hidden="true">g</span>
+                        </div>
+                        <div class="field-support" id="s-fat"></div>
+                    </div>
+                    <div class="field" data-key="protein" data-macro="protein">
+                        <div class="field-box">
+                            <span class="macro-dot" aria-hidden="true"></span>
+                            <input class="field-input" id="f-protein" type="text" inputmode="decimal" autocomplete="off" placeholder=" " aria-describedby="s-protein">
+                            <label class="field-label" for="f-protein">Protein<span class="sr-only"> in grams, optional</span></label>
+                            <span class="field-suffix" aria-hidden="true">g</span>
+                        </div>
+                        <div class="field-support" id="s-protein"></div>
+                    </div>
+                </div>
+            </form>
+
+            <div class="sheet-footer">
+                <p class="footer-status" id="footerStatus" role="status" aria-live="polite"></p>
+                <div class="footer-actions">
+                    <button type="button" class="text-btn" id="cancelBtn" data-route="mealReview">Cancel</button>
+                    <button type="button" class="filled-btn" id="applyBtn" data-route="mealReview">Apply</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite"></div>
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data (consistent with S-02 / S-12: today's lunch) ---------------- */
+        const AI = { name: 'Grilled chicken salad', meal: 'Lunch', time: '11:02', grams: 350, kcal: 450, carbs: 14, fat: 26, protein: 38 };
+        const OTHER_MEALS_KCAL = 320; // Breakfast "Oatmeal & berries"
+        const GOAL_KCAL = 2300;
+        const DEPENDENT = ['kcal', 'carbs', 'fat', 'protein']; // scale with grams unless edited by hand
+        const UNITS = { grams: 'g', kcal: 'kcal', carbs: 'g', fat: 'g', protein: 'g' };
+        const LABELS = { name: 'Food name', meal: 'Meal', time: 'Time', grams: 'Weight', kcal: 'Calories', carbs: 'Carbs', fat: 'Fat', protein: 'Protein' };
+        const KEYS = ['name', 'meal', 'time', 'grams', 'kcal', 'carbs', 'fat', 'protein'];
+        const STATES = ['default', 'edited', 'error', 'large-text'];
+        const STEP = 10;
+
+        const $ = (id) => document.getElementById(id);
+        const input = (k) => $('f-' + k);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+
+        let state = 'default';
+        let manual = new Set();   // dependent values typed by the user (displayed source, not rescaled)
+        let timers = [];
+        let announceTimer = null;
+        const later = (fn, ms) => timers.push(setTimeout(fn, ms));
+        const clearTimers = () => { timers.forEach(clearTimeout); timers = []; };
+
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        function announceSoon(msg) { clearTimeout(announceTimer); announceTimer = setTimeout(() => announce(msg), 600); }
+
+        /* ---------------- Parsing & validation ---------------- */
+        function parse(raw) {
+            const s = String(raw).trim().replace(',', '.');
+            if (s === '') return { blank: true };
+            if (!/^-?\d+(\.\d+)?$/.test(s)) return { nan: true };
+            return { value: Number(s) };
+        }
+        function gramsValue() {
+            const p = parse(input('grams').value);
+            return p.value > 0 && p.value <= 5000 ? p.value : null;
+        }
+        const estimate = (k, g) => Math.round(AI[k] * (g || AI.grams) / AI.grams);
+
+        function validate() {
+            const errors = {};
+            if (!input('name').value.trim()) errors.name = 'Enter a food name';
+            if (!input('time').value) errors.time = 'Enter a time';
+
+            const g = parse(input('grams').value);
+            if (g.blank) errors.grams = 'Enter the weight';
+            else if (g.nan) errors.grams = 'Use numbers only, e.g. 350';
+            else if (g.value <= 0) errors.grams = 'Weight must be more than 0 g';
+            else if (g.value > 5000) errors.grams = 'Weight can’t exceed 5,000 g';
+
+            const k = parse(input('kcal').value);
+            if (k.blank) errors.kcal = 'Enter calories';
+            else if (k.nan) errors.kcal = 'Use numbers only, e.g. 450';
+            else if (k.value < 0) errors.kcal = 'Calories can’t be negative';
+            else if (k.value > 10000) errors.kcal = 'Calories can’t exceed 10,000 kcal';
+
+            const grams = gramsValue();
+            ['carbs', 'fat', 'protein'].forEach((m) => {
+                const p = parse(input(m).value);
+                if (p.blank) return; // optional
+                if (p.nan) errors[m] = 'Numbers only';
+                else if (p.value < 0) errors[m] = 'Can’t be negative';
+                else if (grams && p.value > grams) errors[m] = `Over ${fmt(grams)} g weight`;
+            });
+            return errors;
+        }
+
+        function isEdited(k) {
+            if (DEPENDENT.includes(k)) return manual.has(k);
+            if (k === 'grams') { const p = parse(input('grams').value); return p.value !== AI.grams; }
+            if (k === 'name') return input('name').value.trim() !== AI.name;
+            return input(k).value !== AI[k];
+        }
+
+        /* ---------------- Render ---------------- */
+        const editedTag = '<span class="edited-tag"><span class="material-symbols-rounded" aria-hidden="true">edit</span>Edited</span>';
+        const aiTag = (text) => `<span class="ai-tag"><span class="material-symbols-rounded" aria-hidden="true">auto_awesome</span>${text}</span>`;
+
+        function supportHtml(k, error) {
+            if (error) return `<span class="field-error"><span class="material-symbols-rounded icon-filled" aria-hidden="true">error</span>${error}</span>`;
+            const edited = isEdited(k);
+            const g = gramsValue();
+            if (k === 'name') return edited ? `${editedTag}<span>AI: ${AI.name}</span>` : aiTag('AI estimate');
+            if (k === 'meal' || k === 'time') return edited ? `${editedTag}<span>Was ${AI[k]}</span>` : '';
+            if (k === 'grams') return edited ? `${editedTag}<span>AI estimate ${AI.grams} g</span>` : aiTag('AI estimate');
+            const unit = UNITS[k];
+            const isMacro = k !== 'kcal';
+            if (edited) return `${editedTag}<span>${isMacro ? 'AI' : 'AI estimate'} ${fmt(estimate(k, g))} ${unit}</span>`;
+            if (g && g !== AI.grams) return `<span>${isMacro ? 'For' : 'Recalculated for'} ${fmt(g)} g</span>`;
+            return aiTag(isMacro ? 'AI' : 'AI estimate');
+        }
+
+        function refresh() {
+            const errors = validate();
+            KEYS.forEach((k) => {
+                const field = document.querySelector(`.field[data-key="${k}"]`);
+                const err = errors[k];
+                field.dataset.invalid = String(Boolean(err));
+                field.dataset.edited = String(!err && isEdited(k));
+                input(k).setAttribute('aria-invalid', String(Boolean(err)));
+                $('s-' + k).innerHTML = supportHtml(k, err);
+            });
+
+            const errorCount = Object.keys(errors).length;
+            const editCount = KEYS.filter(isEdited).length;
+            const status = $('footerStatus');
+            if (errorCount) {
+                status.dataset.tone = 'error';
+                status.innerHTML = `<span class="material-symbols-rounded icon-filled" aria-hidden="true">error</span>Fix ${errorCount} ${errorCount === 1 ? 'field' : 'fields'} to apply`;
+            } else if (editCount) {
+                status.dataset.tone = 'edited';
+                status.innerHTML = `<span class="material-symbols-rounded" aria-hidden="true">edit</span>${editCount} ${editCount === 1 ? 'value' : 'values'} edited`;
+            } else {
+                status.dataset.tone = 'ai';
+                status.innerHTML = ''; // per-field "AI estimate" tags already say where values come from
+            }
+            $('applyBtn').disabled = errorCount > 0;
+            $('resetBtn').disabled = editCount === 0;
+
+            const g = gramsValue();
+            $('gramsMinus').disabled = !g || g <= 1;
+            $('gramsPlus').disabled = Boolean(g) && g >= 5000;
+
+            const k = parse(input('kcal').value);
+            $('dayTotal').textContent = k.value >= 0 && !errors.kcal ? fmt(OTHER_MEALS_KCAL + k.value) : '—';
+        }
+
+        /* Grams drive every dependent value that the user has not typed by hand (local, live). */
+        function recalc() {
+            const g = gramsValue();
+            if (!g) return;
+            DEPENDENT.forEach((k) => { if (!manual.has(k)) input(k).value = estimate(k, g); });
+        }
+
+        function fill(values) {
+            KEYS.forEach((k) => { input(k).value = values[k]; });
+        }
+
+        /* ---------------- Events ---------------- */
+        const form = $('editForm');
+        form.addEventListener('submit', (e) => e.preventDefault());
+        // Food name is single-value: Enter must not add a line break
+        input('name').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.preventDefault(); });
+        input('name').addEventListener('input', () => { input('name').value = input('name').value.replace(/[\r\n]+/g, ' '); });
+
+        form.addEventListener('input', (e) => {
+            const k = e.target.id.replace('f-', '');
+            if (k === 'grams') {
+                recalc();
+                const g = gramsValue();
+                if (g) announceSoon(`${fmt(g)} g. Calories ${input('kcal').value} kcal.`);
+            } else if (DEPENDENT.includes(k)) {
+                const p = parse(input(k).value);
+                if (p.value === estimate(k, gramsValue())) manual.delete(k); else manual.add(k);
+            }
+            refresh();
+        });
+
+        function step(delta) {
+            const p = parse(input('grams').value);
+            const base = p.value > 0 ? p.value : AI.grams;
+            const next = Math.min(5000, Math.max(1, Math.round((base + delta) / STEP) * STEP || 1));
+            input('grams').value = next;
+            recalc();
+            refresh();
+            announceSoon(`${fmt(next)} g. Calories ${input('kcal').value} kcal.`);
+        }
+        $('gramsMinus').addEventListener('click', () => step(-STEP));
+        $('gramsPlus').addEventListener('click', () => step(STEP));
+
+        $('resetBtn').addEventListener('click', () => {
+            manual.clear();
+            fill(AI);
+            refresh();
+            announce('AI estimate restored');
+            $('sheetTitle').focus(); // Reset becomes disabled; keep focus inside the sheet at its start
+        });
+
+        /* ---------------- Sheet: open, focus trap, dismiss ---------------- */
+        const sheet = $('sheet');
+        const scrim = $('scrim');
+        const underlay = $('underlay');
+
+        function focusables() {
+            return Array.from(sheet.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled)'))
+                .filter((el) => el.offsetParent !== null);
+        }
+
+        function openSheet() {
+            clearTimers();
+            sheet.hidden = false;
+            scrim.hidden = false;
+            underlay.inert = true;
+            underlay.setAttribute('aria-hidden', 'true');
+            sheet.classList.add('opening');
+            sheet.classList.remove('closing');
+            scrim.classList.remove('closing');
+            requestAnimationFrame(() => requestAnimationFrame(() => sheet.classList.remove('opening')));
+            $('openerBtn').setAttribute('aria-expanded', 'true');
+            $('sheetTitle').focus({ preventScroll: true });
+        }
+
+        function closeSheet(applied) {
+            const hadEdits = KEYS.some(isEdited);
+            sheet.classList.add('closing');
+            scrim.classList.add('closing');
+            underlay.inert = false;
+            underlay.removeAttribute('aria-hidden');
+            $('openerBtn').setAttribute('aria-expanded', 'false');
+            later(() => { sheet.hidden = true; scrim.hidden = true; }, 260);
+            $('openerBtn').focus({ preventScroll: true }); // return focus to the invoking control
+
+            if (applied) {
+                const v = (k) => input(k).value.trim();
+                const macro = (k) => (v(k) === '' ? '–' : fmt(parse(v(k)).value));
+                $('uName').textContent = v('name');
+                $('uMeta').textContent = `Today · ${v('time')} · ${input('meal').value}`;
+                $('uGrams').textContent = `${fmt(gramsValue())} g`;
+                $('uKcal').textContent = `${fmt(parse(v('kcal')).value)} kcal`;
+                $('uMacros').textContent = `${macro('carbs')} · ${macro('fat')} · ${macro('protein')} g`;
+                showSnackbar(hadEdits ? 'Nutrition updated' : 'No changes');
+            } else if (hadEdits) {
+                showSnackbar('Edits discarded');
+            }
+            // Prototype: after the result is visible, continue to the S-15 Meal review route.
+            later(() => routeTo('mealReview'), 1400);
+        }
+
+        // Reuse prototype-navigation.js routing without its immediate click handling.
+        function routeTo(route) {
+            const link = document.createElement('button');
+            link.type = 'button';
+            link.hidden = true;
+            link.dataset.route = route;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        $('applyBtn').addEventListener('click', (e) => { e.stopPropagation(); closeSheet(true); });
+        $('cancelBtn').addEventListener('click', (e) => { e.stopPropagation(); closeSheet(false); });
+        scrim.addEventListener('click', () => closeSheet(false));
+        $('openerBtn').addEventListener('click', openSheet);
+
+        sheet.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); closeSheet(false); return; }
+            if (e.key !== 'Tab') return;
+            const items = focusables();
+            if (!items.length) return;
+            const first = items[0];
+            const last = items[items.length - 1];
+            const active = document.activeElement;
+            if (e.shiftKey && (active === first || active === $('sheetTitle'))) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && active === last) { e.preventDefault(); first.focus(); }
+        });
+        // Keep focus inside the modal sheet if it escapes (e.g. click on the frame edge)
+        document.addEventListener('focusin', (e) => {
+            if (!sheet.hidden && !sheet.classList.contains('closing') && !sheet.contains(e.target) && $('sheet').closest('.device-frame').contains(e.target)) {
+                $('sheetTitle').focus({ preventScroll: true });
+            }
+        });
+
+        function showSnackbar(text) {
+            const bar = $('snackbar');
+            bar.textContent = text;
+            bar.classList.add('show');
+            later(() => bar.classList.remove('show'), 3000);
+        }
+
+        /* ---------------- Prototype states ---------------- */
+        function render(next) {
+            state = STATES.includes(next) ? next : 'default';
+            clearTimers();
+            $('snackbar').classList.remove('show');
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+            document.documentElement.style.fontSize = state === 'large-text' ? '200%' : '';
+
+            manual = new Set();
+            fill(AI);
+            if (state === 'edited') {
+                // Weight lowered with the stepper; fat typed by hand (kept as the displayed source).
+                input('grams').value = 300;
+                recalc();
+                manual.add('fat');
+                input('fat').value = 30;
+            } else if (state === 'error') {
+                input('name').value = '';
+                input('grams').value = '-50';
+                manual.add('kcal');
+                input('kcal').value = '';
+            }
+            refresh();
+            openSheet();
+            $('sheet').querySelector('.sheet-body').scrollTop = 0;
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(location.search).get('state') || 'default');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

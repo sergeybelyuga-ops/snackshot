@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-10 | Save / Health Connect Prompt - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens (light/dark color roles, chart colors, typography) -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-10 Save / Health Connect prompt — implements UX spec §4.9, §2.3 "First launch and first save", F-19, F-20.
+         * Saved-meal context (dimmed, inert) -> scrim -> ModalBottomSheet (role=dialog):
+         * local-save confirmation first -> short privacy explanation of optional sync
+         * -> FilledButton Connect Health Connect -> TextButton Keep on device only -> Privacy details; close icon = Later.
+         * Health Connect never blocks local logging and never requires a Snackshot sign-in.
+         * Color tokens come from prototype-theme.css; this file only adds layout.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label {
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+            margin-right: 4px;
+        }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Pixel 9 Pro device frame: 412x892 ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+            position: relative;
+            z-index: 10;
+        }
+        .camera-hole {
+            width: 14px;
+            height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Saved-meal context behind the sheet (inert, decorative) ---------- */
+        .context {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 0 16px;
+        }
+        .context-bar {
+            height: 64px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 0 -12px;
+        }
+        .context-bar .material-symbols-rounded {
+            width: 48px;
+            text-align: center;
+            color: var(--on-surface-variant);
+        }
+        .context-title {
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .context-photo {
+            height: 168px;
+            border-radius: 28px;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .context-photo .material-symbols-rounded { font-size: 48px; }
+        .context-meal {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            gap: 12px;
+        }
+        .context-name { font: 400 22px/28px var(--font-display); }
+        .context-kcal { font: 400 22px/28px var(--font-display); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+        /* ---------- Scrim + ModalBottomSheet ---------- */
+        .scrim {
+            position: absolute;
+            inset: 0;
+            background: rgb(0 0 0 / 32%);
+            z-index: 20;
+        }
+        :root[data-theme="dark"] .scrim { background: rgb(0 0 0 / 56%); }
+
+        .sheet {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            max-height: calc(100% - 56px);
+            overflow-y: auto;
+            scrollbar-width: none;
+            z-index: 30;
+            padding: 0 24px 32px; /* bottom clears the system nav pill */
+            border-radius: 28px 28px 0 0;
+            background: var(--surface-container);
+            box-shadow: 0 -2px 12px rgba(0,0,0,.18);
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            animation: sheet-in 260ms cubic-bezier(.2,0,0,1);
+        }
+        .sheet::-webkit-scrollbar { display: none; }
+        .sheet:focus { outline: none; }
+        @keyframes sheet-in { from { transform: translateY(40px); opacity: 0; } }
+
+        .sheet-top {
+            position: relative;
+            height: 36px;
+            display: flex;
+            justify-content: center;
+            margin-bottom: -12px;
+        }
+        .drag-handle {
+            width: 32px;
+            height: 4px;
+            margin-top: 16px;
+            border-radius: 2px;
+            background: var(--outline);
+            opacity: .6;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface-variant);
+        }
+        .icon-btn:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .later-btn { position: absolute; top: 8px; right: -12px; }
+
+        /* Local save confirmation — always first, always visible */
+        .saved-card {
+            display: grid;
+            grid-template-columns: 40px 1fr;
+            gap: 12px;
+            align-items: center;
+            padding: 12px 16px 12px 12px;
+            margin-right: 32px; /* keeps clear of the Later button */
+            border-radius: 16px;
+            background: var(--surface-container-high);
+        }
+        .saved-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--tertiary);
+            background: color-mix(in srgb, var(--tertiary) 14%, transparent);
+        }
+        .saved-card[data-saving="true"] .saved-icon {
+            color: var(--on-surface-variant);
+            background: transparent;
+        }
+        .saved-text { display: flex; flex-direction: column; min-width: 0; }
+        .saved-title { font: 500 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .saved-meta {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+            overflow-wrap: anywhere;
+        }
+
+        .sheet-view { display: flex; flex-direction: column; gap: 16px; }
+        .sheet-title {
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+            letter-spacing: 0;
+        }
+        .sheet-body {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+
+        /* Short privacy explanation: three plain rows, icon + title + one sentence */
+        .points { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+        .point { display: grid; grid-template-columns: 24px 1fr; gap: 16px; align-items: start; }
+        .point > .material-symbols-rounded { color: var(--on-surface-variant); margin-top: 1px; }
+        .point-title { display: block; font: 500 14px/20px var(--font-text); letter-spacing: 0.1px; }
+        .point-text {
+            display: block;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-radius: 24px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .text-btn .material-symbols-rounded { font-size: 18px; }
+        .privacy-link { align-self: flex-start; margin: -8px 0 -8px -12px; }
+
+        .actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+        .filled-btn {
+            min-height: 48px;
+            padding: 0 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border-radius: 24px;
+            background: var(--primary);
+            color: var(--on-primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            text-align: center;
+        }
+        .filled-btn:hover:not(:disabled) { box-shadow: 0 1px 3px rgba(0,0,0,.25); background: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        .filled-btn:disabled {
+            background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 50%, transparent);
+        }
+        .actions .text-btn { width: 100%; }
+
+        /* Circular progress indicator (indeterminate) */
+        .spinner {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            border: 2.5px solid currentColor;
+            border-right-color: transparent;
+            animation: spin 900ms linear infinite;
+        }
+        .saved-icon .spinner { width: 22px; height: 22px; border-width: 3px; color: var(--primary); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 40;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-10 states required by spec §4.1 / §4.9.
+         Empty is not a separate state here: "local-only with no connection" is the Default prompt. -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="error">Not available</button>
+        <button type="button" data-state-choice="success">Kept on device</button>
+    </div>
+
+    <!-- Pixel 9 UI Board -->
+    <div class="device-frame">
+        <!-- Status Bar -->
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <!-- Saved-meal context the sheet opens over (decorative, not interactive while the sheet is open) -->
+        <div class="context" aria-hidden="true" inert>
+            <div class="context-bar">
+                <span class="material-symbols-rounded">arrow_back</span>
+                <span class="context-title">Meal review</span>
+            </div>
+            <div class="context-photo"><span class="material-symbols-rounded">restaurant</span></div>
+            <div class="context-meal">
+                <span class="context-name" id="ctxName"></span>
+                <span class="context-kcal" id="ctxKcal"></span>
+            </div>
+        </div>
+
+        <!-- Scrim: tapping outside the sheet = Later -->
+        <div class="scrim" id="scrim" aria-hidden="true"></div>
+
+        <!-- S-10 ModalBottomSheet -->
+        <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" aria-describedby="savedTitle" tabindex="-1">
+            <div class="sheet-top">
+                <span class="drag-handle" aria-hidden="true"></span>
+                <!-- Later: dismiss without deciding; the meal is already saved -->
+                <button type="button" class="icon-btn later-btn" id="laterBtn" aria-label="Later, decide another time" data-route="home">
+                    <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                </button>
+            </div>
+
+            <!-- 1. Local save comes first -->
+            <div class="saved-card" id="savedCard" data-saving="false">
+                <span class="saved-icon" id="savedIcon" aria-hidden="true"></span>
+                <span class="saved-text">
+                    <span class="saved-title" id="savedTitle">Meal saved on this device</span>
+                    <span class="saved-meta" id="savedMeta"></span>
+                </span>
+            </div>
+
+            <!-- 2a. Default / Loading: optional Health Connect explanation -->
+            <div class="sheet-view" id="viewPrompt">
+                <h1 class="sheet-title" id="titlePrompt">Also share with Health Connect?</h1>
+                <ul class="points">
+                    <li class="point">
+                        <span class="material-symbols-rounded" aria-hidden="true">smartphone</span>
+                        <span>
+                            <span class="point-title">Your meals stay on this phone</span>
+                            <span class="point-text">Snackshot has no servers and no account. Your nutrition history is kept on this device.</span>
+                        </span>
+                    </li>
+                    <li class="point">
+                        <span class="material-symbols-rounded" aria-hidden="true">sync</span>
+                        <span>
+                            <span class="point-title">Health Connect is optional</span>
+                            <span class="point-text">If you connect, each meal's calories and macros are also saved in Health Connect, and your calorie and macro goals are read from it. Apps you allow there can use this data.</span>
+                        </span>
+                    </li>
+                    <li class="point">
+                        <span class="material-symbols-rounded" aria-hidden="true">tune</span>
+                        <span>
+                            <span class="point-title">Your choice, anytime</span>
+                            <span class="point-text">No Snackshot sign-in needed. Change this later in Settings.</span>
+                        </span>
+                    </li>
+                </ul>
+                <button type="button" class="text-btn privacy-link" data-route="privacy">
+                    <span class="material-symbols-rounded" aria-hidden="true">shield</span> Privacy details
+                </button>
+                <div class="actions">
+                    <button type="button" class="filled-btn" id="connectBtn" data-route="healthConnect">Connect Health Connect</button>
+                    <button type="button" class="text-btn" data-route="homeSavedLocal">Keep on device only</button>
+                </div>
+            </div>
+
+            <!-- 2b. Error: Health Connect not available on this device -->
+            <div class="sheet-view" id="viewUnavailable" hidden>
+                <h1 class="sheet-title" id="titleUnavailable">Health Connect isn't available on this phone</h1>
+                <p class="sheet-body">Snackshot works fully without it, and your meals stay on this device.</p>
+                <ul class="points">
+                    <li class="point">
+                        <span class="material-symbols-rounded" aria-hidden="true">info</span>
+                        <span class="point-text">Health Connect needs Android 9 or later. You can connect from Settings if it becomes available.</span>
+                    </li>
+                </ul>
+                <button type="button" class="text-btn privacy-link" data-route="privacy">
+                    <span class="material-symbols-rounded" aria-hidden="true">shield</span> Privacy details
+                </button>
+                <div class="actions">
+                    <button type="button" class="filled-btn" data-route="homeSavedLocal">Continue</button>
+                </div>
+            </div>
+
+            <!-- 2c. Success: local-only choice confirmed -->
+            <div class="sheet-view" id="viewDone" hidden>
+                <h1 class="sheet-title" id="titleDone">Kept on this device</h1>
+                <p class="sheet-body">This meal and the ones you log next stay on this phone only. You can connect Health Connect anytime in Settings.</p>
+                <div class="actions">
+                    <button type="button" class="filled-btn" data-route="homeSavedLocal">Done</button>
+                </div>
+            </div>
+        </section>
+
+        <div class="system-nav-pill" aria-hidden="true"></div>
+
+        <!-- Screen-reader announcements: save confirmation, availability check, errors -->
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data (matches S-02 Home ?state=saved) ---------------- */
+        const MEAL = { name: 'Greek yogurt & honey', type: 'Snack', time: '11:16', kcal: 210, c: 24, f: 6, p: 15 };
+
+        const $ = (id) => document.getElementById(id);
+        let timers = [];
+        const later = (fn, ms) => timers.push(window.setTimeout(fn, ms));
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+        function announce(msg) { $('announcer').textContent = ''; later(() => { $('announcer').textContent = msg; }, 50); }
+
+        $('ctxName').textContent = MEAL.name;
+        $('ctxKcal').textContent = MEAL.kcal + ' kcal';
+        const savedMetaText = `${MEAL.name} · ${MEAL.kcal} kcal · ${MEAL.time}`;
+
+        /* ---------------- Local save card ---------------- */
+        function setSaved(saving) {
+            $('savedCard').dataset.saving = String(saving);
+            $('savedIcon').innerHTML = saving
+                ? '<span class="spinner"></span>'
+                : '<span class="material-symbols-rounded icon-filled">check_circle</span>';
+            $('savedTitle').textContent = saving ? 'Saving on this device…' : 'Meal saved on this device';
+            $('savedMeta').textContent = savedMetaText;
+        }
+
+        /* ---------------- Connect button ---------------- */
+        function setConnect(checking) {
+            const btn = $('connectBtn');
+            btn.disabled = checking;
+            btn.innerHTML = checking
+                ? '<span class="spinner" aria-hidden="true"></span> Checking Health Connect…'
+                : 'Connect Health Connect';
+        }
+
+        function showView(view) {
+            ['viewPrompt', 'viewUnavailable', 'viewDone'].forEach((id) => { $(id).hidden = id !== view; });
+            const title = { viewPrompt: 'titlePrompt', viewUnavailable: 'titleUnavailable', viewDone: 'titleDone' }[view];
+            $('sheet').setAttribute('aria-labelledby', title);
+        }
+
+        /* ---------------- States ---------------- */
+        let state = 'default';
+        function render(next) {
+            state = next;
+            clearTimers();
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            switch (state) {
+                case 'loading':
+                    // §4.9: persist locally first, then check the SDK. Connect stays disabled
+                    // while checking; "Keep on device only" is always available.
+                    showView('viewPrompt');
+                    setSaved(true);
+                    setConnect(true);
+                    announce('Saving meal on this device');
+                    later(() => {
+                        setSaved(false);
+                        announce('Meal saved on this device. Checking Health Connect.');
+                    }, 900);
+                    break;
+
+                case 'error':
+                    // Health Connect SDK unavailable: explain calmly, keep local, offer Continue.
+                    showView('viewUnavailable');
+                    setSaved(false);
+                    announce("Meal saved on this device. Health Connect isn't available on this phone.");
+                    break;
+
+                case 'success':
+                    showView('viewDone');
+                    setSaved(false);
+                    announce('Meal saved on this device. Kept on this device only.');
+                    break;
+
+                default:
+                    state = 'default';
+                    showView('viewPrompt');
+                    setSaved(false);
+                    setConnect(false);
+                    announce('Meal saved on this device');
+            }
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state');
+            else url.searchParams.set('state', state);
+            try { window.history.replaceState(null, '', url); } catch (e) { /* file:// in some browsers */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        /* ---------------- Modal behavior: scrim / Esc = Later, focus trap ---------------- */
+        $('scrim').addEventListener('click', () => $('laterBtn').click());
+
+        document.addEventListener('keydown', (e) => {
+            const sheet = $('sheet');
+            if (e.key === 'Escape' && sheet.contains(document.activeElement)) {
+                $('laterBtn').click();
+                return;
+            }
+            if (e.key !== 'Tab' || !sheet.contains(document.activeElement)) return;
+            const focusables = [...sheet.querySelectorAll('button:not(:disabled)')]
+                .filter((el) => el.offsetParent !== null);
+            if (!focusables.length) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && (document.activeElement === first || document.activeElement === sheet)) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+
+        render(new URLSearchParams(window.location.search).get('state') || 'default');
+        $('sheet').focus({ preventScroll: true }); // the dialog takes focus when it opens
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

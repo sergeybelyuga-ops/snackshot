@@ -1,0 +1,1434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-16 | Settings - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, macro and status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-16 Settings / integration — UX spec §4.12, §5.4, F-19, F-20.
+         * In-page sub-views (switchView): Settings hub -> Google Health connection,
+         * Image retention policy, Nutrition preferences (+ goal details), Theme.
+         * Privacy details opens S-01A. Destructive / consequential actions use an
+         * S-17 AlertDialog; results are reported with an S-18 snackbar.
+         * Color tokens come from prototype-theme.css; this file only adds layout.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: default; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Pixel 9 Pro device frame: 412x892 ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px;
+            height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .views { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+        /* ---------- Sub-views ---------- */
+        .view-screen {
+            display: none;
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 0 16px 32px;
+            flex-direction: column;
+            gap: 16px;
+            scrollbar-width: none;
+        }
+        .view-screen::-webkit-scrollbar { display: none; }
+        .view-screen.active { display: flex; }
+
+        .top-app-bar {
+            position: sticky;
+            top: 0;
+            z-index: 3;
+            flex: 0 0 64px;
+            margin: 0 -16px;
+            padding: 0 16px 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: var(--surface);
+        }
+        .top-app-bar h1 {
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+            min-width: 0;
+        }
+        .top-app-bar h1:focus { outline: none; }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+        }
+        .icon-btn:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        .section-label {
+            margin: 8px 4px -8px;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            color: var(--on-surface-variant);
+        }
+        .intro {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            padding: 0 4px;
+        }
+        .intro strong { color: var(--on-surface); font-weight: 500; }
+
+        /* ---------- Grouped list rows (§3.2: grouped surfaces, no nested cards) ---------- */
+        .list-group { display: flex; flex-direction: column; gap: 2px; }
+        .list-row {
+            width: 100%;
+            min-height: 72px;
+            display: grid;
+            grid-template-columns: 40px minmax(0, 1fr) auto;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 16px;
+            background: var(--surface-container);
+            border-radius: 4px;
+            color: var(--on-surface);
+        }
+        .list-group > .list-row:first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
+        .list-group > .list-row:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
+        button.list-row:hover,
+        label.list-row:hover { background: color-mix(in srgb, var(--on-surface) 5%, var(--surface-container)); }
+        .row-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+        }
+        .row-icon .material-symbols-rounded { font-size: 22px; }
+        .row-text { display: flex; flex-direction: column; min-width: 0; }
+        .row-title { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .row-support {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .row-support .material-symbols-rounded { font-size: 16px; }
+        .row-support.is-error { color: var(--error); }
+        .row-trailing { color: var(--on-surface-variant); display: flex; align-items: center; gap: 4px; }
+        .row-value {
+            font-family: var(--font-display);
+            font-size: 20px;
+            line-height: 28px;
+            color: var(--on-surface);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .row-value small { font: 400 13px/16px var(--font-text); color: var(--on-surface-variant); margin-left: 2px; }
+        .list-row.no-icon { grid-template-columns: minmax(0, 1fr) auto; }
+
+        /* Macro accent: colored bar + text label, never color alone */
+        .list-row[data-macro="carbs"]   { --accent: var(--macro-carbs); }
+        .list-row[data-macro="fat"]     { --accent: var(--macro-fat); }
+        .list-row[data-macro="protein"] { --accent: var(--macro-protein); }
+        .list-row[data-macro="calories"] { --accent: var(--primary); }
+        .accent-bar {
+            width: 6px;
+            height: 36px;
+            border-radius: 3px;
+            margin-left: 17px;
+            background: var(--accent);
+        }
+
+        .footnote {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 4px 4px 0;
+            font: 400 12px/16px var(--font-text);
+            letter-spacing: 0.3px;
+            color: var(--on-surface-variant);
+        }
+        .footnote .material-symbols-rounded { font-size: 18px; flex-shrink: 0; }
+
+        /* ---------- Buttons ---------- */
+        .btn {
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .btn .material-symbols-rounded { font-size: 18px; }
+        .btn.block { width: 100%; }
+        .btn-filled { background: var(--primary); color: var(--on-primary); }
+        .btn-filled:hover { box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+        .btn-tonal { background: var(--primary-container); color: var(--on-surface); }
+        .btn-tonal:hover { background: color-mix(in srgb, var(--on-surface) 8%, var(--primary-container)); }
+        .btn-outlined { border: 1px solid var(--outline); color: var(--primary); }
+        .btn-outlined:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .btn-text { padding: 0 12px; color: var(--primary); }
+        .btn-text:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .btn:disabled { opacity: .45; box-shadow: none; }
+        .btn.is-busy .material-symbols-rounded { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ---------- Google Health connection ---------- */
+        .status-card {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            padding: 20px;
+            border-radius: 16px;
+            background: var(--surface-container);
+        }
+        .status-head { display: flex; align-items: center; gap: 16px; }
+        .status-icon {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+        }
+        .status-icon[data-tone="ok"] { background: var(--primary-container); color: var(--on-surface); }
+        .status-icon[data-tone="error"] { color: var(--error); }
+        .status-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 400; }
+        .status-chip {
+            margin-top: 4px;
+            height: 28px;
+            padding: 0 10px 0 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            font: 500 12px/16px var(--font-text);
+            letter-spacing: 0.1px;
+            color: var(--on-surface-variant);
+        }
+        .status-chip .material-symbols-rounded { font-size: 16px; }
+        .status-chip[data-tone="ok"] .material-symbols-rounded { color: var(--tertiary); }
+        .status-chip[data-tone="error"] { border-color: var(--error); color: var(--error); }
+        .status-text { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .kv {
+            display: flex;
+            justify-content: space-between;
+            align-items: baseline;
+            padding-top: 12px;
+            border-top: 1px solid var(--outline-variant);
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+        }
+        .kv dt { color: var(--on-surface-variant); }
+        .kv dd { font-weight: 500; font-variant-numeric: tabular-nums; }
+        .benefits { list-style: none; display: flex; flex-direction: column; gap: 14px; }
+        .benefits li { display: grid; grid-template-columns: 24px 1fr; gap: 14px; align-items: start; font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; }
+        .benefits .material-symbols-rounded { font-size: 22px; color: var(--primary); }
+        .perm-state { font: 500 14px/20px var(--font-text); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+        .perm-state .material-symbols-rounded { font-size: 18px; }
+        .perm-state[data-allowed="true"] { color: var(--on-surface); }
+        .perm-state[data-allowed="true"] .material-symbols-rounded { color: var(--tertiary); }
+        .perm-state[data-allowed="false"] { color: var(--error); }
+        .linear-progress {
+            height: 4px;
+            border-radius: 2px;
+            background: var(--surface-container-high);
+            overflow: hidden;
+            position: relative;
+        }
+        .linear-progress::after {
+            content: '';
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 40%;
+            border-radius: 2px;
+            background: var(--primary);
+            animation: indeterminate 1.3s cubic-bezier(.4,0,.2,1) infinite;
+        }
+        @keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(260%); } }
+        .sk {
+            display: block;
+            background: var(--surface-container-high);
+            border-radius: 8px;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+        @keyframes pulse { 50% { opacity: .5; } }
+
+        /* ---------- Radio rows (retention, theme) ---------- */
+        fieldset { border: 0; min-width: 0; }
+        legend { padding: 0; }
+        .radio-row { cursor: pointer; grid-template-columns: minmax(0, 1fr) 48px; min-height: 64px; padding: 8px 4px 8px 16px; }
+        .radio-row input {
+            appearance: none;
+            width: 48px;
+            height: 48px;
+            margin: 0;
+            border-radius: 50%;
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+        }
+        .radio-row input::before {
+            content: '';
+            width: 20px;
+            height: 20px;
+            box-sizing: border-box;
+            border-radius: 50%;
+            border: 2px solid var(--on-surface-variant);
+        }
+        .radio-row input:checked::before {
+            border-color: var(--primary);
+            background: radial-gradient(circle, var(--primary) 0 5px, transparent 5.5px);
+        }
+        .radio-row input:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+        .radio-row:has(input:checked) .row-title { font-weight: 500; }
+
+        /* ---------- Goal details ---------- */
+        .goal-detail-view { gap: 0; padding-bottom: 24px; }
+        .goal-main {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            padding: 36px 0 28px;
+        }
+        .goal-value-row { width: 100%; display: flex; align-items: flex-start; gap: 8px; }
+        .goal-value-group { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .goal-caption { font: 500 12px/16px var(--font-text); letter-spacing: 0.5px; color: var(--on-surface-variant); text-transform: uppercase; }
+        .goal-value {
+            font-family: var(--font-display);
+            font-size: 57px;
+            line-height: 64px;
+            font-weight: 400;
+            letter-spacing: -0.25px;
+            font-variant-numeric: tabular-nums;
+        }
+        .goal-value-row .goal-value { font-size: 44px; line-height: 52px; }
+        .goal-unit { font: 400 16px/24px var(--font-text); letter-spacing: 0.5px; color: var(--on-surface-variant); }
+        .goal-accent { width: 56px; height: 8px; border-radius: 4px; background: var(--accent, var(--primary)); }
+        .goal-detail-view[data-goal-screen="carbs"]   { --accent: var(--macro-carbs); }
+        .goal-detail-view[data-goal-screen="fat"]     { --accent: var(--macro-fat); }
+        .goal-detail-view[data-goal-screen="protein"] { --accent: var(--macro-protein); }
+        .goal-range-dash { color: var(--on-surface-variant); font-size: 28px; line-height: 52px; margin-top: 24px; }
+        .goal-adjusters { width: 100%; height: 56px; display: flex; gap: 2px; margin-top: 8px; }
+        .goal-adjusters button {
+            flex: 1;
+            min-width: 0;
+            background: var(--surface-container-high);
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .goal-adjusters button .material-symbols-rounded { font-size: 28px; }
+        .goal-adjusters button:first-child { border-radius: 16px 4px 4px 16px; }
+        .goal-adjusters button:last-child { border-radius: 4px 16px 16px 4px; }
+        .goal-adjusters button:hover { background: color-mix(in srgb, var(--primary) 12%, var(--surface-container-high)); }
+        .goal-adjusters button:disabled { opacity: .4; }
+        .goal-target {
+            margin-top: 8px;
+            padding: 6px 14px;
+            border-radius: 16px;
+            background: var(--surface-container);
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+        .goal-target strong { color: var(--on-surface); font-weight: 500; }
+        .goal-about {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 20px;
+            border-radius: 16px;
+            background: var(--surface-container);
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .goal-about h2 { font: 500 16px/24px var(--font-text); letter-spacing: 0.15px; color: var(--on-surface); }
+        .goal-about strong { color: var(--on-surface); font-weight: 500; font-variant-numeric: tabular-nums; }
+        .goal-actions { margin-top: auto; padding-top: 24px; }
+
+        /* ---------- S-18 Snackbar ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 40px;
+            min-height: 48px;
+            padding: 4px 8px 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+        }
+        .snackbar.show { transform: none; opacity: 1; pointer-events: auto; }
+        .snackbar span { flex: 1; padding: 10px 0; }
+        .snackbar button {
+            min-height: 40px;
+            padding: 0 12px;
+            border-radius: 20px;
+            color: var(--primary-container);
+            font: 500 14px/20px var(--font-text);
+        }
+        :root[data-theme="dark"] .snackbar button { color: var(--md-sys-color-primary-light); }
+
+        /* ---------- S-17 AlertDialog ---------- */
+        .scrim {
+            position: absolute;
+            inset: 0;
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background: rgba(0,0,0,.42);
+            animation: fade 160ms ease;
+        }
+        .dialog {
+            width: 100%;
+            max-width: 320px;
+            padding: 24px;
+            border-radius: 28px;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            box-shadow: 0 6px 24px rgba(0,0,0,.3);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            animation: pop 200ms cubic-bezier(.2,0,0,1);
+        }
+        .dialog-icon { align-self: center; color: var(--primary); font-size: 24px; }
+        .dialog h2 { font-family: var(--font-display); font-size: 24px; line-height: 32px; font-weight: 400; text-align: center; }
+        .dialog-body { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); display: flex; flex-direction: column; gap: 12px; }
+        .dialog-body ul { list-style: none; display: flex; flex-direction: column; gap: 12px; }
+        .dialog-body li { display: grid; grid-template-columns: 20px 1fr; gap: 12px; }
+        .dialog-body li .material-symbols-rounded { font-size: 20px; color: var(--on-surface-variant); }
+        .dialog-body strong { color: var(--on-surface); font-weight: 500; }
+        .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+        .dialog-actions .btn { padding: 0 16px; }
+        .dialog-actions .is-destructive { color: var(--error); }
+        .dialog-actions .is-destructive:hover { background: color-mix(in srgb, var(--error) 8%, transparent); }
+        @keyframes fade { from { opacity: 0; } }
+        @keyframes pop { from { opacity: 0; transform: scale(.92); } }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 60;
+        }
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: S-16 states from spec §4.1 / §4.12.
+         Connected = Success, Not connected = Empty (local-only), Error = permission revoked outside the app. -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Connected</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="empty">Not connected</button>
+        <button type="button" data-state-choice="error">Error</button>
+    </div>
+
+    <!-- Pixel 9 UI Board -->
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <div class="views" id="views">
+
+        <!-- ================= SETTINGS HUB (s16_settings) ================= -->
+        <section class="view-screen active" id="view-settings" aria-labelledby="h-settings">
+            <header class="top-app-bar">
+                <button type="button" class="icon-btn" aria-label="Back" data-route="home"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span></button>
+                <h1 id="h-settings" tabindex="-1">Settings</h1>
+            </header>
+
+            <div class="list-group">
+                <button type="button" class="list-row" data-route="paywall">
+                    <span class="row-icon" aria-hidden="true"><span class="material-symbols-rounded">photo_camera</span></span>
+                    <span class="row-text">
+                        <span class="row-title">AI recognition</span>
+                        <span class="row-support">57 of 90 free pictures left · no registration needed</span>
+                    </span>
+                    <span class="row-trailing" aria-hidden="true"><span class="material-symbols-rounded">chevron_right</span></span>
+                </button>
+                <button type="button" class="list-row" data-view-target="google-health">
+                    <span class="row-icon" aria-hidden="true"><span class="material-symbols-rounded">health_and_safety</span></span>
+                    <span class="row-text">
+                        <span class="row-title">Google Health connection</span>
+                        <span class="row-support" id="hub-gh-support">Connected</span>
+                    </span>
+                    <span class="row-trailing" aria-hidden="true"><span class="material-symbols-rounded">chevron_right</span></span>
+                </button>
+                <button type="button" class="list-row" data-view-target="retention">
+                    <span class="row-icon" aria-hidden="true"><span class="material-symbols-rounded">photo_library</span></span>
+                    <span class="row-text">
+                        <span class="row-title">Image retention policy</span>
+                        <span class="row-support" id="hub-retention-support">Keep for 365 days</span>
+                    </span>
+                    <span class="row-trailing" aria-hidden="true"><span class="material-symbols-rounded">chevron_right</span></span>
+                </button>
+                <button type="button" class="list-row" data-view-target="nutrition">
+                    <span class="row-icon" aria-hidden="true"><span class="material-symbols-rounded">nutrition</span></span>
+                    <span class="row-text">
+                        <span class="row-title">Nutrition preferences</span>
+                        <span class="row-support" id="hub-nutrition-support">2,300 kcal · C 220 · F 70 · P 150 g</span>
+                    </span>
+                    <span class="row-trailing" aria-hidden="true"><span class="material-symbols-rounded">chevron_right</span></span>
+                </button>
+                <button type="button" class="list-row" data-view-target="theme">
+                    <span class="row-icon" aria-hidden="true"><span class="material-symbols-rounded">contrast</span></span>
+                    <span class="row-text">
+                        <span class="row-title">Theme</span>
+                        <span class="row-support" id="hub-theme-support">Light</span>
+                    </span>
+                    <span class="row-trailing" aria-hidden="true"><span class="material-symbols-rounded">chevron_right</span></span>
+                </button>
+                <button type="button" class="list-row" data-route="privacy">
+                    <span class="row-icon" aria-hidden="true"><span class="material-symbols-rounded">shield</span></span>
+                    <span class="row-text">
+                        <span class="row-title">Privacy details</span>
+                        <span class="row-support">Where your data is stored and shared</span>
+                    </span>
+                    <span class="row-trailing" aria-hidden="true"><span class="material-symbols-rounded">chevron_right</span></span>
+                </button>
+            </div>
+
+            <p class="footnote">
+                <span class="material-symbols-rounded" aria-hidden="true">smartphone</span>
+                <span>Your meals are stored on this device. Snackshot keeps no health data on its servers; only an anonymous AI-picture counter.</span>
+            </p>
+        </section>
+
+        <!-- ================= GOOGLE HEALTH CONNECTION (s16_google_health_connection) ================= -->
+        <section class="view-screen" id="view-google-health" aria-labelledby="h-google-health">
+            <header class="top-app-bar">
+                <button type="button" class="icon-btn" aria-label="Back" data-view-target="settings"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span></button>
+                <h1 id="h-google-health" tabindex="-1">Google Health connection</h1>
+            </header>
+            <div id="gh-content" style="display: contents;"></div>
+        </section>
+
+        <!-- ================= IMAGE RETENTION POLICY (s16_image_retention_policy) ================= -->
+        <section class="view-screen" id="view-retention" aria-labelledby="h-retention">
+            <header class="top-app-bar">
+                <button type="button" class="icon-btn" aria-label="Back" data-view-target="settings"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span></button>
+                <h1 id="h-retention" tabindex="-1">Image retention policy</h1>
+            </header>
+
+            <p class="intro">Meal photos are kept only on this device. Captured originals are deleted after processing.</p>
+
+            <fieldset>
+                <legend class="section-label" style="margin: 8px 4px 0;">Processed meal photos</legend>
+                <div class="list-group" style="margin-top: 8px;">
+                    <label class="list-row no-icon radio-row">
+                        <span class="row-text">
+                            <span class="row-title">Keep for 30 days</span>
+                            <span class="row-support">Older photos are deleted automatically</span>
+                        </span>
+                        <input type="radio" name="retention" value="30">
+                    </label>
+                    <label class="list-row no-icon radio-row">
+                        <span class="row-text">
+                            <span class="row-title">Keep for 365 days</span>
+                            <span class="row-support">Default</span>
+                        </span>
+                        <input type="radio" name="retention" value="365" checked>
+                    </label>
+                    <label class="list-row no-icon radio-row">
+                        <span class="row-text">
+                            <span class="row-title">Do not keep photos</span>
+                            <span class="row-support">Deleted right after recognition</span>
+                        </span>
+                        <input type="radio" name="retention" value="0">
+                    </label>
+                </div>
+            </fieldset>
+
+            <dl><div class="kv" style="border-top: 0; padding: 0 4px;">
+                <dt>Retained photos on this device</dt>
+                <dd id="retention-storage">124 MB</dd>
+            </div></dl>
+
+            <button type="button" class="btn btn-outlined block" id="delete-photos-btn">
+                <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+                Delete all retained photos
+            </button>
+
+            <p class="footnote">
+                <span class="material-symbols-rounded" aria-hidden="true">info</span>
+                <span>Deleting photos never deletes meals, calories or macros. Photos you pick from your gallery are never changed.</span>
+            </p>
+        </section>
+
+        <!-- ================= NUTRITION PREFERENCES (s16_nutrition_preferences) ================= -->
+        <section class="view-screen" id="view-nutrition" aria-labelledby="h-nutrition">
+            <header class="top-app-bar">
+                <button type="button" class="icon-btn" aria-label="Back" data-view-target="settings"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span></button>
+                <h1 id="h-nutrition" tabindex="-1">Nutrition preferences</h1>
+            </header>
+
+            <p class="intro" id="nutrition-source"></p>
+
+            <h2 class="section-label">Daily goals</h2>
+            <div class="list-group">
+                <button type="button" class="list-row" data-macro="calories" data-view-target="goal-calories" id="row-calories">
+                    <span class="row-icon" aria-hidden="true"><span class="material-symbols-rounded">local_fire_department</span></span>
+                    <span class="row-text">
+                        <span class="row-title">Calories</span>
+                        <span class="row-support" id="summary-calories-range">Range 2,070–2,530</span>
+                    </span>
+                    <span class="row-trailing">
+                        <span class="row-value" id="summary-calories">2,300<small>kcal</small></span>
+                        <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                    </span>
+                </button>
+                <button type="button" class="list-row" data-macro="carbs" data-view-target="goal-carbs" id="row-carbs">
+                    <span class="accent-bar" aria-hidden="true"></span>
+                    <span class="row-text">
+                        <span class="row-title">Carbs</span>
+                        <span class="row-support" id="summary-carbs-range">Range 198–242 g</span>
+                    </span>
+                    <span class="row-trailing">
+                        <span class="row-value" id="summary-carbs">220<small>g</small></span>
+                        <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                    </span>
+                </button>
+                <button type="button" class="list-row" data-macro="fat" data-view-target="goal-fat" id="row-fat">
+                    <span class="accent-bar" aria-hidden="true"></span>
+                    <span class="row-text">
+                        <span class="row-title">Fat</span>
+                        <span class="row-support" id="summary-fat-range">Range 63–77 g</span>
+                    </span>
+                    <span class="row-trailing">
+                        <span class="row-value" id="summary-fat">70<small>g</small></span>
+                        <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                    </span>
+                </button>
+                <button type="button" class="list-row" data-macro="protein" data-view-target="goal-protein" id="row-protein">
+                    <span class="accent-bar" aria-hidden="true"></span>
+                    <span class="row-text">
+                        <span class="row-title">Protein</span>
+                        <span class="row-support" id="summary-protein-range">Range 135–165 g</span>
+                    </span>
+                    <span class="row-trailing">
+                        <span class="row-value" id="summary-protein">150<small>g</small></span>
+                        <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                    </span>
+                </button>
+            </div>
+
+            <p class="footnote">
+                <span class="material-symbols-rounded" aria-hidden="true">info</span>
+                <span>Dashboards show each goal as a personal range of ±10%.</span>
+            </p>
+        </section>
+
+        <!-- Goal detail: calories (min/max range) -->
+        <section class="view-screen goal-detail-view" id="view-goal-calories" data-goal-screen="calories" aria-labelledby="h-goal-calories">
+            <header class="top-app-bar">
+                <button type="button" class="icon-btn" aria-label="Back to nutrition preferences" data-view-target="nutrition"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span></button>
+                <h1 id="h-goal-calories" tabindex="-1">Calories</h1>
+            </header>
+            <div class="goal-main">
+                <div class="goal-value-row">
+                    <div class="goal-value-group">
+                        <span class="goal-caption" id="cap-cal-min">Minimum</span>
+                        <output class="goal-value" id="goal-calories-min" aria-labelledby="cap-cal-min">2,070</output>
+                        <span class="goal-unit">kcal per day</span>
+                        <div class="goal-adjusters" role="group" aria-label="Adjust minimum calories">
+                            <button type="button" aria-label="Decrease minimum by 10 kcal" data-goal="caloriesMin" data-delta="-10"><span class="material-symbols-rounded" aria-hidden="true">remove</span></button>
+                            <button type="button" aria-label="Increase minimum by 10 kcal" data-goal="caloriesMin" data-delta="10"><span class="material-symbols-rounded" aria-hidden="true">add</span></button>
+                        </div>
+                    </div>
+                    <span class="goal-range-dash" aria-hidden="true">–</span>
+                    <div class="goal-value-group">
+                        <span class="goal-caption" id="cap-cal-max">Maximum</span>
+                        <output class="goal-value" id="goal-calories-max" aria-labelledby="cap-cal-max">2,530</output>
+                        <span class="goal-unit">kcal per day</span>
+                        <div class="goal-adjusters" role="group" aria-label="Adjust maximum calories">
+                            <button type="button" aria-label="Decrease maximum by 10 kcal" data-goal="caloriesMax" data-delta="-10"><span class="material-symbols-rounded" aria-hidden="true">remove</span></button>
+                            <button type="button" aria-label="Increase maximum by 10 kcal" data-goal="caloriesMax" data-delta="10"><span class="material-symbols-rounded" aria-hidden="true">add</span></button>
+                        </div>
+                    </div>
+                </div>
+                <p class="goal-target" id="goal-calories-target">Target <strong>2,300 kcal</strong> · middle of your range</p>
+            </div>
+            <section class="goal-about" aria-labelledby="about-calories">
+                <h2 id="about-calories">About this goal</h2>
+                <p>Days between your minimum and maximum count as <strong>in range</strong> on your dashboard. The default range is your target ±10%.</p>
+                <p>For personalized nutrition advice, it's always best to consult a doctor or registered dietitian.</p>
+            </section>
+            <div class="goal-actions">
+                <button type="button" class="btn btn-filled block" data-save-goal="calories">Set goal</button>
+            </div>
+        </section>
+
+        <!-- Goal details for macros (Carbs, Fat, Protein) are built from MACROS in the script -->
+        <div id="macro-goal-views" style="display: contents;"></div>
+
+        <!-- ================= THEME (s16_theme) ================= -->
+        <section class="view-screen" id="view-theme" aria-labelledby="h-theme">
+            <header class="top-app-bar">
+                <button type="button" class="icon-btn" aria-label="Back" data-view-target="settings"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span></button>
+                <h1 id="h-theme" tabindex="-1">Theme</h1>
+            </header>
+            <fieldset>
+                <legend class="sr-only">Theme</legend>
+                <div class="list-group" style="margin-top: 8px;">
+                    <label class="list-row no-icon radio-row">
+                        <span class="row-text">
+                            <span class="row-title">System default</span>
+                            <span class="row-support">Follows your phone's setting</span>
+                        </span>
+                        <input type="radio" name="theme-mode" value="system">
+                    </label>
+                    <label class="list-row no-icon radio-row">
+                        <span class="row-text"><span class="row-title">Light</span></span>
+                        <input type="radio" name="theme-mode" value="light">
+                    </label>
+                    <label class="list-row no-icon radio-row">
+                        <span class="row-text"><span class="row-title">Dark</span></span>
+                        <input type="radio" name="theme-mode" value="dark">
+                    </label>
+                </div>
+            </fieldset>
+        </section>
+
+        </div>
+
+        <!-- S-18 Snackbar -->
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite">
+            <span id="snackbar-text"></span>
+            <button type="button" id="snackbar-action" hidden></button>
+        </div>
+
+        <!-- S-17 AlertDialog (filled by openDialog) -->
+        <div class="scrim" id="dialog-scrim" hidden>
+            <div class="dialog" id="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialog-title" aria-describedby="dialog-body">
+                <span class="material-symbols-rounded dialog-icon" id="dialog-icon" aria-hidden="true"></span>
+                <h2 id="dialog-title"></h2>
+                <div class="dialog-body" id="dialog-body"></div>
+                <div class="dialog-actions">
+                    <button type="button" class="btn btn-text" id="dialog-cancel">Cancel</button>
+                    <button type="button" class="btn btn-text" id="dialog-confirm"></button>
+                </div>
+            </div>
+        </div>
+
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => n.toLocaleString('en-US');
+        function store(key, value) {
+            try {
+                if (value === undefined) return window.localStorage.getItem(key);
+                window.localStorage.setItem(key, value);
+            } catch (e) { return null; }
+            return null;
+        }
+        function announce(msg) {
+            $('announcer').textContent = '';
+            window.setTimeout(() => { $('announcer').textContent = msg; }, 50);
+        }
+        let timers = [];
+        function later(fn, ms) { timers.push(window.setTimeout(fn, ms)); }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+        /* ---------------- Sub-view mechanism ---------------- */
+        const viewTriggers = {}; // viewId -> control that opened it (focus returns there on Back)
+        let currentView = 'settings';
+
+        function switchView(viewId, opts) {
+            const next = $('view-' + viewId);
+            if (!next) return;
+            const options = opts || {};
+            if (viewId.indexOf('goal-') === 0 && !options.keepDraft) resetDraft();
+            document.querySelectorAll('.view-screen').forEach(el => el.classList.remove('active'));
+            next.classList.add('active');
+            next.scrollTop = 0;
+            const previous = currentView;
+            currentView = viewId;
+            if (options.focus === false) return;
+            // Returning to a parent view: focus the row that opened the child; otherwise focus the heading.
+            const back = viewTriggers[previous];
+            if (back && next.contains(back) && document.contains(back)) back.focus();
+            else { const h = next.querySelector('h1'); if (h) h.focus({ preventScroll: true }); }
+        }
+
+        document.addEventListener('click', (e) => {
+            const control = e.target.closest('[data-view-target]');
+            if (!control) return;
+            const target = control.dataset.viewTarget;
+            if (!control.closest('.top-app-bar')) viewTriggers[target] = control;
+            switchView(target);
+        });
+
+        /* ---------------- S-18 Snackbar ---------------- */
+        let snackTimer = null;
+        let snackAction = null;
+        function hideSnackbar() { $('snackbar').classList.remove('show'); snackAction = null; }
+        function showSnackbar(text, action) {
+            window.clearTimeout(snackTimer);
+            $('snackbar-text').textContent = text;
+            const btn = $('snackbar-action');
+            snackAction = action || null;
+            btn.hidden = !action;
+            if (action) btn.textContent = action.label;
+            $('snackbar').classList.add('show');
+            snackTimer = window.setTimeout(hideSnackbar, action ? 6000 : 4000);
+        }
+        $('snackbar-action').addEventListener('click', () => {
+            const action = snackAction;
+            hideSnackbar();
+            if (action) action.run();
+        });
+
+        /* ---------------- S-17 AlertDialog ---------------- */
+        let dialogConfig = null;
+        let dialogReturnFocus = null;
+        function openDialog(config) {
+            dialogConfig = config;
+            dialogReturnFocus = document.activeElement;
+            $('dialog-icon').textContent = config.icon || '';
+            $('dialog-icon').hidden = !config.icon;
+            $('dialog-title').textContent = config.title;
+            $('dialog-body').innerHTML = config.body;
+            const confirm = $('dialog-confirm');
+            confirm.textContent = config.confirmLabel;
+            confirm.classList.toggle('is-destructive', !!config.destructive);
+            $('views').inert = true;
+            $('snackbar').inert = true;
+            $('dialog-scrim').hidden = false;
+            $('dialog-cancel').focus();
+        }
+        function closeDialog(confirmed) {
+            const config = dialogConfig;
+            if (!config) return;
+            dialogConfig = null;
+            $('dialog-scrim').hidden = true;
+            $('views').inert = false;
+            $('snackbar').inert = false;
+            if (dialogReturnFocus && document.contains(dialogReturnFocus)) dialogReturnFocus.focus();
+            if (confirmed && config.onConfirm) config.onConfirm();
+            if (!confirmed && config.onCancel) config.onCancel();
+        }
+        $('dialog-cancel').addEventListener('click', () => closeDialog(false));
+        $('dialog-confirm').addEventListener('click', () => closeDialog(true));
+        $('dialog-scrim').addEventListener('click', (e) => { if (e.target === $('dialog-scrim')) closeDialog(false); });
+        document.addEventListener('keydown', (e) => {
+            if (!dialogConfig) return;
+            if (e.key === 'Escape') { e.preventDefault(); closeDialog(false); }
+            if (e.key === 'Tab') { // trap focus between the two actions
+                const first = $('dialog-cancel'), last = $('dialog-confirm');
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
+
+        /* ---------------- Google Health connection ---------------- */
+        let state = 'default';
+        let lastSync = 'Today, 11:15';
+
+        const PERMISSIONS = [
+            { icon: 'edit_note', title: 'Write nutrition', support: 'Meals, calories and macros' },
+            { icon: 'flag', title: 'Read nutrition goals', support: 'Calorie and macro goals' }
+        ];
+
+        function permissionRows(allowed) {
+            return `<div class="list-group">${PERMISSIONS.map(p => `
+                <div class="list-row">
+                    <span class="row-icon" aria-hidden="true"><span class="material-symbols-rounded">${p.icon}</span></span>
+                    <span class="row-text"><span class="row-title">${p.title}</span><span class="row-support">${p.support}</span></span>
+                    <span class="perm-state" data-allowed="${allowed}">
+                        <span class="material-symbols-rounded" aria-hidden="true">${allowed ? 'check_circle' : 'block'}</span>${allowed ? 'Allowed' : 'Not allowed'}
+                    </span>
+                </div>`).join('')}</div>`;
+        }
+
+        function statusHead(tone, icon, chipIcon, chipText) {
+            return `<div class="status-head">
+                <span class="status-icon" data-tone="${tone}" aria-hidden="true"><span class="material-symbols-rounded">${icon}</span></span>
+                <div>
+                    <h2 class="status-title" id="gh-status-title">Health Connect</h2>
+                    <span class="status-chip" data-tone="${tone}"><span class="material-symbols-rounded" aria-hidden="true">${chipIcon}</span>${chipText}</span>
+                </div>
+            </div>`;
+        }
+
+        const disconnectButton = `<button type="button" class="btn btn-outlined block" data-action="disconnect">
+                <span class="material-symbols-rounded" aria-hidden="true">link_off</span>Disconnect Health Connect</button>`;
+
+        function renderGoogleHealth() {
+            const slot = $('gh-content');
+            const view = $('view-google-health');
+            view.removeAttribute('aria-busy');
+
+            if (state === 'loading') {
+                view.setAttribute('aria-busy', 'true');
+                slot.innerHTML = `
+                    <section class="status-card" aria-label="Checking Health Connect">
+                        <div class="status-head" aria-hidden="true">
+                            <span class="sk" style="width:48px;height:48px;border-radius:50%"></span>
+                            <span style="flex:1;display:flex;flex-direction:column;gap:8px">
+                                <span class="sk" style="width:60%;height:20px"></span>
+                                <span class="sk" style="width:38%;height:24px"></span>
+                            </span>
+                        </div>
+                        <div class="linear-progress" role="progressbar" aria-label="Checking Health Connect"></div>
+                        <p class="status-text">Checking Health Connect…</p>
+                        <button type="button" class="btn btn-tonal block" disabled>
+                            <span class="material-symbols-rounded" aria-hidden="true">sync</span>Sync now</button>
+                    </section>
+                    <h2 class="section-label">Permissions</h2>
+                    <div class="list-group" aria-hidden="true">
+                        ${[0, 1].map(() => `<div class="list-row">
+                            <span class="sk" style="width:40px;height:40px;border-radius:50%"></span>
+                            <span style="display:flex;flex-direction:column;gap:6px"><span class="sk" style="width:70%;height:14px"></span><span class="sk" style="width:50%;height:12px"></span></span>
+                            <span class="sk" style="width:56px;height:16px"></span></div>`).join('')}
+                    </div>`;
+                return;
+            }
+
+            if (state === 'empty') {
+                slot.innerHTML = `
+                    <section class="status-card" aria-labelledby="gh-status-title">
+                        ${statusHead('neutral', 'smartphone', 'smartphone', 'Not connected')}
+                        <p class="status-text">Snackshot works fully on this device. Connecting Health Connect is optional and adds:</p>
+                        <ul class="benefits">
+                            <li><span class="material-symbols-rounded" aria-hidden="true">history</span><span>A copy of your meals, calories and macros in Health Connect</span></li>
+                            <li><span class="material-symbols-rounded" aria-hidden="true">flag</span><span>Calorie and macro goals you already set in other health apps</span></li>
+                            <li><span class="material-symbols-rounded" aria-hidden="true">share</span><span>Your nutrition, available to apps you allow</span></li>
+                        </ul>
+                        <button type="button" class="btn btn-filled block" data-route="healthConnect">Connect Health Connect</button>
+                    </section>
+                    <p class="footnote">
+                        <span class="material-symbols-rounded" aria-hidden="true">lock</span>
+                        <span>Data moves only between Snackshot and Health Connect on this phone. You can disconnect at any time.</span>
+                    </p>
+                    <button type="button" class="btn btn-text" data-route="privacy" style="align-self:flex-start">Privacy details</button>`;
+                return;
+            }
+
+            if (state === 'error') {
+                slot.innerHTML = `
+                    <section class="status-card" aria-labelledby="gh-status-title">
+                        ${statusHead('error', 'sync_problem', 'error', 'Permission turned off')}
+                        <p class="status-text">Health Connect access for Snackshot was turned off outside the app. New meals are still saved on this device, but aren't written to Health Connect until you allow access again.</p>
+                        <dl><div class="kv"><dt>Last successful sync</dt><dd>Today, 09:40</dd></div></dl>
+                        <button type="button" class="btn btn-filled block" data-action="open-system-settings">
+                            <span class="material-symbols-rounded" aria-hidden="true">open_in_new</span>Open Health Connect settings</button>
+                    </section>
+                    <h2 class="section-label">Permissions</h2>
+                    ${permissionRows(false)}
+                    ${disconnectButton}`;
+                return;
+            }
+
+            // Success: connected
+            slot.innerHTML = `
+                <section class="status-card" aria-labelledby="gh-status-title">
+                    ${statusHead('ok', 'health_and_safety', 'check_circle', 'Connected')}
+                    <p class="status-text">Meals you save are written to Health Connect. Your calorie and macro goals are read from it.</p>
+                    <dl><div class="kv"><dt>Last sync</dt><dd id="gh-last-sync">${lastSync}</dd></div></dl>
+                    <button type="button" class="btn btn-tonal block" data-action="sync-now" id="sync-now-btn">
+                        <span class="material-symbols-rounded" aria-hidden="true">sync</span><span>Sync now</span></button>
+                </section>
+                <h2 class="section-label">Permissions</h2>
+                ${permissionRows(true)}
+                <button type="button" class="btn btn-text" data-action="manage-permissions" style="align-self:flex-start">Manage in Health Connect</button>
+                ${disconnectButton}`;
+        }
+
+        function renderHubConnection() {
+            const el = $('hub-gh-support');
+            el.classList.toggle('is-error', state === 'error');
+            const map = {
+                loading: '<span class="sk" style="width:90px;height:14px" aria-hidden="true"></span><span class="sr-only">Checking</span>',
+                empty: 'Not connected',
+                error: '<span class="material-symbols-rounded" aria-hidden="true">error</span>Permission turned off',
+                default: 'Connected'
+            };
+            el.innerHTML = map[state] || map.default;
+        }
+
+        function runSyncNow(btn) {
+            btn.disabled = true;
+            btn.classList.add('is-busy');
+            btn.querySelector('span:last-child').textContent = 'Syncing…';
+            announce('Syncing with Health Connect');
+            later(() => {
+                lastSync = 'Today, 11:17';
+                if (state !== 'default' || !document.contains(btn)) return;
+                btn.disabled = false;
+                btn.classList.remove('is-busy');
+                btn.querySelector('span:last-child').textContent = 'Sync now';
+                $('gh-last-sync').textContent = lastSync;
+                showSnackbar('Sync complete. Goals and meals are up to date.');
+            }, 1400);
+        }
+
+        function confirmDisconnect() {
+            openDialog({
+                icon: 'link_off',
+                title: 'Disconnect Health Connect?',
+                body: `<ul>
+                    <li><span class="material-symbols-rounded" aria-hidden="true">smartphone</span><span><strong>Meals stay on this device.</strong></span></li>
+                    <li><span class="material-symbols-rounded" aria-hidden="true">sync_disabled</span><span>Snackshot stops writing to and reading goals from Health Connect.</span></li>
+                    <li><span class="material-symbols-rounded" aria-hidden="true">health_and_safety</span><span>Data already in Health Connect is not deleted.</span></li>
+                </ul>`,
+                confirmLabel: 'Disconnect',
+                onConfirm: () => {
+                    render('empty');
+                    $('h-google-health').focus();
+                    showSnackbar('Disconnected. Meals stay on this device.');
+                }
+            });
+        }
+
+        $('gh-content').addEventListener('click', (e) => {
+            const btn = e.target.closest('[data-action]');
+            if (!btn) return;
+            const action = btn.dataset.action;
+            if (action === 'sync-now') runSyncNow(btn);
+            if (action === 'disconnect') confirmDisconnect();
+            if (action === 'manage-permissions') showSnackbar('Opens Health Connect app permissions (simulated)');
+            if (action === 'open-system-settings') {
+                // Prototype: the system settings screen is simulated; the action stands in for returning with access allowed.
+                showSnackbar('Health Connect settings open here (simulated)', {
+                    label: 'Allow access',
+                    run: () => {
+                        lastSync = 'Today, 11:17';
+                        render('default');
+                        $('h-google-health').focus();
+                        showSnackbar('Access allowed. Sync complete.');
+                    }
+                });
+            }
+        });
+
+        /* ---------------- Nutrition goals ---------------- */
+        // v2 key: earlier prototype builds stored different defaults under 'snackshot-nutrition-goals'.
+        const nutritionGoalStorageKey = 'snackshot-nutrition-goals-v2';
+        const defaultNutritionGoals = { caloriesMin: 2070, caloriesMax: 2530, carbs: 220, fat: 70, protein: 150 };
+        const LIMITS = {
+            caloriesMin: [800, 6000], caloriesMax: [800, 6000],
+            carbs: [0, 900], fat: [0, 400], protein: [0, 500]
+        };
+        const MACROS = [
+            { key: 'carbs',   name: 'Carbs',   kcalPerG: 4, note: 'Carbs are your main source of steady energy during the day.' },
+            { key: 'fat',     name: 'Fat',     kcalPerG: 9, note: 'Fat supports nutrient absorption and keeps you full for longer.' },
+            { key: 'protein', name: 'Protein', kcalPerG: 4, note: 'Protein supports muscle recovery and keeps you feeling full.' }
+        ];
+
+        let saved = {};
+        try { saved = JSON.parse(store(nutritionGoalStorageKey) || '{}') || {}; } catch (e) { saved = {}; }
+        const nutritionGoals = { ...defaultNutritionGoals };
+        Object.keys(defaultNutritionGoals).forEach(goal => {
+            if (Number.isFinite(saved[goal])) nutritionGoals[goal] = saved[goal];
+        });
+        let draft = { ...nutritionGoals };
+
+        const calorieTarget = (g) => Math.round((g.caloriesMin + g.caloriesMax) / 2);
+        const range10 = (v) => `${fmt(Math.round(v * 0.9))}–${fmt(Math.round(v * 1.1))}`;
+
+        function buildMacroViews() {
+            $('macro-goal-views').outerHTML = MACROS.map(m => `
+                <section class="view-screen goal-detail-view" id="view-goal-${m.key}" data-goal-screen="${m.key}" aria-labelledby="h-goal-${m.key}">
+                    <header class="top-app-bar">
+                        <button type="button" class="icon-btn" aria-label="Back to nutrition preferences" data-view-target="nutrition"><span class="material-symbols-rounded" aria-hidden="true">arrow_back</span></button>
+                        <h1 id="h-goal-${m.key}" tabindex="-1">${m.name}</h1>
+                    </header>
+                    <div class="goal-main">
+                        <span class="goal-accent" aria-hidden="true"></span>
+                        <output class="goal-value" id="goal-${m.key}" aria-label="${m.name} goal in grams per day">${nutritionGoals[m.key]}</output>
+                        <span class="goal-unit">g per day</span>
+                        <div class="goal-adjusters" role="group" aria-label="Adjust ${m.name.toLowerCase()} goal">
+                            <button type="button" aria-label="Decrease ${m.name.toLowerCase()} by 1 gram" data-goal="${m.key}" data-delta="-1"><span class="material-symbols-rounded" aria-hidden="true">remove</span></button>
+                            <button type="button" aria-label="Increase ${m.name.toLowerCase()} by 1 gram" data-goal="${m.key}" data-delta="1"><span class="material-symbols-rounded" aria-hidden="true">add</span></button>
+                        </div>
+                        <p class="goal-target" id="goal-${m.key}-range">Shown as <strong>198–242 g</strong> on your dashboard</p>
+                    </div>
+                    <section class="goal-about" aria-labelledby="about-${m.key}">
+                        <h2 id="about-${m.key}">About this goal</h2>
+                        <p id="goal-${m.key}-share"></p>
+                        <p>For personalized nutrition advice, it's always best to consult a doctor or registered dietitian.</p>
+                    </section>
+                    <div class="goal-actions">
+                        <button type="button" class="btn btn-filled block" data-save-goal="${m.key}">Set goal</button>
+                    </div>
+                </section>`).join('');
+        }
+
+        function renderDetail() {
+            $('goal-calories-min').textContent = fmt(draft.caloriesMin);
+            $('goal-calories-max').textContent = fmt(draft.caloriesMax);
+            $('goal-calories-target').innerHTML = `Target <strong>${fmt(calorieTarget(draft))} kcal</strong> · middle of your range`;
+            const target = calorieTarget(nutritionGoals);
+            MACROS.forEach(m => {
+                const v = draft[m.key];
+                $('goal-' + m.key).textContent = String(v);
+                $('goal-' + m.key + '-range').innerHTML = `Shown as <strong>${range10(v)} g</strong> on your dashboard`;
+                const pct = Math.round(v * m.kcalPerG / target * 100);
+                $('goal-' + m.key + '-share').innerHTML =
+                    `${v} g of ${m.name.toLowerCase()} is about <strong>${fmt(v * m.kcalPerG)} kcal</strong>, or ${pct}% of your ${fmt(target)} kcal target. ${m.note}`;
+            });
+            document.querySelectorAll('[data-goal][data-delta]').forEach(b => {
+                const goal = b.dataset.goal, delta = Number(b.dataset.delta), v = draft[goal] + delta;
+                let ok = v >= LIMITS[goal][0] && v <= LIMITS[goal][1];
+                if (goal === 'caloriesMin' && v >= draft.caloriesMax) ok = false;
+                if (goal === 'caloriesMax' && v <= draft.caloriesMin) ok = false;
+                b.disabled = !ok;
+            });
+        }
+
+        function renderNutritionGoals() {
+            const g = nutritionGoals;
+            $('summary-calories').innerHTML = `${fmt(calorieTarget(g))}<small>kcal</small>`;
+            $('summary-calories-range').textContent = `Range ${fmt(g.caloriesMin)}–${fmt(g.caloriesMax)}`;
+            $('row-calories').setAttribute('aria-label', `Calories: target ${fmt(calorieTarget(g))} kcal, range ${fmt(g.caloriesMin)} to ${fmt(g.caloriesMax)} kcal. Edit`);
+            MACROS.forEach(m => {
+                $('summary-' + m.key).innerHTML = `${g[m.key]}<small>g</small>`;
+                $('summary-' + m.key + '-range').textContent = `Range ${range10(g[m.key])} g`;
+                $('row-' + m.key).setAttribute('aria-label', `${m.name}: ${g[m.key]} grams per day, range ${range10(g[m.key])} grams. Edit`);
+            });
+            $('hub-nutrition-support').textContent = `${fmt(calorieTarget(g))} kcal · C ${g.carbs} · F ${g.fat} · P ${g.protein} g`;
+            renderDetail();
+        }
+
+        function resetDraft() { draft = { ...nutritionGoals }; renderDetail(); }
+
+        function renderNutritionSource() {
+            const text = {
+                default: 'Goals are read from Health Connect while it’s connected. A goal you change here is used on this device.',
+                loading: 'Checking whether goals are available from Health Connect…',
+                empty: 'Goals are saved on this device. When Health Connect is connected, goals may be read from it.',
+                error: 'Using goals saved on this device. Health Connect access is turned off.'
+            };
+            $('nutrition-source').textContent = text[state] || text.default;
+        }
+
+        function saveGoal(goal) {
+            if (goal === 'calories') {
+                nutritionGoals.caloriesMin = draft.caloriesMin;
+                nutritionGoals.caloriesMax = draft.caloriesMax;
+            } else {
+                nutritionGoals[goal] = draft[goal];
+            }
+            store(nutritionGoalStorageKey, JSON.stringify(nutritionGoals));
+            renderNutritionGoals();
+            switchView('nutrition', { keepDraft: true });
+            const m = MACROS.find(x => x.key === goal);
+            showSnackbar(m
+                ? `${m.name} goal set to ${nutritionGoals[goal]} g`
+                : `Calorie goal set to ${fmt(nutritionGoals.caloriesMin)}–${fmt(nutritionGoals.caloriesMax)} kcal`);
+        }
+
+        /* ---------------- Image retention ---------------- */
+        let retention = '365';
+        let storageMb = 124;
+        const RETENTION_LABEL = { '30': 'Keep for 30 days', '365': 'Keep for 365 days', '0': 'Do not keep photos' };
+
+        function renderRetention() {
+            document.querySelectorAll('input[name="retention"]').forEach(r => { r.checked = r.value === retention; });
+            $('retention-storage').textContent = storageMb + ' MB';
+            $('delete-photos-btn').disabled = storageMb === 0;
+            $('hub-retention-support').textContent = RETENTION_LABEL[retention];
+        }
+
+        document.querySelectorAll('input[name="retention"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const next = radio.value;
+                const apply = (mb, message) => { retention = next; if (mb !== null) storageMb = mb; renderRetention(); showSnackbar(message); };
+                if (next === '365' || storageMb === 0) {
+                    apply(null, next === '0' ? 'New meal photos won’t be kept' : `Photos will be kept for ${next} days`);
+                    return;
+                }
+                const toNone = next === '0';
+                openDialog({
+                    icon: 'delete',
+                    title: toNone ? 'Stop keeping meal photos?' : 'Keep photos for 30 days?',
+                    body: toNone
+                        ? `<p><strong>All retained meal photos (${storageMb} MB) are deleted from this device now.</strong> New photos are deleted right after recognition.</p><p>Your meals, calories and macros stay in your log.</p>`
+                        : `<p><strong>Photos older than 30 days (about ${Math.round(storageMb * 0.74)} MB) are deleted from this device now.</strong></p><p>Your meals, calories and macros stay in your log.</p>`,
+                    confirmLabel: toNone ? 'Delete photos' : 'Delete older photos',
+                    destructive: true,
+                    onConfirm: () => apply(toNone ? 0 : storageMb - Math.round(storageMb * 0.74),
+                        toNone ? 'Meal photos deleted. New photos won’t be kept.' : 'Older photos deleted. Keeping 30 days.'),
+                    onCancel: () => renderRetention()
+                });
+            });
+        });
+
+        $('delete-photos-btn').addEventListener('click', () => {
+            openDialog({
+                icon: 'delete',
+                title: 'Delete all meal photos?',
+                body: `<p><strong>${storageMb} MB of processed meal photos are deleted from this device.</strong> Your meals, calories and macros stay in your log.</p><p>This can't be undone.</p>`,
+                confirmLabel: 'Delete',
+                destructive: true,
+                onConfirm: () => {
+                    storageMb = 0;
+                    renderRetention();
+                    $('h-retention').focus();
+                    showSnackbar('Meal photos deleted');
+                }
+            });
+        });
+
+        /* ---------------- Theme ---------------- */
+        const THEME_MODE_KEY = 'snackshot-settings-theme-mode';
+        const THEME_LABEL = { system: 'System default', light: 'Light', dark: 'Dark' };
+        const systemPrefersDark = () => window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        function currentThemeMode() {
+            if (store(THEME_MODE_KEY) === 'system') return 'system';
+            return document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light';
+        }
+        function renderTheme() {
+            const mode = currentThemeMode();
+            document.querySelectorAll('input[name="theme-mode"]').forEach(r => { r.checked = r.value === mode; });
+            $('hub-theme-support').textContent = THEME_LABEL[mode];
+        }
+        function setThemeMode(mode) {
+            store(THEME_MODE_KEY, mode);
+            if (window.setPrototypeTheme) window.setPrototypeTheme(mode === 'system' ? (systemPrefersDark() ? 'dark' : 'light') : mode);
+            renderTheme();
+            announce(`Theme: ${THEME_LABEL[mode]}`);
+        }
+        document.querySelectorAll('input[name="theme-mode"]').forEach(r => {
+            r.addEventListener('change', () => setThemeMode(r.value));
+        });
+        // The prototype Light/Dark switcher above the device sets an explicit theme.
+        document.addEventListener('click', (e) => {
+            const choice = e.target.closest('[data-theme-choice]');
+            if (!choice) return;
+            store(THEME_MODE_KEY, choice.dataset.themeChoice);
+            window.setTimeout(renderTheme, 0);
+        });
+        document.addEventListener('DOMContentLoaded', () => {
+            // prototype-theme.js has run by now: apply "System default" if it was chosen, then sync the radios.
+            if (store(THEME_MODE_KEY) === 'system' && window.setPrototypeTheme) {
+                window.setPrototypeTheme(systemPrefersDark() ? 'dark' : 'light');
+            }
+            renderTheme();
+        });
+
+        /* ---------------- Goal adjusters & save ---------------- */
+        buildMacroViews();
+
+        document.addEventListener('click', (e) => {
+            const adj = e.target.closest('[data-goal][data-delta]');
+            if (adj && !adj.disabled) {
+                const goal = adj.dataset.goal;
+                draft[goal] = draft[goal] + Number(adj.dataset.delta);
+                renderDetail();
+                const label = goal === 'caloriesMin' ? `Minimum ${fmt(draft[goal])} kcal`
+                    : goal === 'caloriesMax' ? `Maximum ${fmt(draft[goal])} kcal`
+                    : `${draft[goal]} grams`;
+                announce(label);
+                return;
+            }
+            const save = e.target.closest('[data-save-goal]');
+            if (save) saveGoal(save.dataset.saveGoal);
+        });
+
+        /* ---------------- States ---------------- */
+        function render(next) {
+            state = ['default', 'loading', 'empty', 'error'].indexOf(next) >= 0 ? next : 'default';
+            clearTimers();
+            document.querySelectorAll('[data-state-choice]').forEach(b =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+            renderGoogleHealth();
+            renderHubConnection();
+            renderNutritionSource();
+            if (state === 'loading') announce('Checking Health Connect');
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state');
+            else url.searchParams.set('state', state);
+            try { window.history.replaceState(null, '', url); } catch (e) { /* file:// in some browsers */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) { hideSnackbar(); if (dialogConfig) closeDialog(false); render(b.dataset.stateChoice); }
+        });
+
+        const params = new URLSearchParams(window.location.search);
+        renderNutritionGoals();
+        renderRetention();
+        // Home's "On device" chip deep-links here only in local-only mode, so without ?state= that link opens Not connected.
+        render(params.get('state') || (params.get('view') === 'google-health' ? 'empty' : 'default'));
+
+        // Deep link: s16_settings.html?view=google-health opens a sub-view directly
+        // (used by the Home sync chip in local-only mode). Back from a deep-linked view returns to Home.
+        (function openDeepLinkedView() {
+            const viewId = params.get('view');
+            const view = viewId && document.getElementById('view-' + viewId);
+            if (!view) return;
+            switchView(viewId, { focus: false });
+            const back = view.querySelector('.top-app-bar .icon-btn[aria-label="Back"]');
+            if (back) {
+                back.removeAttribute('data-view-target');
+                back.dataset.route = 'home';
+                back.setAttribute('aria-label', 'Back to Home');
+            }
+        })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

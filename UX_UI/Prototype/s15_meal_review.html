@@ -1,0 +1,1212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-15 | Meal Review - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, chart, macro and status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-15 Meal review — UX spec §4.7, F-01/F-02/F-03/F-23, zero-edit principle (§1.2).
+         * Visual reference: GoogleHealth (6).png (meal detail).
+         * TopAppBar (back, edit, delete in saved mode) -> processed image -> food name + meta
+         * -> confidence AssistChip (-> review hint below 80%) -> grams stepper -> calorie / meal rows
+         * -> Macro split (share of kcal) -> FilledButton Save -> Retake / Search / Quick add / Discard.
+         * ?mode=new|saved (default new) and ?state=default|loading|low|partial|empty.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: not-allowed; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state / mode switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher-sep { width: 100%; height: 0; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar .spacer { flex: 1; }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .icon-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 16px 24px;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        /* ---------- Processed image ---------- */
+        .photo {
+            position: relative;
+            flex-shrink: 0;
+            height: 184px;
+            border-radius: 24px;
+            overflow: hidden;
+            background: #4E4740;
+        }
+        .photo svg { display: block; width: 100%; height: 100%; }
+        .photo[data-quality="poor"] svg { filter: blur(5px) brightness(.55); transform: scale(1.06); }
+        .photo-placeholder {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            justify-content: center;
+            align-items: center;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            font: 400 14px/20px var(--font-text);
+        }
+        .photo-placeholder .material-symbols-rounded { font-size: 40px; }
+        .photo-progress {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            height: 4px;
+            background: rgb(255 255 255 / 30%);
+            overflow: hidden;
+        }
+        .photo-progress::after {
+            content: "";
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 40%;
+            background: var(--md-sys-color-primary-dark);
+            animation: indeterminate 1.4s cubic-bezier(.4,0,.2,1) infinite;
+        }
+        @keyframes indeterminate { from { left: -40%; } to { left: 100%; } }
+
+        /* ---------- Title block ---------- */
+        .title-block { margin-top: 20px; display: flex; flex-direction: column; gap: 4px; }
+        .meal-name {
+            font-family: var(--font-display);
+            font-size: 32px;
+            line-height: 40px;
+            font-weight: 400;
+            overflow-wrap: anywhere;
+        }
+        .meta { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+
+        /* AssistChip: 32dp visual inside a 48dp target */
+        .assist-chip {
+            align-self: flex-start;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            margin-top: 4px;
+        }
+        .assist-chip-inner {
+            height: 32px;
+            padding: 0 16px 0 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 8px;
+            border: 1px solid var(--outline);
+            color: var(--on-surface);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .assist-chip-inner .material-symbols-rounded { font-size: 18px; color: var(--primary); }
+        .assist-chip:hover .assist-chip-inner { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .assist-chip[data-level="low"] .assist-chip-inner {
+            border-color: transparent;
+            background: var(--status-below-bg);
+            color: var(--status-below-fg);
+        }
+        .assist-chip[data-level="low"] .assist-chip-inner .material-symbols-rounded { color: var(--status-below-fg); }
+        .assist-chip .chev { font-size: 18px; margin-left: -4px; transition: transform 200ms ease; }
+        .assist-chip[aria-expanded="true"] .chev { transform: rotate(180deg); }
+        .conf-info {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            padding: 0 4px 4px;
+        }
+
+        /* ---------- Review hint (low confidence / partial) ---------- */
+        .hint {
+            margin-top: 12px;
+            padding: 16px;
+            border-radius: 16px;
+            display: grid;
+            grid-template-columns: 24px 1fr;
+            column-gap: 12px;
+            row-gap: 4px;
+        }
+        .hint[data-kind="low"] { background: var(--status-below-bg); color: var(--status-below-fg); }
+        .hint[data-kind="partial"] {
+            background: var(--error-container);
+            color: var(--on-error-container);
+        }
+        /* Dark error-container is saturated; soften it on this content surface (text stays >= 4.5:1). */
+        :root[data-theme="dark"] .hint[data-kind="partial"] { background: color-mix(in srgb, var(--error-container) 55%, var(--surface-container)); }
+        .hint-icon { grid-row: 1 / span 2; }
+        .hint-title { font: 500 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .hint-text { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; }
+        .hint-actions { grid-column: 1 / -1; display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .hint-actions button {
+            min-height: 48px;
+            padding: 0 20px 0 16px;
+            border-radius: 24px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--surface-container);
+            color: var(--on-surface);
+            font: 500 14px/20px var(--font-text);
+        }
+        .hint-actions button .material-symbols-rounded { font-size: 20px; color: var(--primary); }
+        .hint-actions button:hover { background: color-mix(in srgb, var(--on-surface) 8%, var(--surface-container)); }
+
+        /* ---------- Value rows (Google Health label / large value) ---------- */
+        .values { margin-top: 16px; display: flex; flex-direction: column; }
+        .value-row {
+            min-height: 68px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+        .row-label { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; color: var(--on-surface-variant); }
+        .row-value {
+            font-family: var(--font-display);
+            font-size: 28px;
+            line-height: 36px;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            text-align: right;
+        }
+        .row-value small { font-size: 18px; margin-left: 4px; }
+
+        .stepper { display: flex; align-items: center; gap: 4px; }
+        .step-btn {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+        }
+        .step-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 10%, var(--surface-container-high)); }
+        .step-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+        .num-field {
+            height: 56px;
+            padding: 0 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid var(--outline);
+            border-radius: 4px;
+            background: transparent;
+        }
+        .num-field:focus-within { border: 2px solid var(--primary); padding: 0 11px; }
+        .num-field[data-invalid="true"] { border: 2px solid var(--error); padding: 0 11px; }
+        .num-field input {
+            width: 3.2em;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: var(--on-surface);
+            font-family: var(--font-display);
+            font-size: 24px;
+            line-height: 32px;
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        .num-field .suffix { font: 400 16px/24px var(--font-text); color: var(--on-surface-variant); }
+        .num-field.small { height: 48px; }
+        .num-field.small input { width: 2.6em; font-size: 20px; line-height: 28px; }
+        .field-error {
+            display: flex;
+            padding-bottom: 4px;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 4px;
+            color: var(--error);
+            font: 400 12px/16px var(--font-text);
+            letter-spacing: 0.4px;
+            margin-top: -6px;
+        }
+        .field-error .material-symbols-rounded { font-size: 16px; }
+        .reset-line { display: flex; justify-content: flex-end; }
+
+        .select-wrap { position: relative; display: inline-flex; align-items: center; }
+        .select-wrap select {
+            appearance: none;
+            -webkit-appearance: none;
+            min-height: 48px;
+            padding: 0 32px 0 12px;
+            border: none;
+            border-radius: 12px;
+            background: transparent;
+            color: var(--on-surface);
+            font-family: var(--font-display);
+            font-size: 28px;
+            line-height: 36px;
+            text-align: right;
+            cursor: pointer;
+        }
+        .select-wrap select:hover { background: color-mix(in srgb, var(--on-surface) 6%, transparent); }
+        .select-wrap select option { font: 400 16px/24px var(--font-text); background: var(--surface-container); color: var(--on-surface); }
+        .select-wrap .material-symbols-rounded { position: absolute; right: 4px; pointer-events: none; color: var(--on-surface-variant); }
+
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 20px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn .material-symbols-rounded { font-size: 18px; }
+        .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .outlined-btn {
+            margin-top: 8px;
+            min-height: 48px;
+            padding: 0 24px 0 16px;
+            border-radius: 24px;
+            border: 1px solid var(--outline);
+            display: inline-flex;
+            align-self: flex-start;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+        }
+        .outlined-btn .material-symbols-rounded { font-size: 18px; }
+        .outlined-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .outlined-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); border-color: color-mix(in srgb, var(--on-surface) 12%, transparent); }
+
+        /* ---------- Macro split ---------- */
+        .section-header {
+            margin-top: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 48px;
+        }
+        .section-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; }
+        .section-header .text-btn { margin-right: -12px; }
+        .section-text { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); margin-bottom: 12px; }
+        .macros { display: flex; flex-direction: column; gap: 18px; }
+        .macro { display: flex; flex-direction: column; gap: 10px; }
+        .macro[data-macro="carbs"]   { --macro-color: var(--macro-carbs); }
+        .macro[data-macro="fat"]     { --macro-color: var(--macro-fat); }
+        .macro[data-macro="protein"] { --macro-color: var(--macro-protein); }
+        .macro-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 24px; }
+        .macro-label { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; font-variant-numeric: tabular-nums; }
+        .missing-tag { display: inline-flex; align-items: center; gap: 4px; color: var(--error); font-weight: 500; }
+        .missing-tag .material-symbols-rounded { font-size: 18px; }
+        .macro-track {
+            height: 16px;
+            border-radius: 8px;
+            background: var(--macro-track);
+            overflow: hidden;
+        }
+        .macro-fill {
+            display: block;
+            height: 100%;
+            border-radius: 8px;
+            background: var(--macro-color);
+            transition: width 300ms cubic-bezier(.2,0,0,1);
+        }
+        .macro-fill[data-zero="false"] { min-width: 8px; }
+        .macro[data-missing="true"] .macro-track {
+            background: transparent;
+            border: 1.5px dashed color-mix(in srgb, var(--on-surface) 45%, transparent);
+        }
+
+        /* ---------- Empty / unavailable ---------- */
+        .empty { margin-top: 24px; display: flex; flex-direction: column; gap: 12px; }
+        .empty-title { font-family: var(--font-display); font-size: 32px; line-height: 40px; font-weight: 400; }
+        .empty-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .tips { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+        .tips li {
+            list-style: none;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+        }
+        .tips .material-symbols-rounded { font-size: 20px; color: var(--on-surface-variant); }
+
+        /* ---------- Bottom action area ---------- */
+        .bottom-bar {
+            flex-shrink: 0;
+            padding: 12px 16px 28px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: var(--surface);
+            border-top: 1px solid var(--outline-variant);
+        }
+        .filled-btn, .tonal-btn {
+            width: 100%;
+            min-height: 56px;
+            border-radius: 28px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font: 500 16px/24px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .filled-btn { background: var(--primary); color: var(--on-primary); }
+        .filled-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        .filled-btn:disabled {
+            background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 50%, transparent);
+        }
+        .tonal-btn { background: var(--primary-container); color: var(--md-sys-color-on-primary-container-light); }
+        :root[data-theme="dark"] .tonal-btn { color: var(--md-sys-color-on-primary-container-dark); }
+        .tonal-btn:hover { background: color-mix(in srgb, var(--on-surface) 8%, var(--primary-container)); }
+        .btn-row { display: flex; gap: 8px; }
+        .btn-row .outlined-btn { flex: 1; margin-top: 0; justify-content: center; padding: 0 16px; }
+        .btn-row .text-btn { justify-content: center; }
+
+        .save-reason {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 6px;
+            text-align: center;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .save-reason .material-symbols-rounded { font-size: 18px; }
+        .save-reason[data-kind="error"] { color: var(--error); }
+
+        .alt-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+        .alt-btn {
+            min-height: 56px;
+            padding: 6px 2px;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: var(--on-surface);
+            font: 500 12px/16px var(--font-text);
+            letter-spacing: 0.5px;
+            text-align: center;
+        }
+        .alt-btn .material-symbols-rounded { font-size: 22px; color: var(--on-surface-variant); }
+        .alt-btn:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Skeletons ---------- */
+        .sk { display: block; background: color-mix(in srgb, var(--on-surface) 10%, var(--surface)); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: .5; } }
+
+        /* ---------- S-17 AlertDialog ---------- */
+        .scrim { position: absolute; inset: 0; background: rgb(0 0 0 / 40%); z-index: 50; }
+        .dialog {
+            position: absolute;
+            left: 24px; right: 24px;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 24px;
+            border-radius: 28px;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            box-shadow: 0 8px 24px rgba(0,0,0,.3);
+            z-index: 51;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        .dialog-icon { align-self: center; color: var(--secondary); font-size: 24px; }
+        .dialog h2 { font-family: var(--font-display); font-size: 24px; line-height: 32px; font-weight: 400; text-align: center; }
+        .dialog p { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+        .dialog-actions .text-btn { padding: 0 16px; }
+        .dialog-actions .danger { color: var(--error); }
+        .dialog-actions .danger:hover { background: color-mix(in srgb, var(--error) 8%, transparent); }
+
+        /* ---------- Snackbar (S-18) ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px; right: 16px; bottom: 32px;
+            min-height: 48px;
+            padding: 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+        }
+        .snackbar.show { transform: none; opacity: 1; }
+        .snackbar .material-symbols-rounded { font-size: 20px; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only controls: S-15 states (spec §4.1 / §4.7) and entry mode -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="low">Low confidence</button>
+        <button type="button" data-state-choice="partial">Partial</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <span class="state-switcher-sep" aria-hidden="true"></span>
+        <span class="state-switcher-label">Mode</span>
+        <button type="button" data-mode-choice="new">New recognition</button>
+        <button type="button" data-mode-choice="saved">Saved meal</button>
+    </div>
+
+    <div class="device-frame" id="frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <header class="top-app-bar" id="appBar">
+            <button type="button" class="icon-btn" id="backBtn" aria-label="Back to History" data-route="history">
+                <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            </button>
+            <span class="spacer"></span>
+            <button type="button" class="icon-btn" id="editBtn" aria-label="Edit nutrition values" data-route="edit">
+                <span class="material-symbols-rounded" aria-hidden="true">edit</span>
+            </button>
+            <button type="button" class="icon-btn" id="deleteBtn" aria-label="Delete meal" aria-haspopup="dialog">
+                <span class="material-symbols-rounded" aria-hidden="true">delete</span>
+            </button>
+        </header>
+
+        <main class="scaffold-content" id="content">
+            <div class="photo" id="photo"></div>
+            <div id="body"></div>
+        </main>
+
+        <div class="bottom-bar" id="bottom"></div>
+
+        <!-- S-17 confirmation dialog (in-page, no window.confirm) -->
+        <div class="scrim" id="scrim" hidden></div>
+        <div class="dialog" id="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogText" hidden>
+            <span class="material-symbols-rounded dialog-icon" id="dialogIcon" aria-hidden="true">delete</span>
+            <h2 id="dialogTitle"></h2>
+            <p id="dialogText"></p>
+            <div class="dialog-actions">
+                <button type="button" class="text-btn" id="dialogCancel">Cancel</button>
+                <button type="button" class="text-btn danger" id="dialogConfirm"></button>
+            </div>
+        </div>
+
+        <!-- S-18 snackbar -->
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite">
+            <span class="material-symbols-rounded" id="snackbarIcon" aria-hidden="true">check_circle</span>
+            <span id="snackbarText"></span>
+        </div>
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+
+        <!-- Programmatic navigation targets (fired after the save / delete snackbar) -->
+        <div hidden>
+            <button type="button" tabindex="-1" id="go-savePrompt" data-route="savePrompt"></button>
+            <button type="button" tabindex="-1" id="go-history" data-route="history"></button>
+            <button type="button" tabindex="-1" id="go-home" data-route="home"></button>
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data (consistent with S-02 / S-12 / S-14) ---------------- */
+        // Today's lunch, recognized from a photo at 11:02. Values are for the estimated 350 g portion.
+        const BASE = { name: 'Grilled chicken salad', grams: 350, kcal: 450, c: 14, f: 26, p: 38, type: 'Lunch', time: '11:02' };
+        const CONFIDENCE = { default: 86, low: 72, partial: 81 };
+        const THRESHOLD = 80;                         // spec §4.7: below 80% emphasize review
+        const MIN_G = 1, MAX_G = 5000, STEP = 10;
+        const MACROS = [                              // order per Google Health: Carbs, Fat, Protein
+            { key: 'c', id: 'carbs', name: 'Carbs', kcalPerG: 4 },
+            { key: 'f', id: 'fat', name: 'Fat', kcalPerG: 9 },
+            { key: 'p', id: 'protein', name: 'Protein', kcalPerG: 4 }
+        ];
+        const PARTIAL_MISSING = ['f', 'p'];           // partial recognition: no fat / protein returned
+        const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+        const STATES = ['default', 'loading', 'low', 'partial', 'empty'];
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+        const frame = $('frame');
+        let timers = [];
+        function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        let announceTimer;
+        function announceSoon(msg) { clearTimeout(announceTimer); announceTimer = setTimeout(() => announce(msg), 600); }
+        function go(route) { $('go-' + route).click(); }
+        function listJoin(items) { return items.length < 2 ? items.join('') : items.slice(0, -1).join(', ') + ' and ' + items[items.length - 1]; }
+
+        /* ---------------- State ---------------- */
+        let state = 'default';
+        let mode = 'new';
+        let grams = BASE.grams;       // last valid portion
+        let gramsValid = true;
+        let mealType = BASE.type;
+        let supplied = {};            // user-entered values for missing macros (partial)
+        let busy = false;             // save / delete in progress
+
+        const isReview = () => state !== 'empty';
+        const confidence = () => CONFIDENCE[state] || CONFIDENCE.default;
+
+        // Grams changes recalculate provider values linearly (per-gram density of the estimate).
+        // Values the user supplied for missing fields stay as entered (spec §4.7 correction contract).
+        function current() {
+            const k = grams / BASE.grams;
+            const v = { kcal: Math.round(BASE.kcal * k) };
+            MACROS.forEach((m) => {
+                if (state === 'partial' && PARTIAL_MISSING.includes(m.key)) v[m.key] = supplied[m.key];
+                else v[m.key] = Math.round(BASE[m.key] * k);
+            });
+            return v;
+        }
+        function missingNames() {
+            if (state !== 'partial') return [];
+            return MACROS.filter((m) => PARTIAL_MISSING.includes(m.key) && supplied[m.key] === undefined).map((m) => m.name.toLowerCase());
+        }
+        function saveBlockReason() {
+            if (state === 'loading') return { kind: 'info', icon: 'hourglass_top', text: 'Estimating nutrition from your photo…' };
+            if (!gramsValid) return { kind: 'error', icon: 'error', text: `Enter a portion from ${MIN_G} to ${fmt(MAX_G)} g to save` };
+            const missing = missingNames();
+            if (missing.length) return { kind: 'error', icon: 'error', text: `Add ${listJoin(missing)} to save` };
+            return null;
+        }
+        function isDirty() {
+            return grams !== BASE.grams || mealType !== BASE.type || Object.keys(supplied).length > 0;
+        }
+
+        /* ---------------- Render: processed image ---------------- */
+        // Illustrative stand-in for the processed (resized, compressed) meal photo.
+        const PHOTO_SVG = `<svg viewBox="0 0 364 184" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">
+            <rect width="364" height="184" fill="#544B43"/>
+            <rect y="0" width="364" height="184" fill="#5E544B" opacity=".55"/>
+            <circle cx="186" cy="98" r="88" fill="#3F3832" opacity=".45"/>
+            <circle cx="182" cy="92" r="84" fill="#E7E2DA"/>
+            <circle cx="182" cy="92" r="70" fill="#F3F0EA"/>
+            <g>
+                <ellipse cx="150" cy="70" rx="30" ry="15" fill="#5E8C3E" transform="rotate(-25 150 70)"/>
+                <ellipse cx="210" cy="64" rx="28" ry="14" fill="#7BA94C" transform="rotate(20 210 64)"/>
+                <ellipse cx="142" cy="112" rx="26" ry="13" fill="#7BA94C" transform="rotate(30 142 112)"/>
+                <ellipse cx="222" cy="114" rx="30" ry="14" fill="#5E8C3E" transform="rotate(-18 222 114)"/>
+                <ellipse cx="182" cy="128" rx="24" ry="11" fill="#8FBC5A"/>
+                <ellipse cx="180" cy="56" rx="20" ry="10" fill="#8FBC5A"/>
+            </g>
+            <g>
+                <rect x="156" y="78" width="54" height="15" rx="7" fill="#C98F55" transform="rotate(-12 183 85)"/>
+                <rect x="160" y="96" width="56" height="15" rx="7" fill="#D39C62" transform="rotate(-8 188 103)"/>
+                <rect x="150" y="60" width="44" height="13" rx="6" fill="#BF8448" transform="rotate(-16 172 66)"/>
+                <path d="M168 80 l6 12 M184 77 l6 12 M198 75 l6 12 M172 98 l5 12 M188 96 l5 12 M203 95 l5 12" stroke="#8A5A2E" stroke-width="2.5" stroke-linecap="round" opacity=".7"/>
+            </g>
+            <g>
+                <circle cx="128" cy="90" r="9" fill="#D24B3F"/><circle cx="125" cy="87" r="2.5" fill="#F08A7E"/>
+                <circle cx="236" cy="88" r="9" fill="#D24B3F"/><circle cx="233" cy="85" r="2.5" fill="#F08A7E"/>
+                <circle cx="206" cy="134" r="8" fill="#D24B3F"/><circle cx="203" cy="131" r="2.2" fill="#F08A7E"/>
+                <circle cx="158" cy="134" r="9" fill="#D5E8B0" stroke="#7FA556" stroke-width="2"/>
+                <circle cx="226" cy="44" r="8" fill="#D5E8B0" stroke="#7FA556" stroke-width="2"/>
+            </g>
+        </svg>`;
+
+        function renderPhoto() {
+            const photo = $('photo');
+            if (state === 'empty' && mode === 'saved') {
+                photo.removeAttribute('role');
+                photo.innerHTML = `<div class="photo-placeholder" aria-hidden="true"><span class="material-symbols-rounded">no_photography</span>No photo</div>`;
+                return;
+            }
+            photo.dataset.quality = state === 'empty' ? 'poor' : 'ok';
+            photo.setAttribute('role', 'img');
+            photo.setAttribute('aria-label', state === 'empty' ? 'Processed meal photo, dark and blurry' : 'Processed meal photo');
+            photo.innerHTML = PHOTO_SVG + (state === 'loading' ? '<div class="photo-progress" aria-hidden="true"></div>' : '');
+        }
+
+        /* ---------------- Render: review body ---------------- */
+        function chipHtml() {
+            if (state === 'loading') {
+                return `<p class="meta" role="status"><span class="sr-only">Recognition in progress. </span>Analyzing photo…</p>`;
+            }
+            const conf = confidence();
+            const low = conf < THRESHOLD;
+            const text = low ? `Low confidence · ${conf}%` : `AI estimate · ${conf}% confident`;
+            return `<button type="button" class="assist-chip" id="confChip" data-level="${low ? 'low' : 'high'}" aria-expanded="false" aria-controls="confInfo">
+                    <span class="assist-chip-inner">
+                        <span class="material-symbols-rounded ${low ? 'icon-filled' : ''}" aria-hidden="true">${low ? 'error' : 'auto_awesome'}</span>
+                        ${text}
+                        <span class="material-symbols-rounded chev" aria-hidden="true">expand_more</span>
+                    </span>
+                </button>
+                <p class="conf-info" id="confInfo" hidden>Confidence shows how sure the recognition is about the food. The portion and nutrition are estimated from the photo, so check them before saving.</p>`;
+        }
+
+        function hintHtml() {
+            if (state === 'low') {
+                return `<div class="hint" data-kind="low" role="note" aria-labelledby="hintTitle">
+                    <span class="material-symbols-rounded hint-icon" aria-hidden="true">fact_check</span>
+                    <span class="hint-title" id="hintTitle">Check the food and portion</span>
+                    <span class="hint-text">${mode === 'new'
+                        ? 'This estimate is less certain than usual. Adjust the grams, or find the exact food instead.'
+                        : 'This meal was saved from a less certain estimate. Adjust the grams or edit the values if needed.'}</span>
+                    <div class="hint-actions" ${mode === 'new' ? '' : 'hidden'}>
+                        <button type="button" data-route="search"><span class="material-symbols-rounded" aria-hidden="true">search</span>Search food</button>
+                        <button type="button" data-route="quickAdd"><span class="material-symbols-rounded" aria-hidden="true">bolt</span>Quick add</button>
+                    </div>
+                </div>`;
+            }
+            if (state === 'partial') {
+                return `<div class="hint" data-kind="partial" role="note" aria-labelledby="hintTitle">
+                    <span class="material-symbols-rounded hint-icon icon-filled" aria-hidden="true">error</span>
+                    <span class="hint-title" id="hintTitle">Some values are missing</span>
+                    <span class="hint-text">The food and calories were recognized, but not fat and protein. Add them below to save.</span>
+                </div>`;
+            }
+            return '';
+        }
+
+        function macroRowHtml(m) {
+            const missing = state === 'partial' && PARTIAL_MISSING.includes(m.key);
+            if (state === 'loading') {
+                return `<div class="macro" data-macro="${m.id}" aria-hidden="true">
+                    <span class="sk" style="width:46%;height:20px"></span>
+                    <span class="sk" style="height:16px;border-radius:8px"></span>
+                </div>`;
+            }
+            if (missing) {
+                return `<div class="macro" data-macro="${m.id}" data-missing="true" id="macro-${m.id}">
+                    <div class="macro-head">
+                        <label class="macro-label" for="in-${m.id}" id="lab-${m.id}"></label>
+                        <span class="num-field small" id="field-${m.id}">
+                            <input id="in-${m.id}" type="text" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="–">
+                            <span class="suffix" aria-hidden="true">g</span>
+                        </span>
+                    </div>
+                    <span class="macro-track" aria-hidden="true"><span class="macro-fill" id="fill-${m.id}" data-zero="true" style="width:0%"></span></span>
+                </div>`;
+            }
+            return `<div class="macro" data-macro="${m.id}" role="img" id="macro-${m.id}">
+                <div class="macro-head" aria-hidden="true"><span class="macro-label" id="lab-${m.id}"></span></div>
+                <span class="macro-track" aria-hidden="true"><span class="macro-fill" id="fill-${m.id}" style="width:0%"></span></span>
+            </div>`;
+        }
+
+        function reviewBodyHtml() {
+            const loading = state === 'loading';
+            const nameHtml = loading
+                ? `<h1 class="meal-name"><span class="sr-only">Meal review</span><span class="sk" style="width:72%;height:36px;border-radius:10px" aria-hidden="true"></span></h1>`
+                : `<h1 class="meal-name">${BASE.name}</h1>`;
+            const kcalHtml = loading
+                ? `<span class="sk" style="width:120px;height:32px" aria-hidden="true"></span>`
+                : `<span class="row-value" id="kcalValue"></span>`;
+            return `<section class="title-block" aria-label="Meal">
+                    ${nameHtml}
+                    <p class="meta">Today · ${BASE.time} · From photo</p>
+                    ${chipHtml()}
+                </section>
+                ${hintHtml()}
+                <section class="values" aria-label="Portion and calories">
+                    <div class="value-row">
+                        <label class="row-label" for="gramsInput">Portion size</label>
+                        <div class="stepper">
+                            <button type="button" class="step-btn" id="minusBtn" aria-label="Decrease portion by ${STEP} grams" ${loading ? 'disabled' : ''}>
+                                <span class="material-symbols-rounded" aria-hidden="true">remove</span>
+                            </button>
+                            <span class="num-field" id="gramsField">
+                                <input id="gramsInput" type="text" inputmode="numeric" autocomplete="off" maxlength="4"
+                                       value="${loading ? '' : grams}" placeholder="${loading ? '–' : ''}" aria-describedby="gramsError" ${loading ? 'disabled' : ''}>
+                                <span class="suffix" aria-hidden="true">g</span>
+                            </span>
+                            <button type="button" class="step-btn" id="plusBtn" aria-label="Increase portion by ${STEP} grams" ${loading ? 'disabled' : ''}>
+                                <span class="material-symbols-rounded" aria-hidden="true">add</span>
+                            </button>
+                        </div>
+                    </div>
+                    <p class="field-error" id="gramsError" hidden><span class="material-symbols-rounded" aria-hidden="true">error</span>Enter ${MIN_G} to ${fmt(MAX_G)} g</p>
+                    <div class="reset-line" id="resetLine" hidden><button type="button" class="text-btn" id="resetBtn">
+                        <span class="material-symbols-rounded" aria-hidden="true">undo</span>Reset to estimate (${BASE.grams} g)</button></div>
+                    <div class="value-row">
+                        <span class="row-label">Calorie intake</span>
+                        ${kcalHtml}
+                    </div>
+                    <div class="value-row">
+                        <label class="row-label" for="mealType">Meal</label>
+                        <span class="select-wrap">
+                            <select id="mealType" ${loading ? 'disabled' : ''}>
+                                ${MEAL_TYPES.map((t) => `<option ${t === mealType ? 'selected' : ''}>${t}</option>`).join('')}
+                            </select>
+                            <span class="material-symbols-rounded" aria-hidden="true">arrow_drop_down</span>
+                        </span>
+                    </div>
+                    <button type="button" class="outlined-btn" data-route="edit" ${loading ? 'disabled' : ''}>
+                        <span class="material-symbols-rounded" aria-hidden="true">tune</span>Edit values
+                    </button>
+                </section>
+                <section aria-labelledby="macroTitle">
+                    <div class="section-header">
+                        <h2 class="section-title" id="macroTitle">Macro split</h2>
+                        <button type="button" class="text-btn" id="fullNutrients">View full nutrients</button>
+                    </div>
+                    <p class="section-text" id="macroText">Percent is each macro's share of this meal's calories.</p>
+                    <div class="macros" id="macros">${MACROS.map(macroRowHtml).join('')}</div>
+                </section>`;
+        }
+
+        function emptyBodyHtml() {
+            if (mode === 'saved') {
+                return `<div class="empty">
+                    <h1 class="empty-title">This meal isn't available</h1>
+                    <p class="empty-text">It may have been deleted. Your other meals are still in History.</p>
+                </div>`;
+            }
+            return `<div class="empty">
+                <h1 class="empty-title">No food recognized</h1>
+                <p class="empty-text">We couldn't find a meal in this photo. Nothing has been saved. You can retake the photo or log the meal another way.</p>
+                <ul class="tips" aria-label="Photo tips">
+                    <li><span class="material-symbols-rounded" aria-hidden="true">light_mode</span>Use good light and avoid strong shadows</li>
+                    <li><span class="material-symbols-rounded" aria-hidden="true">center_focus_strong</span>Hold steady and keep the whole plate in frame</li>
+                </ul>
+            </div>`;
+        }
+
+        /* ---------------- Render: bottom actions ---------------- */
+        function bottomHtml() {
+            if (state === 'empty' && mode === 'saved') {
+                return `<button type="button" class="filled-btn" data-route="history">
+                    <span class="material-symbols-rounded" aria-hidden="true">history</span>Back to History</button>`;
+            }
+            if (state === 'empty') {
+                return `<button type="button" class="filled-btn" data-route="search">
+                        <span class="material-symbols-rounded" aria-hidden="true">search</span>Search for a food</button>
+                    <button type="button" class="tonal-btn" data-route="quickAdd">
+                        <span class="material-symbols-rounded" aria-hidden="true">bolt</span>Quick add calories</button>
+                    <div class="btn-row">
+                        <button type="button" class="outlined-btn" data-route="camera">
+                            <span class="material-symbols-rounded" aria-hidden="true">photo_camera</span>Retake photo</button>
+                        <button type="button" class="text-btn" data-action="discard" aria-haspopup="dialog">Discard</button>
+                    </div>`;
+            }
+            const alt = mode === 'new'
+                ? `<div class="alt-actions" role="group" aria-label="Other ways to log this meal">
+                        <button type="button" class="alt-btn" data-route="camera"><span class="material-symbols-rounded" aria-hidden="true">photo_camera</span>Retake</button>
+                        <button type="button" class="alt-btn" data-route="search"><span class="material-symbols-rounded" aria-hidden="true">search</span>Search</button>
+                        <button type="button" class="alt-btn" data-route="quickAdd"><span class="material-symbols-rounded" aria-hidden="true">bolt</span>Quick add</button>
+                        <button type="button" class="alt-btn" data-action="discard" aria-haspopup="dialog"><span class="material-symbols-rounded" aria-hidden="true">close</span>Discard</button>
+                    </div>`
+                : '';
+            return `<button type="button" class="filled-btn" id="saveBtn" aria-describedby="saveReason">
+                    <span class="material-symbols-rounded" aria-hidden="true">check</span>${mode === 'new' ? 'Save' : 'Save changes'}</button>
+                <p class="save-reason" id="saveReason" hidden></p>
+                ${alt}`;
+        }
+
+        /* ---------------- Live update (no re-render, keeps focus) ---------------- */
+        function update() {
+            if (!isReview()) return;
+            const loading = state === 'loading';
+            const v = current();
+
+            if (!loading) {
+                $('kcalValue').innerHTML = `${fmt(v.kcal)}<small>kcal</small>`;
+                $('kcalValue').setAttribute('aria-label', `${fmt(v.kcal)} kilocalories`);
+
+                const complete = MACROS.every((m) => v[m.key] !== undefined);
+                const kcalSum = MACROS.reduce((s, m) => s + (v[m.key] || 0) * m.kcalPerG, 0);
+                MACROS.forEach((m) => {
+                    const g = v[m.key];
+                    const pct = complete && kcalSum ? Math.round(g * m.kcalPerG / kcalSum * 100) : null;
+                    const lab = $('lab-' + m.id);
+                    const fill = $('fill-' + m.id);
+                    const row = $('macro-' + m.id);
+                    if (g === undefined) {
+                        lab.innerHTML = `${m.name} · <span class="missing-tag"><span class="material-symbols-rounded icon-filled" aria-hidden="true">error</span>Missing</span>`;
+                    } else {
+                        lab.textContent = pct === null ? `${m.name} · ${g} g` : `${m.name} · ${pct}% · ${g} g`;
+                    }
+                    fill.style.width = (pct || 0) + '%';
+                    fill.dataset.zero = String(!pct);
+                    if (row.getAttribute('role') === 'img') {
+                        row.setAttribute('aria-label', `${m.name}: ${g} grams` + (pct === null ? '' : `, ${pct}% of this meal's calories`));
+                    }
+                    const field = $('field-' + m.id);
+                    if (field) field.dataset.invalid = String(g === undefined && field.dataset.touched === 'true');
+                });
+
+                $('macroText').textContent = complete
+                    ? "Percent is each macro's share of this meal's calories."
+                    : "Add the missing values to see each macro's share of this meal's calories.";
+                $('minusBtn').disabled = grams <= MIN_G;
+                $('plusBtn').disabled = grams >= MAX_G;
+                $('resetLine').hidden = grams === BASE.grams && gramsValid;
+            }
+
+            $('gramsError').hidden = gramsValid;
+            $('gramsField').dataset.invalid = String(!gramsValid);
+            $('gramsInput').setAttribute('aria-invalid', String(!gramsValid));
+
+            const save = $('saveBtn');
+            const reasonEl = $('saveReason');
+            const reason = saveBlockReason();
+            save.disabled = busy || !!reason;
+            reasonEl.hidden = !reason;
+            if (reason) {
+                reasonEl.dataset.kind = reason.kind;
+                reasonEl.innerHTML = `<span class="material-symbols-rounded" aria-hidden="true">${reason.icon}</span>${reason.text}`;
+            }
+        }
+
+        /* ---------------- Main render ---------------- */
+        function render() {
+            clearTimers();
+            closeDialog(false);
+            hideSnackbar();
+            busy = false;
+            grams = BASE.grams; gramsValid = true; mealType = BASE.type; supplied = {};
+
+            document.querySelectorAll('[data-state-choice]').forEach((b) => {
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state));
+                // A saved meal always has complete values, so Partial applies to new recognitions only.
+                b.hidden = mode === 'saved' && b.dataset.stateChoice === 'partial';
+            });
+            document.querySelectorAll('[data-mode-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.modeChoice === mode)));
+
+            // Top app bar: Back target, Edit and Delete availability per mode / state
+            const back = $('backBtn');
+            back.dataset.route = mode === 'saved' ? 'history' : 'camera';
+            back.setAttribute('aria-label', mode === 'saved' ? 'Back to History' : 'Back to camera');
+            $('editBtn').hidden = state === 'empty';
+            $('editBtn').disabled = state === 'loading';
+            $('deleteBtn').hidden = mode !== 'saved' || state === 'empty';
+            $('deleteBtn').disabled = state === 'loading';
+
+            renderPhoto();
+            $('body').innerHTML = isReview() ? reviewBodyHtml() : emptyBodyHtml();
+            $('bottom').innerHTML = bottomHtml();
+            $('content').scrollTop = 0;
+            update();
+
+            if (state === 'empty') announce(mode === 'saved' ? 'This meal is not available' : 'No food recognized. Choose another way to log the meal.');
+            else if (state !== 'loading') announce(`${BASE.name}, ${confidence()}% confidence, ${fmt(BASE.kcal)} kilocalories`);
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            if (mode === 'new') url.searchParams.delete('mode'); else url.searchParams.set('mode', mode);
+            try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        /* ---------------- Grams editing ---------------- */
+        function setGrams(next, fromInput) {
+            grams = Math.max(MIN_G, Math.min(MAX_G, Math.round(next)));
+            gramsValid = true;
+            if (!fromInput) $('gramsInput').value = grams;
+            update();
+            announceSoon(`${grams} grams, ${fmt(current().kcal)} kilocalories`);
+        }
+
+        $('body').addEventListener('input', (e) => {
+            if (e.target.id === 'gramsInput') {
+                const digits = e.target.value.replace(/\D/g, '');
+                if (digits !== e.target.value) e.target.value = digits;
+                const n = parseInt(digits, 10);
+                if (Number.isFinite(n) && n >= MIN_G && n <= MAX_G) setGrams(n, true);
+                else { gramsValid = false; update(); }
+                return;
+            }
+            const m = MACROS.find((x) => e.target.id === 'in-' + x.id);
+            if (m) {
+                const digits = e.target.value.replace(/\D/g, '');
+                if (digits !== e.target.value) e.target.value = digits;
+                if (digits === '') delete supplied[m.key]; else supplied[m.key] = parseInt(digits, 10);
+                update();
+                if (!missingNames().length) announceSoon('All values added. You can save the meal.');
+            }
+        });
+        $('body').addEventListener('focusout', (e) => {
+            const m = MACROS.find((x) => e.target.id === 'in-' + x.id);
+            if (m) { $('field-' + m.id).dataset.touched = 'true'; update(); }
+            if (e.target.id === 'gramsInput' && gramsValid) e.target.value = grams;
+        });
+        $('body').addEventListener('change', (e) => {
+            if (e.target.id === 'mealType') { mealType = e.target.value; announce(`Meal set to ${mealType}`); update(); }
+        });
+        $('body').addEventListener('click', (e) => {
+            if (e.target.closest('#minusBtn')) { setGrams(grams - STEP); return; }
+            if (e.target.closest('#plusBtn')) { setGrams(grams + STEP); return; }
+            if (e.target.closest('#resetBtn')) {
+                setGrams(BASE.grams);
+                $('gramsInput').focus();
+                return;
+            }
+            const chip = e.target.closest('#confChip');
+            if (chip) {
+                const open = chip.getAttribute('aria-expanded') !== 'true';
+                chip.setAttribute('aria-expanded', String(open));
+                $('confInfo').hidden = !open;
+                return;
+            }
+            if (e.target.closest('#fullNutrients')) showSnackbar('Full nutrients will be available in a later version', 'info');
+        });
+
+        /* ---------------- Save / discard / delete ---------------- */
+        function vibrate() { try { if (navigator.vibrate) navigator.vibrate(12); } catch (e) { /* unsupported */ } }
+
+        $('bottom').addEventListener('click', (e) => {
+            if (e.target.closest('#saveBtn')) {
+                if (saveBlockReason() || busy) return;
+                busy = true;
+                update();
+                vibrate(); // light confirmation haptic on local save (§5.3)
+                if (mode === 'new') {
+                    showSnackbar('Meal saved on this device');
+                    later(() => go('savePrompt'), 1400);
+                } else {
+                    showSnackbar(isDirty() ? 'Changes saved' : 'No changes to save');
+                    later(() => go('history'), 1400);
+                }
+                return;
+            }
+            if (e.target.closest('[data-action="discard"]')) {
+                openDialog({
+                    icon: 'close',
+                    title: 'Discard this meal?',
+                    text: 'The photo and AI estimate will be removed. Nothing has been saved.',
+                    confirm: 'Discard',
+                    onConfirm: () => { showSnackbar('Meal discarded', 'info'); later(() => go('home'), 1200); }
+                }, e.target.closest('button'));
+            }
+        });
+
+        $('deleteBtn').addEventListener('click', (e) => {
+            openDialog({
+                icon: 'delete',
+                title: 'Delete this meal?',
+                text: 'It will be removed from this device and from Health Connect if connected.',
+                confirm: 'Delete',
+                onConfirm: () => { busy = true; update(); showSnackbar('Meal deleted'); later(() => go('history'), 1400); }
+            }, e.currentTarget);
+        });
+
+        /* ---------------- S-17 AlertDialog ---------------- */
+        let dialogOpts = null;
+        let dialogReturnFocus = null;
+        const inertTargets = () => [$('appBar'), $('content'), $('bottom')];
+
+        function openDialog(opts, invoker) {
+            dialogOpts = opts;
+            dialogReturnFocus = invoker || null;
+            $('dialogIcon').textContent = opts.icon;
+            $('dialogTitle').textContent = opts.title;
+            $('dialogText').textContent = opts.text;
+            $('dialogConfirm').textContent = opts.confirm;
+            $('scrim').hidden = false;
+            $('dialog').hidden = false;
+            inertTargets().forEach((el) => { el.inert = true; });
+            $('dialogCancel').focus();
+        }
+        function closeDialog(restoreFocus) {
+            if ($('dialog').hidden) return;
+            $('scrim').hidden = true;
+            $('dialog').hidden = true;
+            inertTargets().forEach((el) => { el.inert = false; });
+            if (restoreFocus !== false && dialogReturnFocus && document.contains(dialogReturnFocus)) dialogReturnFocus.focus();
+            dialogOpts = null;
+        }
+        $('dialogCancel').addEventListener('click', () => closeDialog());
+        $('scrim').addEventListener('click', () => closeDialog());
+        $('dialogConfirm').addEventListener('click', () => {
+            const opts = dialogOpts;
+            closeDialog(false);
+            if (opts) opts.onConfirm();
+        });
+        $('dialog').addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); closeDialog(); return; }
+            if (e.key === 'Tab') { // focus trap between the two actions
+                const first = $('dialogCancel'), last = $('dialogConfirm');
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
+
+        /* ---------------- S-18 Snackbar ---------------- */
+        function hideSnackbar() { $('snackbar').classList.remove('show'); }
+        function showSnackbar(text, kind) {
+            $('snackbarText').textContent = text;
+            $('snackbarIcon').textContent = kind === 'info' ? 'info' : 'check_circle';
+            $('snackbar').style.bottom = ($('bottom').offsetHeight + 8) + 'px'; // sit above the action area
+            $('snackbar').classList.add('show');
+            later(hideSnackbar, 3000);
+        }
+
+        /* ---------------- Prototype switchers ---------------- */
+        document.addEventListener('click', (e) => {
+            const s = e.target.closest('[data-state-choice]');
+            if (s) { state = s.dataset.stateChoice; render(); return; }
+            const m = e.target.closest('[data-mode-choice]');
+            if (m) {
+                mode = m.dataset.modeChoice;
+                if (mode === 'saved' && state === 'partial') state = 'default';
+                render();
+            }
+        });
+
+        const params = new URLSearchParams(location.search);
+        state = STATES.includes(params.get('state')) ? params.get('state') : 'default';
+        const modeParam = params.get('mode');
+        if (modeParam === 'new' || modeParam === 'saved') mode = modeParam;
+        else if (/s(02_home|12_|14_history)/.test(document.referrer)) mode = 'saved'; // opened from Home / Dashboard / History
+        if (mode === 'saved' && state === 'partial') state = 'default';
+        render();
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

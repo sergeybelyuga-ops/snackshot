@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-14 | History - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, chart, macro and status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-14 Meal history feed — UX spec §4.11, F-23:
+         * TopAppBar (back, "History") -> date filter chip + meal-type filter chips
+         * -> reverse-chronological LazyColumn grouped by day (day header + day total kcal)
+         * -> meal rows (thumbnail/placeholder, name, type · time · grams, macro line, kcal, overflow menu).
+         * Delete: overflow menu or long-press -> S-17 AlertDialog -> row removed -> S-18 snackbar with Undo.
+         * Per user preference this screen shows NO sync status and NO manual sync button (Home only).
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: default; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        ul { list-style: none; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar h1 {
+            flex: 1;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Filter chips (same style as S-12 daily dashboard) ---------- */
+        .chips {
+            position: relative;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            overflow-x: auto;
+            padding: 0 16px 4px;
+            scrollbar-width: none;
+        }
+        .chips::-webkit-scrollbar { display: none; }
+        .chip {
+            flex-shrink: 0;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+        }
+        .chip-inner {
+            height: 32px;
+            padding: 0 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--outline);
+            color: var(--on-surface);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .chip:hover:not(:disabled) .chip-inner { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .chip-inner .material-symbols-rounded { font-size: 18px; }
+        .chip .check { display: none; margin-left: -6px; }
+        .chip[aria-pressed="true"] .chip-inner {
+            border-color: transparent;
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+        :root[data-theme="dark"] .chip[aria-pressed="true"] .chip-inner { color: #FFFFFF; }
+        .chip[aria-pressed="true"] .check { display: inline-block; }
+        .chip:disabled .chip-inner { opacity: .38; }
+        /* Date chip (M3 input chip): leading calendar icon, dropdown arrow; when set, a trailing clear
+           button sits inside the same selected container but is a separate 48dp target. */
+        .date-group { position: relative; flex-shrink: 0; display: flex; align-items: center; min-height: 48px; }
+        .date-chip .chip-inner { padding: 0 8px 0 10px; }
+        .date-group[data-set="true"]::before {
+            content: '';
+            position: absolute;
+            left: 0; right: 0; top: 8px; bottom: 8px;
+            border-radius: 8px;
+            background: var(--primary-container);
+            pointer-events: none;
+        }
+        .date-group[data-set="true"] .chip-inner { position: relative; background: transparent !important; border-color: transparent; padding-right: 0; }
+        :root[data-theme="dark"] .date-group[data-set="true"] { color: #FFFFFF; }
+        .chip-clear {
+            position: relative;
+            width: 36px;
+            height: 48px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-shrink: 0;
+        }
+        .chip-clear span {
+            width: 24px; height: 24px;
+            border-radius: 50%;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 18px;
+        }
+        .chip-clear:hover span { background: color-mix(in srgb, var(--on-surface) 10%, transparent); }
+        .date-bar { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 16px 4px; }
+        .date-bar-label { font: 400 12px/16px var(--font-text); letter-spacing: 0.4px; color: var(--on-surface-variant); }
+        #dateBtn[aria-pressed="true"] { background: var(--primary-container); }
+        :root[data-theme="dark"] #dateBtn[aria-pressed="true"] { color: #FFFFFF; }
+        #datePicker { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 16px 96px;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        /* ---------- Day groups ---------- */
+        .day { margin-top: 16px; }
+        .day:first-child { margin-top: 4px; }
+        .day-header {
+            min-height: 48px;
+            padding: 0 4px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 12px;
+            padding-bottom: 8px;
+        }
+        .day-titles { display: flex; flex-direction: column; min-width: 0; }
+        .day-title {
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .day-date { font: 400 12px/16px var(--font-text); letter-spacing: 0.4px; color: var(--on-surface-variant); }
+        .day-total {
+            font-family: var(--font-display);
+            font-size: 18px;
+            line-height: 28px;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .day-total small { font: 400 12px/16px var(--font-text); color: var(--on-surface-variant); margin-left: 3px; }
+        .day-total .of { font: 400 12px/16px var(--font-text); color: var(--on-surface-variant); margin: 0 3px; }
+
+        /* Grouped surface rows: 16dp outer corners, 2dp gaps, no nested cards */
+        .day-list { display: flex; flex-direction: column; gap: 2px; }
+        .meal-row {
+            position: relative;
+            display: flex;
+            align-items: stretch;
+            background: var(--surface-container);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .day-list .meal-row:first-child { border-top-left-radius: 16px; border-top-right-radius: 16px; }
+        .day-list .meal-row:last-child { border-bottom-left-radius: 16px; border-bottom-right-radius: 16px; }
+        :root:not([data-theme="dark"]) .meal-row { box-shadow: inset 0 0 0 1px var(--outline-variant); }
+        .meal-row.is-restored { background: color-mix(in srgb, var(--primary) 10%, var(--surface-container)); }
+        .meal-open {
+            flex: 1;
+            min-width: 0;
+            min-height: 80px;
+            padding: 12px 4px 12px 12px;
+            display: grid;
+            grid-template-columns: 48px 1fr auto;
+            gap: 12px;
+            align-items: center;
+            -webkit-touch-callout: none;
+            user-select: none;
+        }
+        .meal-open:focus-visible { outline-offset: -2px; border-radius: inherit; }
+        .meal-row:hover { background: color-mix(in srgb, var(--on-surface) 4%, var(--surface-container)); }
+        .meal-thumb {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            align-self: start;
+        }
+        .meal-thumb .material-symbols-rounded { font-size: 22px; }
+        .meal-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .meal-name {
+            font: 400 16px/22px var(--font-text);
+            letter-spacing: 0.15px;
+            overflow-wrap: anywhere; /* long names wrap, never truncate */
+        }
+        .meal-meta, .meal-macros {
+            font: 400 12px/16px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+        .meal-kcal {
+            font-family: var(--font-display);
+            font-size: 18px;
+            line-height: 24px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+            text-align: right;
+        }
+        .meal-kcal small { font: 400 12px/16px var(--font-text); color: var(--on-surface-variant); margin-left: 2px; }
+        .more-btn { align-self: center; margin-right: 2px; color: var(--on-surface-variant); }
+        .more-btn[aria-expanded="true"] { background: color-mix(in srgb, var(--on-surface) 10%, transparent); }
+
+        /* ---------- List footer / end of history / paging error ---------- */
+        .list-footer {
+            margin-top: 20px;
+            padding: 0 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            text-align: center;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .page-error {
+            margin-top: 16px;
+            padding: 16px;
+            border-radius: 16px;
+            background: var(--surface-container);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        :root:not([data-theme="dark"]) .page-error { box-shadow: inset 0 0 0 1px var(--outline-variant); }
+        .page-error > .material-symbols-rounded { color: var(--error); font-size: 24px; }
+        .page-error-text { flex: 1; display: flex; flex-direction: column; }
+        .page-error-title { font: 500 14px/20px var(--font-text); letter-spacing: 0.1px; }
+        .page-error-sub { font: 400 12px/16px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+
+        /* ---------- Buttons ---------- */
+        .filled-btn, .outlined-btn, .text-btn {
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .filled-btn { background: var(--primary); color: var(--on-primary); }
+        .filled-btn:hover { background: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        .outlined-btn { border: 1px solid var(--outline); color: var(--primary); }
+        .outlined-btn:hover, .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .text-btn { padding: 0 12px; color: var(--primary); }
+        .filled-btn .material-symbols-rounded, .outlined-btn .material-symbols-rounded, .text-btn .material-symbols-rounded { font-size: 18px; }
+        .page-error .outlined-btn { min-height: 40px; padding: 0 16px; flex-shrink: 0; }
+
+        /* ---------- Empty / filtered-empty ---------- */
+        .empty {
+            margin-top: 56px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+            padding: 0 12px;
+        }
+        .empty-icon {
+            width: 72px; height: 72px;
+            border-radius: 50%;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            display: flex; justify-content: center; align-items: center;
+            margin-bottom: 4px;
+        }
+        .empty-icon .material-symbols-rounded { font-size: 36px; }
+        .empty-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 400; }
+        .empty-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .empty-actions { margin-top: 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+
+        /* ---------- Skeletons ---------- */
+        .sk { display: block; background: var(--surface-container-high); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: .5; } }
+        .sk-row .sk { background: color-mix(in srgb, var(--on-surface) 9%, var(--surface-container)); }
+        .sk-row { pointer-events: none; padding: 16px 16px 16px 12px; display: grid; grid-template-columns: 48px 1fr auto; gap: 12px; align-items: center; min-height: 80px; }
+
+        /* ---------- Overflow menu (M3 menu, 8dp elevation) ---------- */
+        .menu {
+            position: absolute;
+            z-index: 45;
+            min-width: 196px;
+            padding: 8px 0;
+            border-radius: 4px;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            box-shadow: 0 4px 8px 3px rgba(0,0,0,.15), 0 1px 3px rgba(0,0,0,.3);
+        }
+        :root:not([data-theme="dark"]) .menu { background: var(--surface-container); }
+        .menu-item {
+            width: 100%;
+            min-height: 48px;
+            padding: 0 16px 0 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+        }
+        .menu-item:hover, .menu-item:focus-visible { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .menu-item:focus-visible { outline-offset: -2px; }
+        .menu-item .material-symbols-rounded { font-size: 24px; color: var(--on-surface-variant); }
+        .menu-item.danger, .menu-item.danger .material-symbols-rounded { color: var(--error); }
+
+        /* ---------- S-17 AlertDialog ---------- */
+        .scrim {
+            position: absolute;
+            inset: 0;
+            z-index: 50;
+            background: rgb(0 0 0 / 40%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 24px;
+        }
+        .dialog {
+            width: 100%;
+            max-width: 312px;
+            padding: 24px;
+            border-radius: 28px;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            box-shadow: 0 8px 12px 6px rgba(0,0,0,.15), 0 4px 4px rgba(0,0,0,.3);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        :root:not([data-theme="dark"]) .dialog { background: var(--surface-container); }
+        .dialog-icon { align-self: center; color: var(--error); font-size: 24px; }
+        .dialog h2 { text-align: center; font-family: var(--font-display); font-size: 24px; line-height: 32px; font-weight: 400; }
+        .dialog-body { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); display: flex; flex-direction: column; gap: 12px; }
+        .dialog-meal {
+            padding: 12px;
+            border-radius: 12px;
+            background: var(--surface);
+            color: var(--on-surface);
+            display: flex;
+            flex-direction: column;
+        }
+        .dialog-meal strong { font: 500 14px/20px var(--font-text); letter-spacing: 0.1px; overflow-wrap: anywhere; }
+        .dialog-meal span { font: 400 12px/16px var(--font-text); color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+        .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; margin-right: -12px; }
+        .dialog-actions .text-btn.danger { color: var(--error); }
+        .dialog-actions .text-btn.danger:hover { background: color-mix(in srgb, var(--error) 8%, transparent); }
+
+        /* ---------- S-18 Snackbar ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 32px;
+            min-height: 48px;
+            padding: 4px 8px 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+            visibility: hidden;
+        }
+        .snackbar.show { transform: none; opacity: 1; pointer-events: auto; visibility: visible; }
+        .snackbar span { flex: 1; }
+        .snackbar button {
+            min-height: 48px;
+            padding: 0 12px;
+            border-radius: 20px;
+            color: var(--primary-container);
+            font: 500 14px/20px var(--font-text);
+        }
+        :root[data-theme="dark"] .snackbar button { color: var(--md-sys-color-primary-light); }
+        .snackbar button:hover { background: color-mix(in srgb, var(--surface) 10%, transparent); }
+        .snackbar button:focus-visible { outline-color: var(--surface); }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        /* Macro-dots layout: kcal sits top-right beside the name; meta and macro lines
+           span the full text width under it, so "Carbs · Fat · Protein" fits on one line. */
+        .meal-open { grid-template-rows: auto auto auto; row-gap: 1px; column-gap: 12px; }
+        .meal-open > :first-child { grid-row: 1 / span 3; align-self: center; }
+        .meal-open .meal-info { display: contents; }
+        .meal-open .meal-name { grid-column: 2; grid-row: 1; align-self: start; }
+        .meal-open .meal-meta { grid-column: 2 / span 2; grid-row: 2; }
+        .meal-open .meal-macros { grid-column: 2 / span 2; grid-row: 3; margin-top: 2px; }
+        .meal-open .meal-kcal { grid-column: 3; grid-row: 1; align-self: start; }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-14 states required by spec §4.1 / §4.11 -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <button type="button" data-state-choice="filtered">Filtered empty</button>
+        <button type="button" data-state-choice="error">Error</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <!-- Top App Bar: no sync status / manual sync here by user preference (Home only) -->
+        <header class="top-app-bar" id="appBar">
+            <button type="button" class="icon-btn" aria-label="Back to Home" data-route="home">
+                <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            </button>
+            <h1>History</h1>
+            <button type="button" class="icon-btn" id="dateBtn" aria-label="Filter by date">
+                <span class="material-symbols-rounded" aria-hidden="true">calendar_month</span>
+            </button>
+        </header>
+
+        <!-- Date / meal-type filters -->
+        <div class="chips" id="chips" role="group" aria-label="Filter by meal type"></div>
+        <!-- Active date filter (input chip), shown only when a day is selected via the calendar button -->
+        <div class="date-bar" id="dateBar" hidden></div>
+        <input type="date" id="datePicker" tabindex="-1" aria-hidden="true" max="2026-09-24">
+
+        <main class="scaffold-content" id="content">
+            <div id="feedSlot"></div>
+        </main>
+
+        <!-- Overflow menu (shared by all rows) -->
+        <div class="menu" id="rowMenu" role="menu" aria-label="Meal options" hidden>
+            <button type="button" class="menu-item" role="menuitem" id="menuEdit" data-route="mealReviewSaved">
+                <span class="material-symbols-rounded" aria-hidden="true">edit</span> Edit meal
+            </button>
+            <button type="button" class="menu-item danger" role="menuitem" id="menuDelete">
+                <span class="material-symbols-rounded" aria-hidden="true">delete</span> Delete
+            </button>
+        </div>
+
+        <!-- S-17 Delete confirmation -->
+        <div class="scrim" id="dialogScrim" hidden>
+            <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="dialogTitle" aria-describedby="dialogBody">
+                <span class="material-symbols-rounded dialog-icon" aria-hidden="true">delete</span>
+                <h2 id="dialogTitle">Delete this meal?</h2>
+                <div class="dialog-body" id="dialogBody">
+                    <div class="dialog-meal" id="dialogMeal"></div>
+                    <p>It will be removed from this device and from Health Connect if connected. Your daily totals will update.</p>
+                </div>
+                <div class="dialog-actions">
+                    <button type="button" class="text-btn" id="dialogCancel">Cancel</button>
+                    <button type="button" class="text-btn danger" id="dialogConfirm">Delete</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- S-18 Snackbar -->
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite">
+            <span id="snackbarText"></span>
+            <button type="button" id="snackbarUndo">Undo</button>
+        </div>
+
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data (consistent with S-02 Home and S-12 daily dashboard) ---------------- */
+        const TODAY = new Date(2026, 8, 24); // Thu, Sep 24, 2026 · now 11:17
+
+        // Days keyed by offset (0 = today). Within a day meals are shown newest first.
+        // image: false = photo was captured but the processed image is no longer available.
+        const DAYS = {
+            0: [
+                { id: 'm1', type: 'Breakfast', name: 'Oatmeal & berries', time: '07:12', g: 280, kcal: 320, p: 10, c: 54, f: 7, src: 'photo' },
+                { id: 'm2', type: 'Lunch', name: 'Grilled chicken salad', time: '11:02', g: 350, kcal: 450, p: 38, c: 14, f: 26, src: 'photo' }
+            ],
+            1: [
+                { id: 'm3', type: 'Lunch', name: 'Buckwheat with mushrooms', time: '13:15', g: 300, kcal: 410, p: 14, c: 68, f: 9, src: 'photo' },
+                { id: 'm4', type: 'Dinner', name: 'Chicken soup', time: '19:30', g: 400, kcal: 120, p: 11, c: 9, f: 4, src: 'search' }
+            ],
+            2: [
+                { id: 'm5', type: 'Breakfast', name: 'Greek yogurt & granola', time: '07:40', g: 200, kcal: 380, p: 20, c: 48, f: 11, src: 'photo' },
+                { id: 'm6', type: 'Lunch', name: 'Roast salmon with rice', time: '12:50', g: 380, kcal: 760, p: 46, c: 70, f: 30, src: 'photo' },
+                { id: 'm7', type: 'Dinner', name: 'Pasta bolognese', time: '19:05', g: 350, kcal: 640, p: 32, c: 82, f: 20, src: 'photo' },
+                { id: 'm8', type: 'Snack', name: 'Apple', time: '16:10', g: 180, kcal: 95, p: 0, c: 25, f: 0, src: 'manual' },
+                { id: 'm9', type: 'Snack', name: 'Nut mix', time: '21:30', g: 45, kcal: 260, p: 8, c: 10, f: 22, src: 'search' }
+            ]
+        };
+        // Older days (offset 3 = Mon Sep 21 ... offset 10 = Mon Sep 14): same day totals and the same
+        // derivation as s12_daily_dashboard.html (OLDER_TOTALS / OLDER_MENU) so History matches the dashboards.
+        const OLDER_TOTALS = {
+            3:  { kcal: 2190, c: 248, f: 74, p: 132 },
+            4:  { kcal: 1890, c: 190, f: 60, p: 118 },
+            5:  { kcal: 2280, c: 228, f: 75, p: 150 },
+            6:  { kcal: 2610, c: 280, f: 92, p: 120 },
+            7:  { kcal: 2420, c: 262, f: 80, p: 142 },
+            8:  { kcal: 2350, c: 250, f: 78, p: 135 },
+            9:  { kcal: 1980, c: 205, f: 64, p: 128 },
+            10: { kcal: 2210, c: 230, f: 68, p: 140 }
+        };
+        const OLDER_MENU = [
+            { type: 'Breakfast', share: 0.25, time: '07:30', names: ['Scrambled eggs on toast', 'Oatmeal & berries', 'Greek yogurt & granola', 'Cottage cheese pancakes'] },
+            { type: 'Lunch',     share: 0.35, time: '12:45', names: ['Chicken & rice bowl', 'Grilled chicken salad', 'Buckwheat with mushrooms', 'Tuna wrap'] },
+            { type: 'Dinner',    share: 0.30, time: '19:10', names: ['Roast salmon with rice', 'Beef stew', 'Pasta bolognese', 'Chicken soup'] },
+            { type: 'Snack',     share: 0.10, time: '16:00', names: ['Apple', 'Nut mix', 'Banana', 'Protein bar'] }
+        ];
+        Object.keys(OLDER_TOTALS).forEach((offset) => {
+            const t = OLDER_TOTALS[offset];
+            const used = { kcal: 0, c: 0, f: 0, p: 0 };
+            DAYS[offset] = OLDER_MENU.map((slot, i) => {
+                const last = i === OLDER_MENU.length - 1;
+                const part = (key) => last ? t[key] - used[key] : Math.round(t[key] * slot.share);
+                const m = { kcal: part('kcal'), c: part('c'), f: part('f'), p: part('p') };
+                Object.keys(used).forEach((k) => { used[k] += m[k]; });
+                return {
+                    id: `d${offset}-${i}`,
+                    type: slot.type, time: slot.time,
+                    name: slot.names[Number(offset) % slot.names.length],
+                    g: Math.round(m.kcal / 1.6), // plausible portion weight
+                    kcal: m.kcal, c: m.c, f: m.f, p: m.p,
+                    src: slot.type === 'Snack' ? 'manual' : 'photo'
+                };
+            });
+        });
+        DAYS[3][2].image = false; // edge case: photo meal whose processed image is no longer available
+        const FIRST_PAGE_DAYS = 3;  // Error state: first page (3 days) is cached, older page fails
+        const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+        const SRC_ICON = { photo: 'image', search: 'search', manual: 'edit_note' };
+        const SRC_TEXT = { photo: 'From photo', search: 'From food search', manual: 'Entered manually' };
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+        const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        let timers = [];
+        function later(fn, ms) { const t = setTimeout(fn, ms); timers.push(t); return t; }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+        function dateFor(offset) { const d = new Date(TODAY); d.setDate(d.getDate() - offset); return d; }
+        const longDate = (offset) => dateFor(offset).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        function dayLabel(offset) {
+            if (offset === 0) return 'Today';
+            if (offset === 1) return 'Yesterday';
+            return longDate(offset);
+        }
+        function dayPhrase(offset) {
+            if (offset === 0) return 'today';
+            if (offset === 1) return 'yesterday';
+            return `on ${longDate(offset)}`;
+        }
+        function iso(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        const sumKcal = (meals) => meals.reduce((s, m) => s + m.kcal, 0);
+        const byTimeDesc = (a, b) => b.time.localeCompare(a.time);
+
+        /* ---------------- State ---------------- */
+        let state = 'default';
+        let typeFilter = 'all';     // 'all' | 'breakfast' | ...
+        let dayFilter = null;       // null | day offset
+        let olderLoaded = true;     // false in Error state until Retry succeeds
+        let olderLoading = false;
+        const deleted = new Set();  // meal ids removed in this session
+        let pendingUndo = null;     // { id }
+        let restoredId = null;
+        let menuFor = null;         // { id, trigger }
+        let dialogFor = null;       // { id, trigger }
+
+        const offsets = () => Object.keys(DAYS).map(Number).sort((a, b) => a - b);
+        function findMeal(id) {
+            for (const off of offsets()) {
+                const m = DAYS[off].find((x) => x.id === id);
+                if (m) return { meal: m, offset: off };
+            }
+            return null;
+        }
+        function availableOffsets() {
+            if (state === 'empty') return [];
+            return offsets().filter((off, i) => olderLoaded || i < FIRST_PAGE_DAYS);
+        }
+        const liveMeals = (off) => DAYS[off].filter((m) => !deleted.has(m.id));
+
+        /* ---------------- Render: filter chips ---------------- */
+        function renderChips() {
+            const chips = $('chips');
+            const disabled = state === 'loading';
+            chips.hidden = state === 'empty' || (!availableOffsets().some((o) => liveMeals(o).length) && state !== 'loading');
+            const dateSet = dayFilter !== null;
+            const btn = $('dateBtn');
+            btn.disabled = disabled || state === 'empty';
+            btn.setAttribute('aria-pressed', String(dateSet));
+            btn.setAttribute('aria-label', dateSet ? `Date filter: ${dayLabel(dayFilter)}. Change date` : 'Filter by date');
+            btn.firstElementChild.classList.toggle('icon-filled', dateSet);
+            const bar = $('dateBar');
+            bar.hidden = !dateSet || state === 'empty';
+            bar.innerHTML = dateSet ? `<span class="date-bar-label" aria-hidden="true">Showing</span>
+                <span class="date-group" data-set="true">
+                    <button type="button" class="chip date-chip" id="dateChip" aria-label="Date: ${esc(dayLabel(dayFilter))}, ${esc(longDate(dayFilter))}. Change date">
+                        <span class="chip-inner">
+                            <span class="material-symbols-rounded" aria-hidden="true">calendar_month</span>
+                            ${esc(dayFilter <= 1 ? `${dayLabel(dayFilter)}, ${longDate(dayFilter)}` : longDate(dayFilter))}
+                        </span>
+                    </button>
+                    <button type="button" class="chip-clear" id="dateClear" aria-label="Clear date filter, show all days">
+                        <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                    </button>
+                </span>` : '';
+            const typeChips = ['All', ...MEAL_TYPES].map((o) => {
+                const key = o.toLowerCase();
+                return `<button type="button" class="chip" data-filter="${key}" aria-pressed="${typeFilter === key}" ${disabled ? 'disabled' : ''}>
+                    <span class="chip-inner"><span class="material-symbols-rounded check" aria-hidden="true">check</span>${o}</span>
+                </button>`;
+            }).join('');
+            chips.innerHTML = typeChips;
+            // Keep the selected meal-type chip visible in the horizontally scrolling row
+            const sel = chips.querySelector('[data-filter][aria-pressed="true"]');
+            if (sel && typeFilter !== 'all') chips.scrollLeft = sel.offsetLeft + sel.offsetWidth - chips.clientWidth + 16;
+            else chips.scrollLeft = 0;
+            const picker = $('datePicker');
+            const avail = offsets();
+            picker.min = iso(dateFor(avail[avail.length - 1]));
+            picker.value = iso(dateFor(dateSet ? dayFilter : 0));
+        }
+
+        /* ---------------- Render: feed ---------------- */
+        function thumbHtml(m) {
+            if (m.src === 'photo' && m.image === false) {
+                return `<span class="meal-thumb" aria-hidden="true"><span class="material-symbols-rounded">hide_image</span></span>`;
+            }
+            return `<span class="meal-thumb" aria-hidden="true"><span class="material-symbols-rounded">${SRC_ICON[m.src]}</span></span>`;
+        }
+
+        function rowHtml(m, off) {
+            const src = m.src === 'photo' && m.image === false ? 'Photo no longer available' : SRC_TEXT[m.src];
+            const label = `${m.name}. ${m.type}, ${dayLabel(off)} at ${m.time}, ${m.g} grams, ${m.kcal} kilocalories. ` +
+                `Carbs ${m.c}, fat ${m.f}, protein ${m.p} grams. ${src}. Open meal`;
+            return `<li class="meal-row${restoredId === m.id ? ' is-restored' : ''}" data-id="${m.id}">
+                <button type="button" class="meal-open" data-route="mealReviewSaved" data-open="${m.id}" aria-label="${esc(label)}">
+                    ${thumbHtml(m)}
+                    <span class="meal-info" aria-hidden="true">
+                        <span class="meal-name">${esc(m.name)}</span>
+                        <span class="meal-meta">${m.type} · ${m.time} · ${m.g} g</span>
+                        <span class="meal-macros macro-dots"><span><i data-m="carbs"></i>Carbs ${m.c}</span><span><i data-m="fat"></i>Fat ${m.f}</span><span><i data-m="protein"></i>Protein ${m.p} g</span></span>
+                    </span>
+                    <span class="meal-kcal" aria-hidden="true">${fmt(m.kcal)}<small>kcal</small></span>
+                </button>
+                <button type="button" class="icon-btn more-btn" data-more="${m.id}" aria-haspopup="menu" aria-expanded="false"
+                        aria-label="More options for ${esc(m.name)}">
+                    <span class="material-symbols-rounded" aria-hidden="true">more_vert</span>
+                </button>
+            </li>`;
+        }
+
+        function skeletonRows(n) {
+            return `<ul class="day-list" aria-hidden="true">${Array.from({ length: n }, () => `<li class="meal-row sk-row">
+                    <span class="sk" style="width:48px;height:48px;border-radius:10px"></span>
+                    <span style="display:flex;flex-direction:column;gap:6px">
+                        <span class="sk" style="width:72%;height:14px"></span>
+                        <span class="sk" style="width:50%;height:12px"></span>
+                        <span class="sk" style="width:42%;height:12px"></span>
+                    </span>
+                    <span class="sk" style="width:56px;height:20px"></span>
+                </li>`).join('')}</ul>`;
+        }
+
+        function skeletonHtml() {
+            return `<div role="status" aria-label="Loading meal history">` +
+                [2, 2, 3].map((n) => `<section class="day" aria-hidden="true">
+                    <div class="day-header">
+                        <span style="display:flex;flex-direction:column;gap:6px"><span class="sk" style="width:110px;height:22px"></span><span class="sk" style="width:80px;height:12px"></span></span>
+                        <span class="sk" style="width:70px;height:20px"></span>
+                    </div>${skeletonRows(n)}</section>`).join('') + `</div>`;
+        }
+
+        function emptyHtml() {
+            return `<div class="empty">
+                <span class="empty-icon" aria-hidden="true"><span class="material-symbols-rounded">restaurant</span></span>
+                <h2 class="empty-title">No meals logged yet</h2>
+                <p class="empty-text">Meals you save appear here, newest first, with their calories and macros. Take a photo of your plate or search for a food to log your first meal.</p>
+                <div class="empty-actions">
+                    <button type="button" class="filled-btn" data-route="camera">
+                        <span class="material-symbols-rounded" aria-hidden="true">photo_camera</span> Take a photo
+                    </button>
+                    <button type="button" class="text-btn" data-route="search">
+                        <span class="material-symbols-rounded" aria-hidden="true">search</span> Search for a food
+                    </button>
+                </div>
+            </div>`;
+        }
+
+        function filteredEmptyHtml() {
+            const type = typeFilter === 'all' ? null : MEAL_TYPES.find((t) => t.toLowerCase() === typeFilter);
+            const when = dayFilter !== null ? ` ${dayPhrase(dayFilter)}` : '';
+            const text = type ? `Nothing was logged as ${type}${when}.` : `No meals were logged${when}.`;
+            return `<div class="empty" role="status">
+                <span class="empty-icon" aria-hidden="true"><span class="material-symbols-rounded">filter_alt_off</span></span>
+                <h2 class="empty-title">No matching meals</h2>
+                <p class="empty-text">${text} Change the filters to see other meals.</p>
+                <div class="empty-actions">
+                    <button type="button" class="outlined-btn" id="clearFilters">Clear filters</button>
+                </div>
+            </div>`;
+        }
+
+        function footerHtml() {
+            if (olderLoading) {
+                return `<section class="day" aria-hidden="true"><div class="day-header"><span class="sk" style="width:110px;height:22px"></span></div>${skeletonRows(2)}</section>
+                    <p class="sr-only" role="status">Loading older meals</p>`;
+            }
+            if (!olderLoaded) {
+                return `<div class="page-error" role="alert">
+                    <span class="material-symbols-rounded" aria-hidden="true">error</span>
+                    <span class="page-error-text">
+                        <span class="page-error-title">Couldn't load older meals</span>
+                        <span class="page-error-sub">Meals above are shown. Try again to load earlier days.</span>
+                    </span>
+                    <button type="button" class="outlined-btn" id="retryOlder">Retry</button>
+                </div>`;
+            }
+            return `<p class="list-footer">That's the start of your history</p>`;
+        }
+
+        function feedHtml() {
+            if (state === 'loading') return skeletonHtml();
+            const avail = availableOffsets();
+            if (!avail.some((o) => liveMeals(o).length)) return emptyHtml();
+
+            const sections = avail
+                .filter((off) => dayFilter === null || dayFilter === off)
+                .map((off) => {
+                    const all = liveMeals(off);
+                    const shown = all.filter((m) => typeFilter === 'all' || m.type.toLowerCase() === typeFilter).sort(byTimeDesc);
+                    if (!shown.length) return '';
+                    const dayTotal = sumKcal(all), shownTotal = sumKcal(shown);
+                    const partial = shown.length !== all.length;
+                    const totalHtml = partial
+                        ? `${fmt(shownTotal)}<span class="of">of</span>${fmt(dayTotal)}<small>kcal</small>`
+                        : `${fmt(dayTotal)}<small>kcal</small>`;
+                    const totalLabel = partial
+                        ? `${fmt(shownTotal)} of ${fmt(dayTotal)} kilocalories for the day`
+                        : `Day total ${fmt(dayTotal)} kilocalories`;
+                    const sub = off <= 1 ? longDate(off) : `${all.length} ${all.length === 1 ? 'meal' : 'meals'}`;
+                    return `<section class="day" aria-labelledby="day-${off}">
+                        <div class="day-header">
+                            <span class="day-titles">
+                                <h2 class="day-title" id="day-${off}">${dayLabel(off)}</h2>
+                                <span class="day-date">${sub}</span>
+                            </span>
+                            <span class="day-total"><span aria-hidden="true">${totalHtml}</span><span class="sr-only">${totalLabel}</span></span>
+                        </div>
+                        <ul class="day-list">${shown.map((m) => rowHtml(m, off)).join('')}</ul>
+                    </section>`;
+                }).join('');
+
+            if (!sections) return filteredEmptyHtml();
+            return sections + (dayFilter === null ? footerHtml() : '');
+        }
+
+        function renderFeed() {
+            closeMenu(false);
+            $('content').setAttribute('aria-busy', String(state === 'loading'));
+            renderChips();
+            $('feedSlot').innerHTML = feedHtml();
+        }
+
+        /* ---------------- Filters ---------------- */
+        function countShown() {
+            return availableOffsets()
+                .filter((off) => dayFilter === null || dayFilter === off)
+                .reduce((n, off) => n + liveMeals(off).filter((m) => typeFilter === 'all' || m.type.toLowerCase() === typeFilter).length, 0);
+        }
+        function announceFilter() {
+            const n = countShown();
+            const type = typeFilter === 'all' ? 'all meal types' : typeFilter;
+            const when = dayFilter === null ? 'all days' : dayLabel(dayFilter);
+            announce(`Showing ${type}, ${when}. ${n} ${n === 1 ? 'meal' : 'meals'}`);
+        }
+        function refocus(selector) {
+            const el = document.querySelector(selector);
+            if (el) el.focus({ preventScroll: true });
+            return Boolean(el);
+        }
+
+        function openPicker() {
+            const picker = $('datePicker');
+            try { picker.showPicker(); } catch (err) { picker.click(); }
+        }
+        $('dateBtn').addEventListener('click', openPicker);
+        $('dateBar').addEventListener('click', (e) => {
+            if (e.target.closest('#dateChip')) { openPicker(); return; }
+            if (e.target.closest('#dateClear')) {
+                dayFilter = null;
+                renderFeed(); announceFilter();
+                refocus('#dateBtn');
+            }
+        });
+        $('chips').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-filter]');
+            if (chip) {
+                typeFilter = chip.dataset.filter;
+                renderFeed(); announceFilter();
+                refocus(`[data-filter="${typeFilter}"]`);
+                return;
+            }
+        });
+        $('datePicker').addEventListener('change', (e) => {
+            const [y, m, d] = e.target.value.split('-').map(Number);
+            if (!y) return;
+            const diff = Math.round((TODAY - new Date(y, m - 1, d)) / 86400000);
+            if (diff < 0) return;
+            dayFilter = diff;
+            renderFeed(); announceFilter();
+            refocus("#dateBtn");
+        });
+
+        /* ---------------- Overflow menu ---------------- */
+        const frame = document.querySelector('.device-frame');
+        function openMenu(id, trigger, anchorEl) {
+            closeMenu(false);
+            const menu = $('rowMenu');
+            menuFor = { id, trigger };
+            const { meal } = findMeal(id);
+            menu.setAttribute('aria-label', `Options for ${meal.name}`);
+            menu.hidden = false;
+            const fr = frame.getBoundingClientRect(), ar = anchorEl.getBoundingClientRect();
+            const border = 12;
+            let top = ar.bottom - fr.top - border - 8;
+            if (top + menu.offsetHeight > frame.clientHeight - 24) top = ar.top - fr.top - border - menu.offsetHeight + 8;
+            menu.style.top = `${Math.max(8, top)}px`;
+            menu.style.right = '16px';
+            menu.style.left = 'auto';
+            trigger.setAttribute('aria-expanded', 'true');
+            $('menuEdit').focus({ preventScroll: true });
+        }
+        function closeMenu(returnFocus) {
+            const menu = $('rowMenu');
+            if (!menuFor) { menu.hidden = true; return; }
+            menu.hidden = true;
+            const trigger = menuFor.trigger;
+            menuFor = null;
+            if (trigger && trigger.isConnected) {
+                trigger.setAttribute('aria-expanded', 'false');
+                if (returnFocus) trigger.focus({ preventScroll: true });
+            }
+        }
+
+        $('rowMenu').addEventListener('keydown', (e) => {
+            const items = [...$('rowMenu').querySelectorAll('[role="menuitem"]')];
+            const i = items.indexOf(document.activeElement);
+            if (e.key === 'ArrowDown') { e.preventDefault(); items[(i + 1) % items.length].focus(); }
+            if (e.key === 'ArrowUp') { e.preventDefault(); items[(i - 1 + items.length) % items.length].focus(); }
+            if (e.key === 'Home') { e.preventDefault(); items[0].focus(); }
+            if (e.key === 'End') { e.preventDefault(); items[items.length - 1].focus(); }
+            if (e.key === 'Escape' || e.key === 'Tab') { e.preventDefault(); closeMenu(true); }
+        });
+        $('menuDelete').addEventListener('click', () => {
+            if (!menuFor) return;
+            const { id, trigger } = menuFor;
+            closeMenu(false);
+            openDialog(id, trigger);
+        });
+        // "Edit meal" carries data-route="mealReviewSaved"; prototype-navigation.js navigates.
+
+        document.addEventListener('pointerdown', (e) => {
+            if (menuFor && !e.target.closest('#rowMenu') && !e.target.closest('[data-more]')) closeMenu(false);
+        });
+
+        /* ---------------- Feed interactions: overflow, long-press, row open ---------------- */
+        let pressTimer = null, longPressed = false, pressStart = null;
+        const feed = $('feedSlot');
+        feed.addEventListener('pointerdown', (e) => {
+            const open = e.target.closest('[data-open]');
+            longPressed = false;
+            if (!open || e.button > 0) return;
+            pressStart = { x: e.clientX, y: e.clientY };
+            pressTimer = setTimeout(() => {
+                longPressed = true;
+                const more = open.parentElement.querySelector('[data-more]');
+                openMenu(open.dataset.open, more, open);
+            }, 500);
+        });
+        const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; };
+        feed.addEventListener('pointermove', (e) => {
+            if (pressStart && Math.hypot(e.clientX - pressStart.x, e.clientY - pressStart.y) > 8) cancelPress();
+        });
+        ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => feed.addEventListener(t, cancelPress));
+        feed.addEventListener('contextmenu', (e) => {
+            const open = e.target.closest('[data-open]');
+            if (!open) return;
+            e.preventDefault();
+            cancelPress();
+            if (!longPressed) openMenu(open.dataset.open, open.parentElement.querySelector('[data-more]'), open);
+            longPressed = true;
+        });
+        // Capture phase: a long-press must not also open the meal (navigation listens on document)
+        feed.addEventListener('click', (e) => {
+            if (longPressed && e.target.closest('[data-open]')) {
+                e.preventDefault(); e.stopPropagation(); longPressed = false;
+            }
+        }, true);
+
+        feed.addEventListener('click', (e) => {
+            const more = e.target.closest('[data-more]');
+            if (more) {
+                if (menuFor && menuFor.id === more.dataset.more) { closeMenu(true); return; }
+                openMenu(more.dataset.more, more, more);
+                return;
+            }
+            if (e.target.closest('#clearFilters')) {
+                typeFilter = 'all'; dayFilter = null;
+                renderFeed(); announceFilter();
+                refocus('[data-filter="all"]');
+                return;
+            }
+            if (e.target.closest('#retryOlder')) {
+                olderLoading = true;
+                renderFeed();
+                later(() => {
+                    olderLoading = false; olderLoaded = true;
+                    renderFeed();
+                    announce('Older meals loaded');
+                }, 1200);
+            }
+        });
+
+        /* ---------------- S-17 delete dialog ---------------- */
+        const backgroundEls = () => [$('appBar'), $('chips'), $('dateBar'), $('content'), $('snackbar')];
+        function openDialog(id, trigger) {
+            const { meal, offset } = findMeal(id);
+            dialogFor = { id, trigger };
+            $('dialogMeal').innerHTML = `<strong>${esc(meal.name)}</strong>
+                <span>${meal.type} · ${dayLabel(offset)}, ${meal.time} · ${fmt(meal.kcal)} kcal</span>`;
+            $('dialogScrim').hidden = false;
+            backgroundEls().forEach((el) => { el.inert = true; });
+            $('dialogCancel').focus();
+        }
+        function closeDialog(returnFocus) {
+            $('dialogScrim').hidden = true;
+            backgroundEls().forEach((el) => { el.inert = false; });
+            const trigger = dialogFor && dialogFor.trigger;
+            dialogFor = null;
+            if (returnFocus && trigger && trigger.isConnected) trigger.focus({ preventScroll: true });
+        }
+        $('dialogCancel').addEventListener('click', () => closeDialog(true));
+        $('dialogScrim').addEventListener('click', (e) => { if (e.target === $('dialogScrim')) closeDialog(true); });
+        $('dialogScrim').addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') { e.preventDefault(); closeDialog(true); }
+            if (e.key === 'Tab') { // keep focus inside the two dialog actions
+                const first = $('dialogCancel'), last = $('dialogConfirm');
+                if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+                else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+            }
+        });
+        $('dialogConfirm').addEventListener('click', () => {
+            const id = dialogFor.id;
+            // Focus target after removal: next row, else previous row, else the filter chips
+            const row = document.querySelector(`.meal-row[data-id="${id}"]`);
+            const allRows = [...document.querySelectorAll('.meal-row[data-id]')];
+            const idx = allRows.indexOf(row);
+            const nextRow = allRows[idx + 1] || allRows[idx - 1];
+            const nextId = nextRow ? nextRow.dataset.id : null;
+            closeDialog(false);
+            deleteMeal(id);
+            if (nextId) refocus(`[data-open="${nextId}"]`);
+            else if (!refocus('[data-filter="all"]')) refocus('.empty-actions button');
+        });
+
+        /* ---------------- Delete + S-18 undo snackbar ---------------- */
+        let snackTimer = null;
+        function hideSnackbar() { $('snackbar').classList.remove('show'); pendingUndo = null; }
+        function showSnackbar(text, withUndo, ms) {
+            clearTimeout(snackTimer);
+            $('snackbarText').textContent = text;
+            $('snackbarUndo').hidden = !withUndo;
+            $('snackbar').classList.add('show');
+            snackTimer = later(hideSnackbar, ms);
+        }
+        function deleteMeal(id) {
+            // A previous undo window closes when another meal is deleted (that deletion becomes final)
+            deleted.add(id);
+            pendingUndo = { id };
+            restoredId = null;
+            renderFeed();
+            const { meal } = findMeal(id);
+            showSnackbar(`“${meal.name}” deleted`, true, 6000);
+            announce(`${meal.name} deleted. Undo available`);
+        }
+        $('snackbarUndo').addEventListener('click', () => {
+            if (!pendingUndo) return;
+            const id = pendingUndo.id;
+            deleted.delete(id);
+            restoredId = id;
+            clearTimeout(snackTimer);
+            hideSnackbar();
+            renderFeed();
+            const { meal } = findMeal(id);
+            announce(`${meal.name} restored`);
+            refocus(`[data-open="${id}"]`);
+            later(() => {
+                restoredId = null;
+                const row = document.querySelector(`.meal-row[data-id="${id}"]`);
+                if (row) row.classList.remove('is-restored');
+            }, 1600);
+        });
+
+        /* ---------------- State switcher ---------------- */
+        function render(next) {
+            state = ['default', 'loading', 'empty', 'filtered', 'error'].includes(next) ? next : 'default';
+            clearTimers();
+            clearTimeout(snackTimer);
+            hideSnackbar();
+            if (dialogFor) closeDialog(false);
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            deleted.clear();
+            restoredId = null;
+            olderLoading = false;
+            olderLoaded = state !== 'error';
+            // Filtered-empty: today + Snack (no snack logged today yet at 11:17)
+            typeFilter = state === 'filtered' ? 'snack' : 'all';
+            dayFilter = state === 'filtered' ? 0 : null;
+            renderFeed();
+            $('content').scrollTop = 0;
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(location.search).get('state') || 'default');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

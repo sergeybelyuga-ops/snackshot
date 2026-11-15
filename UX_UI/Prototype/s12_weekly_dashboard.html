@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-12 Weekly | Food & Drink Dashboard - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, chart, macro and status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-12 W range / S-13 Weekly summary — UX spec §3.2 / §4.10, F-16, visual reference GoogleHealth (4).png and (1).png:
+         * TopAppBar -> D/W/M/3M/Y segments -> week label + prev/next/current -> metric insight header (daily average)
+         * -> single-metric bar chart with personal range band -> metric selector (Intake / Macro goal) -> legend
+         * -> chronological day value rows -> Macros goal (daily averages) -> History CTA.
+         */
+        /* Screen-local chart color: --chart-intake (#32C5F0) is below 3:1 on light surfaces, so light mode uses a deeper cyan. */
+        :root { --week-intake: #0B84B5; }
+        :root[data-theme="dark"] { --week-intake: var(--chart-intake); }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: default; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar h1 {
+            flex: 1;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        /* ---------- D / W / M / 3M / Y segments (Google Health style) ---------- */
+        .segments {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+        }
+        .segment {
+            height: 48px;
+            border-radius: 12px;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            text-align: center;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            transition: background-color 200ms ease, border-radius 200ms ease;
+        }
+        .segment:first-child { border-radius: 24px 12px 12px 24px; }
+        .segment:last-child  { border-radius: 12px 24px 24px 12px; }
+        .segment[aria-pressed="true"] {
+            background: var(--primary);
+            color: var(--on-primary);
+            border-radius: 24px;
+        }
+        .segment:hover:not([aria-pressed="true"]) { background: color-mix(in srgb, var(--on-surface) 8%, var(--surface-container-high)); }
+
+        /* ---------- Week navigation ---------- */
+        .range-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .date-btn {
+            flex: 1;
+            min-width: 0;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 12px;
+            padding-right: 8px;
+            font-family: var(--font-display);
+            font-size: 28px;
+            line-height: 36px;
+            font-weight: 400;
+        }
+        .date-btn .material-symbols-rounded { font-size: 22px; color: var(--on-surface-variant); flex-shrink: 0; }
+        .tonal-icon-btn {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .tonal-icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 10%, var(--surface-container-high)); }
+        .tonal-icon-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+        #datePicker { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+
+        /* ---------- Metric insight header ---------- */
+        .insight { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .insight-value { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .insight-number {
+            font-family: var(--font-display);
+            font-size: 57px;
+            line-height: 64px;
+            font-weight: 400;
+            letter-spacing: -0.25px;
+            font-variant-numeric: tabular-nums;
+        }
+        .insight-unit { font-family: var(--font-display); font-size: 20px; line-height: 28px; font-weight: 500; }
+        .insight-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .insight-meta { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+
+        /* ---------- Weekly bar chart (rounded pills, right-side y-axis) ---------- */
+        .chart { margin: 20px -8px 0 -4px; }
+        [data-metric="kcal"]    { --bar-color: var(--week-intake); }
+        [data-metric="carbs"]   { --bar-color: var(--macro-carbs); }
+        [data-metric="fat"]     { --bar-color: var(--macro-fat); }
+        [data-metric="protein"] { --bar-color: var(--macro-protein); }
+        .chart-body {
+            position: relative;
+            display: grid;
+            grid-template-columns: 1fr 40px;
+            --plot-h: 200px;
+        }
+        .plot-layer {
+            position: absolute;
+            left: 0; right: 40px; top: 0;
+            height: var(--plot-h);
+            pointer-events: none;
+        }
+        .gridline {
+            position: absolute;
+            left: 0; right: 0;
+            border-top: 1px solid var(--outline-variant);
+        }
+        .gridline[data-zero="true"] { border-top-color: var(--outline); }
+        .goal-band {
+            position: absolute;
+            left: 0; right: 0;
+            min-height: 6px;
+            border-radius: 6px;
+            background: color-mix(in srgb, var(--chart-in-range) 22%, transparent);
+            border-top: 1.5px dashed color-mix(in srgb, var(--on-surface) 55%, transparent);
+            border-bottom: 1.5px dashed color-mix(in srgb, var(--on-surface) 55%, transparent);
+        }
+        .bars {
+            position: relative;
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+        }
+        .bar-col {
+            min-width: 0;
+            height: calc(var(--plot-h) + 32px);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            border-radius: 16px;
+            color: var(--on-surface-variant);
+        }
+        button.bar-col { cursor: pointer; }
+        button.bar-col:hover { background: color-mix(in srgb, var(--on-surface) 6%, transparent); }
+        .bar-area {
+            flex: 0 0 var(--plot-h);
+            width: 100%;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+        .bar {
+            width: min(72%, 34px);
+            min-height: 8px;
+            border-radius: 999px;
+            background: var(--bar-color);
+            transition: height 300ms cubic-bezier(.2,0,0,1);
+        }
+        .bar-label {
+            height: 32px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            font: 500 13px/16px var(--font-text);
+            letter-spacing: 0.4px;
+        }
+        .bar-col[data-today="true"] .bar-label { color: var(--on-surface); font-weight: 700; }
+        .bar-col[data-today="true"] .bar-label::after {
+            content: "";
+            width: 14px; height: 3px;
+            border-radius: 2px;
+            background: var(--on-surface);
+        }
+        .bar-col[data-future="true"] .bar-label { color: color-mix(in srgb, var(--on-surface-variant) 70%, transparent); }
+        .y-axis { position: relative; height: var(--plot-h); }
+        .y-tick {
+            position: absolute;
+            left: 6px;
+            transform: translateY(-50%);
+            font: 400 11px/16px var(--font-text);
+            letter-spacing: 0.3px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        /* ---------- Metric selector (Intake / Macro goal dropdown chips) ---------- */
+        .metric-select {
+            margin-top: 12px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+        }
+        .chip {
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+        }
+        .chip-inner {
+            min-height: 32px;
+            padding: 4px 12px 4px 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--outline);
+            color: var(--on-surface);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .chip-inner .chip-check { font-size: 18px; display: none; margin-left: -8px; }
+        .chip-inner .chip-drop { font-size: 18px; margin-right: -4px; }
+        .chip[aria-pressed="true"] .chip-inner,
+        .chip[data-selected="true"] .chip-inner {
+            border-color: transparent;
+            background: var(--primary-container);
+        }
+        :root[data-theme="dark"] .chip[aria-pressed="true"] .chip-inner,
+        :root[data-theme="dark"] .chip[data-selected="true"] .chip-inner { color: #FFFFFF; }
+        .chip[aria-pressed="true"] .chip-check,
+        .chip[data-selected="true"] .chip-check { display: inline-block; }
+        .chip:hover .chip-inner { background-image: linear-gradient(color-mix(in srgb, var(--on-surface) 8%, transparent), color-mix(in srgb, var(--on-surface) 8%, transparent)); }
+
+        .menu {
+            position: absolute;
+            top: calc(100% - 4px);
+            left: 50%;
+            min-width: 196px;
+            padding: 8px 0;
+            border-radius: 4px;
+            background: var(--surface-container);
+            box-shadow: 0 4px 12px rgba(0,0,0,.18), 0 1px 3px rgba(0,0,0,.2);
+            z-index: 20;
+        }
+        :root[data-theme="dark"] .menu { background: var(--surface-container-high); }
+        .menu-item {
+            width: 100%;
+            min-height: 48px;
+            padding: 0 16px 0 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font: 400 16px/24px var(--font-text);
+            letter-spacing: 0.15px;
+        }
+        .menu-item:hover, .menu-item:focus-visible { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .menu-item:focus-visible { outline-offset: -2px; }
+        .menu-item .material-symbols-rounded { font-size: 20px; width: 20px; visibility: hidden; }
+        .menu-item[aria-checked="true"] .material-symbols-rounded { visibility: visible; }
+        .menu-dot { width: 10px; height: 10px; border-radius: 50%; margin-left: auto; flex-shrink: 0; }
+
+        /* ---------- Legend ---------- */
+        .legend {
+            margin-top: 4px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 4px 20px;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .legend-item { display: inline-flex; align-items: center; gap: 8px; }
+        .swatch-band {
+            width: 18px; height: 12px;
+            border-radius: 3px;
+            background: color-mix(in srgb, var(--chart-in-range) 22%, transparent);
+            border-top: 1.5px dashed color-mix(in srgb, var(--on-surface) 55%, transparent);
+            border-bottom: 1.5px dashed color-mix(in srgb, var(--on-surface) 55%, transparent);
+        }
+        .swatch-bar { width: 8px; height: 16px; border-radius: 4px; background: var(--bar-color); }
+
+        /* ---------- Section header ---------- */
+        .section-header {
+            margin-top: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 8px;
+            min-height: 48px;
+        }
+        .section-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; }
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            margin-right: -12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 20px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            flex-shrink: 0;
+        }
+        .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .section-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); margin-bottom: 8px; }
+
+        /* ---------- Chronological day value rows ---------- */
+        .day-rows { margin-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+        .day-row {
+            width: 100%;
+            min-height: 80px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            background: var(--surface-container);
+            border-radius: 4px;
+        }
+        :root:not([data-theme="dark"]) .day-row { box-shadow: inset 0 0 0 1px var(--outline-variant); }
+        .day-row:first-child { border-radius: 24px 24px 4px 4px; }
+        .day-row:last-child  { border-radius: 4px 4px 24px 24px; }
+        .day-row:only-child  { border-radius: 24px; }
+        .day-row:hover { background: color-mix(in srgb, var(--on-surface) 5%, var(--surface-container)); }
+        .day-row-info { display: flex; flex-direction: column; min-width: 0; }
+        .day-row-date { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .day-row-sub {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+            font-variant-numeric: tabular-nums;
+        }
+        .day-row-value {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+            flex-shrink: 0;
+            font-family: var(--font-display);
+            font-size: 32px;
+            line-height: 40px;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .day-row-value small { font-size: 16px; line-height: 24px; color: var(--on-surface-variant); }
+        .goal-met { align-self: center; font-size: 24px; color: var(--status-in-fg); }
+        :root[data-theme="dark"] .goal-met { color: var(--chart-in-range); }
+
+        /* ---------- Macros goal (same as Daily, values are daily averages) ---------- */
+        .macros { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
+        .macro { display: flex; flex-direction: column; gap: 10px; }
+        .macro[data-macro="carbs"]   { --macro-color: var(--macro-carbs); }
+        .macro[data-macro="fat"]     { --macro-color: var(--macro-fat); }
+        .macro[data-macro="protein"] { --macro-color: var(--macro-protein); }
+        .macro-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .macro-label { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; font-variant-numeric: tabular-nums; }
+        .badge {
+            flex-shrink: 0;
+            padding: 4px 12px;
+            border-radius: 14px;
+            font: 500 13px/18px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .badge[data-status="below"] { background: var(--status-below-bg); color: var(--status-below-fg); }
+        .badge[data-status="in"]    { background: var(--status-in-bg);    color: var(--status-in-fg); }
+        .badge[data-status="above"] { background: var(--status-above-bg); color: var(--status-above-fg); }
+        .macro-bar { position: relative; height: 24px; display: flex; align-items: center; }
+        .macro-track {
+            position: absolute;
+            left: 0; right: 0;
+            height: 16px;
+            border-radius: 8px;
+            background: var(--macro-track);
+            overflow: hidden;
+        }
+        .macro-fill {
+            display: block;
+            height: 100%;
+            border-radius: 8px;
+            background: var(--macro-color);
+            transition: width 400ms cubic-bezier(.2,0,0,1);
+        }
+        .macro-fill[data-zero="false"] { min-width: 8px; }
+        .macro-range {
+            position: absolute;
+            top: 0;
+            height: 24px;
+            min-width: 12px;
+            border-radius: 12px;
+            border: 1.5px dashed color-mix(in srgb, var(--on-surface) 70%, transparent);
+            background: color-mix(in srgb, var(--macro-color) 22%, transparent);
+            pointer-events: none;
+        }
+
+        .history-cta {
+            width: 100%;
+            margin-top: 24px;
+            min-height: 48px;
+            border-radius: 24px;
+            border: 1px solid var(--outline);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+        }
+        .history-cta:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+
+        /* ---------- Empty state ---------- */
+        .empty {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+            padding: 0 12px;
+        }
+        .empty-title { font-family: var(--font-display); font-size: 36px; line-height: 44px; font-weight: 400; }
+        .empty-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .filled-btn {
+            margin-top: 12px;
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            background: var(--primary);
+            color: var(--on-primary);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+        }
+
+        /* ---------- Skeletons ---------- */
+        .sk { display: block; background: var(--surface-container-high); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: .5; } }
+
+        /* ---------- Snackbar ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px; right: 16px; bottom: 32px;
+            min-height: 48px;
+            padding: 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+        }
+        .snackbar.show { transform: none; opacity: 1; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-12 W / S-13 states required by spec §4.1 / §4.10 -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <button type="button" data-state-choice="local">No goals</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <header class="top-app-bar">
+            <button type="button" class="icon-btn" aria-label="Back to Home" data-route="home">
+                <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            </button>
+            <h1>Food &amp; drink</h1>
+            <button type="button" class="icon-btn" aria-label="Log a meal" data-route="camera">
+                <span class="material-symbols-rounded" aria-hidden="true">add</span>
+            </button>
+        </header>
+
+        <main class="scaffold-content" id="content">
+            <!-- Range segments -->
+            <div class="segments" role="group" aria-label="Time range">
+                <button type="button" class="segment" aria-pressed="false" aria-label="Day" data-route="dailyDashboard">D</button>
+                <button type="button" class="segment" aria-pressed="true" aria-label="Week">W</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Month" data-route="monthDashboard">M</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Three months" data-route="threeMonthDashboard">3M</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Year" data-route="yearDashboard">Y</button>
+            </div>
+
+            <!-- Week navigation -->
+            <div class="range-nav">
+                <button type="button" class="date-btn" id="dateBtn" aria-label="Choose week">
+                    <span id="dateLabel">Sep 21–27</span>
+                    <span class="material-symbols-rounded" aria-hidden="true">arrow_drop_down</span>
+                </button>
+                <input type="date" id="datePicker" tabindex="-1" aria-hidden="true" max="2026-09-24">
+                <button type="button" class="tonal-icon-btn" id="prevWeek" aria-label="Previous week">
+                    <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+                </button>
+                <button type="button" class="tonal-icon-btn" id="nextWeek" aria-label="Next week">
+                    <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" class="tonal-icon-btn" id="currentWeek" aria-label="Return to this week">
+                    <span class="material-symbols-rounded" aria-hidden="true">history</span>
+                </button>
+            </div>
+
+            <!-- Rendered per selected week, metric and state -->
+            <div id="weekSlot"></div>
+        </main>
+
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite"></div>
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data (consistent with S-02 Home and S-12 Daily) ---------------- */
+        const TODAY = new Date(2026, 8, 24); // Thu, Sep 24, 2026
+        const GOALS = { kcal: 2300, carbs: 220, fat: 70, protein: 150 };
+        const RANGE = 0.10; // personal range = goal ±10%
+
+        // Daily totals keyed by ISO date. Sep 22-24 are the sums of the DAYS meals in s12_daily_dashboard.html;
+        // Mon Sep 21 and the previous week (Sep 14-20) are invented demo data. Missing date = no data (not zero).
+        const TOTALS = {
+            '2026-09-14': { kcal: 2210, carbs: 230, fat: 68, protein: 140 },
+            '2026-09-15': { kcal: 1980, carbs: 205, fat: 64, protein: 128 },
+            '2026-09-16': { kcal: 2350, carbs: 250, fat: 78, protein: 135 },
+            '2026-09-17': { kcal: 2420, carbs: 262, fat: 80, protein: 142 },
+            '2026-09-18': { kcal: 2610, carbs: 280, fat: 92, protein: 120 },
+            '2026-09-19': { kcal: 2280, carbs: 228, fat: 75, protein: 150 },
+            '2026-09-20': { kcal: 1890, carbs: 190, fat: 60, protein: 118 },
+            '2026-09-21': { kcal: 2190, carbs: 248, fat: 74, protein: 132 },
+            '2026-09-22': { kcal: 2135, carbs: 235, fat: 83, protein: 106 },
+            '2026-09-23': { kcal: 530,  carbs: 77,  fat: 13, protein: 25 },
+            '2026-09-24': { kcal: 770,  carbs: 68,  fat: 33, protein: 48 }
+        };
+        const METRICS = {
+            kcal:    { name: 'Intake',  noun: 'calorie', unit: 'kcal', spoken: 'kilocalories' },
+            carbs:   { name: 'Carbs',   noun: 'carbs',   unit: 'g',    spoken: 'grams' },
+            fat:     { name: 'Fat',     noun: 'fat',     unit: 'g',    spoken: 'grams' },
+            protein: { name: 'Protein', noun: 'protein', unit: 'g',    spoken: 'grams' }
+        };
+        const MACROS = ['carbs', 'fat', 'protein'];
+        const STATUS_TEXT = { below: 'Below range', in: 'In range', above: 'Above range' };
+        const MAX_WEEKS_BACK = 52;
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        let timers = [];
+        function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+        function iso(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        function addDays(d, n) { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+        function mondayOf(d) { return addDays(d, -((d.getDay() + 6) % 7)); }
+        const CURRENT_MONDAY = mondayOf(TODAY);
+        function daysBeforeToday(d) { return Math.round((TODAY - d) / 86400000); }
+        const mon = (d) => d.toLocaleDateString('en-US', { month: 'short' });
+        function weekLabel(start) {
+            const end = addDays(start, 6);
+            return mon(start) === mon(end)
+                ? `${mon(start)} ${start.getDate()}–${end.getDate()}`
+                : `${mon(start)} ${start.getDate()}–${mon(end)} ${end.getDate()}`;
+        }
+        function weekSpoken(start) {
+            const o = { month: 'long', day: 'numeric' };
+            return `${start.toLocaleDateString('en-US', o)} to ${addDays(start, 6).toLocaleDateString('en-US', o)}`;
+        }
+        function rowDate(d) { return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); }
+        function longDate(d) { return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }); }
+        function statusOf(value, goal) {
+            if (value < goal * (1 - RANGE)) return 'below';
+            if (value > goal * (1 + RANGE)) return 'above';
+            return 'in';
+        }
+        function niceStep(raw) {
+            const steps = [5, 10, 20, 25, 30, 40, 50, 60, 75, 100, 150, 200, 250, 300, 400, 500, 750, 1000, 1500, 2000];
+            return steps.find((s) => s >= raw) || Math.ceil(raw / 1000) * 1000;
+        }
+        const valueText = (v, m) => `${fmt(v)} ${METRICS[m].unit}`;
+
+        /* ---------------- State ---------------- */
+        let state = 'default';
+        let weeksBack = 0;      // 0 = current week (Sep 21-27)
+        let metric = 'kcal';    // kcal | carbs | fat | protein
+        let menuOpen = false;
+
+        const goals = () => (state === 'local' ? null : GOALS);
+        const weekStart = () => addDays(CURRENT_MONDAY, -7 * weeksBack);
+
+        // Seven days of the selected week; future days and days without meals have data = null (empty, not zero)
+        function weekDays() {
+            const start = weekStart();
+            return Array.from({ length: 7 }, (_, i) => {
+                const d = addDays(start, i);
+                const future = d > TODAY;
+                const emptyCurrent = state === 'empty' && weeksBack === 0;
+                return { date: d, future, today: iso(d) === iso(TODAY), data: future || emptyCurrent ? null : (TOTALS[iso(d)] || null) };
+            });
+        }
+        function averages(days) {
+            const logged = days.filter((d) => d.data);
+            const avg = {};
+            ['kcal', ...MACROS].forEach((k) => { avg[k] = logged.length ? Math.round(logged.reduce((s, d) => s + d.data[k], 0) / logged.length) : 0; });
+            return { avg, count: logged.length, includesToday: logged.some((d) => d.today) };
+        }
+
+        /* ---------------- Render: insight header ---------------- */
+        const ADVICE = {
+            kcal:    { below: "Make sure you're fueling enough to support your daily activity and prevent fatigue.",
+                       in: 'Nicely balanced week.', above: 'Lighter meals on the coming days can help balance the week.' },
+            carbs:   { below: "Carbs are your body's main source of energy.", in: 'Nicely balanced.', above: 'Swapping refined carbs for vegetables can help.' },
+            fat:     { below: 'Including healthy fats in your meals helps your body absorb key nutrients.', in: 'Nicely balanced.', above: 'Choosing leaner cooking methods can help.' },
+            protein: { below: 'Protein helps maintain muscle and keeps you full for longer.', in: 'Nicely balanced.', above: 'Spreading protein across meals is usually enough.' }
+        };
+        function insightHtml(a, g) {
+            const m = METRICS[metric];
+            const v = a.avg[metric];
+            let text;
+            if (!g) {
+                text = `No ${m.noun} goal set, so your average can't be compared with a goal.`;
+            } else {
+                const st = statusOf(v, g[metric]);
+                const verb = { below: 'averaged below your goal.', in: 'averaged within your personal range.', above: 'averaged above your goal.' }[st];
+                text = `Your ${m.noun} intake ${verb} ${ADVICE[metric][st]}`;
+            }
+            const meta = `Average of ${a.count} logged ${a.count === 1 ? 'day' : 'days'}${a.includesToday ? ' · today is still in progress' : ''}`;
+            return `<div class="insight">
+                <div class="insight-value"><span class="insight-number">${fmt(v)}</span><span class="insight-unit">${m.unit} per day (avg)</span></div>
+                <p class="insight-text">${text}</p>
+                <p class="insight-meta">${meta}</p>
+            </div>`;
+        }
+
+        /* ---------------- Render: chart ---------------- */
+        function chartHtml(days, g) {
+            const values = days.filter((d) => d.data).map((d) => d.data[metric]);
+            const goal = g && g[metric];
+            const lo = goal ? goal * (1 - RANGE) : 0, hi = goal ? goal * (1 + RANGE) : 0;
+            const step = niceStep(Math.max(...values, hi, 1) / 3);
+            const max = step * 3;
+            const pct = (v) => Math.min(v / max, 1) * 100;
+            const ticks = [0, 1, 2, 3].map((i) => i * step);
+            const m = METRICS[metric];
+
+            const bars = days.map((d) => {
+                const letter = d.date.toLocaleDateString('en-US', { weekday: 'narrow' });
+                if (!d.data) {
+                    // Future or unlogged day: no bar (empty, not zero) and not interactive
+                    return `<span class="bar-col" data-future="${d.future}" aria-hidden="true">
+                        <span class="bar-area"></span><span class="bar-label">${letter}</span></span>`;
+                }
+                const v = d.data[metric];
+                const st = goal ? `, ${STATUS_TEXT[statusOf(v, goal)]}` : '';
+                return `<button type="button" class="bar-col" data-day-offset="${daysBeforeToday(d.date)}" data-today="${d.today}"
+                        aria-label="${longDate(d.date)}${d.today ? ', today' : ''}: ${fmt(v)} ${m.spoken}${st}. Open day">
+                    <span class="bar-area" aria-hidden="true"><span class="bar" style="height:${pct(v)}%"></span></span>
+                    <span class="bar-label" aria-hidden="true">${letter}</span>
+                </button>`;
+            }).join('');
+
+            const band = goal ? `<span class="goal-band" style="top:${100 - pct(hi)}%;height:${pct(hi) - pct(lo)}%"></span>` : '';
+            const grid = ticks.map((t) => `<span class="gridline" data-zero="${t === 0}" style="top:${100 - pct(t)}%"></span>`).join('');
+            const yAxis = ticks.map((t) => `<span class="y-tick" style="top:${100 - pct(t)}%">${fmt(t)}</span>`).join('');
+
+            // Accessible text summary of the chart (all 7 days + daily average per macro, F-16)
+            const rows = days.map((d) => {
+                if (!d.data) return `<tr><th scope="row">${longDate(d.date)}</th><td colspan="5">${d.future ? 'No data yet' : 'No data'}</td></tr>`;
+                const st = goal ? STATUS_TEXT[statusOf(d.data[metric], goal)] : 'No goal';
+                return `<tr><th scope="row">${longDate(d.date)}${d.today ? ' (today, in progress)' : ''}</th>
+                    <td>${fmt(d.data.kcal)} kcal</td><td>${d.data.carbs} g</td><td>${d.data.fat} g</td><td>${d.data.protein} g</td><td>${st}</td></tr>`;
+            }).join('');
+            const a = averages(days);
+            const goalCap = goal ? `Personal range ${fmt(lo)} to ${fmt(hi)} ${m.unit}.` : 'No goal set.';
+
+            return `<div class="chart" data-metric="${metric}">
+                <div class="chart-body" role="group" aria-label="${m.name} per day, ${weekSpoken(weekStart())}. ${goalCap}">
+                    <div class="plot-layer" aria-hidden="true">${grid}${band}</div>
+                    <div class="bars">${bars}</div>
+                    <div class="y-axis" aria-hidden="true">${yAxis}</div>
+                </div>
+                <table class="sr-only">
+                    <caption>Daily nutrition, ${weekSpoken(weekStart())}. ${m.name} status compared with ${goal ? 'personal range' : 'no goal'}.</caption>
+                    <thead><tr><th scope="col">Day</th><th scope="col">Calories</th><th scope="col">Carbs</th><th scope="col">Fat</th><th scope="col">Protein</th><th scope="col">${m.name} status</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                    <tfoot><tr><th scope="row">Daily average (${a.count} logged days)</th>
+                        <td>${fmt(a.avg.kcal)} kcal</td><td>${a.avg.carbs} g</td><td>${a.avg.fat} g</td><td>${a.avg.protein} g</td><td></td></tr></tfoot>
+                </table>
+            </div>`;
+        }
+
+        function selectorHtml(g) {
+            const macroSel = metric !== 'kcal';
+            const macroName = macroSel ? METRICS[metric].name : (g ? 'Macro goal' : 'Macros');
+            return `<div class="metric-select" role="group" aria-label="Chart metric">
+                <button type="button" class="chip" id="intakeChip" aria-pressed="${!macroSel}">
+                    <span class="chip-inner"><span class="material-symbols-rounded chip-check" aria-hidden="true">check</span>Intake</span>
+                </button>
+                <button type="button" class="chip" id="macroChip" data-selected="${macroSel}" aria-haspopup="menu" aria-expanded="${menuOpen}" aria-controls="macroMenu"
+                        aria-label="Macro${macroSel ? `, ${macroName} selected` : ''}. Choose macro">
+                    <span class="chip-inner"><span class="material-symbols-rounded chip-check" aria-hidden="true">check</span>${macroName}<span class="material-symbols-rounded chip-drop" aria-hidden="true">arrow_drop_down</span></span>
+                </button>
+                <div class="menu" id="macroMenu" role="menu" aria-label="Macro" ${menuOpen ? '' : 'hidden'}>
+                    ${MACROS.map((k) => `<button type="button" class="menu-item" role="menuitemradio" data-metric="${k}" aria-checked="${metric === k}">
+                        <span class="material-symbols-rounded" aria-hidden="true">check</span>${METRICS[k].name}
+                        <span class="menu-dot" aria-hidden="true" style="background:var(--macro-${k})"></span>
+                    </button>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        function legendHtml(g) {
+            const goal = g && g[metric];
+            const m = METRICS[metric];
+            return `<div class="legend" data-metric="${metric}" aria-hidden="true">
+                ${goal ? `<span class="legend-item"><span class="swatch-band"></span>Personal range ${fmt(goal * (1 - RANGE))}–${fmt(goal * (1 + RANGE))} ${m.unit}</span>` : ''}
+                <span class="legend-item"><span class="swatch-bar"></span>${metric === 'kcal' ? 'Daily intake' : `Daily ${m.noun}`}</span>
+            </div>`;
+        }
+
+        /* ---------------- Render: day rows ---------------- */
+        function dayRowsHtml(days, g) {
+            const goal = g && g[metric];
+            const m = METRICS[metric];
+            const logged = days.filter((d) => d.data).reverse(); // newest first, as in Google Health
+            return `<div class="section-header"><h2 class="section-title">${weekLabel(weekStart())}</h2></div>
+                <div class="day-rows">${logged.map((d) => {
+                    const v = d.data[metric];
+                    const st = goal ? statusOf(v, goal) : null;
+                    const parts = [];
+                    if (d.today) parts.push('Today');
+                    if (metric !== 'kcal') parts.push(goal ? `${Math.round(v / goal * 100)}% of goal` : `${Math.round(v * (metric === 'fat' ? 9 : 4) / d.data.kcal * 100)}% of calories`);
+                    if (st) parts.push(STATUS_TEXT[st]);
+                    if (metric === 'kcal' && !goal) parts.push(`C ${d.data.carbs} · F ${d.data.fat} · P ${d.data.protein} g`);
+                    const sub = parts.join(' · ');
+                    return `<button type="button" class="day-row" data-day-offset="${daysBeforeToday(d.date)}"
+                            aria-label="${longDate(d.date)}: ${fmt(v)} ${m.spoken}. ${sub}. Open day">
+                        <span class="day-row-info" aria-hidden="true">
+                            <span class="day-row-date">${rowDate(d.date)}</span>
+                            ${sub ? `<span class="day-row-sub">${sub}</span>` : ''}
+                        </span>
+                        <span class="day-row-value" aria-hidden="true">
+                            ${st === 'in' ? '<span class="material-symbols-rounded icon-filled goal-met">verified</span>' : ''}
+                            ${fmt(v)}<small>${m.unit}</small>
+                        </span>
+                    </button>`;
+                }).join('')}</div>`;
+        }
+
+        /* ---------------- Render: macros goal (daily averages) ---------------- */
+        function macroHtml(key, name, value, goal, totalGrams) {
+            if (!goal) {
+                const share = totalGrams ? Math.round(value / totalGrams * 100) : 0;
+                return `<div class="macro" data-macro="${key}" role="img" aria-label="${name}: ${value} grams per day on average, ${share}% of average macros. No goal">
+                    <div class="macro-head" aria-hidden="true"><span class="macro-label">${name} · ${share}% · ${value} g</span></div>
+                    <div class="macro-bar" aria-hidden="true"><span class="macro-track"><span class="macro-fill" data-zero="${value === 0}" style="width:${share}%"></span></span></div>
+                </div>`;
+            }
+            const pct = Math.round(value / goal * 100);
+            const status = statusOf(value, goal);
+            const scale = goal * 2; // track spans 0..2x goal so the range sits mid-track
+            const fill = Math.min(value / scale, 1) * 100;
+            const lo = goal * (1 - RANGE) / scale * 100, hi = goal * (1 + RANGE) / scale * 100;
+            return `<div class="macro" data-macro="${key}" role="img"
+                    aria-label="${name}: ${value} of ${goal} grams per day on average, ${pct}% of goal. ${STATUS_TEXT[status]}">
+                <div class="macro-head" aria-hidden="true">
+                    <span class="macro-label">${name} · ${pct}% · ${value} of ${goal} g</span>
+                    <span class="badge" data-status="${status}">${STATUS_TEXT[status]}</span>
+                </div>
+                <div class="macro-bar" aria-hidden="true">
+                    <span class="macro-track"><span class="macro-fill" data-zero="${value === 0}" style="width:${fill}%"></span></span>
+                    <span class="macro-range" style="left:${lo}%;width:${hi - lo}%"></span>
+                </div>
+            </div>`;
+        }
+
+        function macrosHtml(a, g) {
+            const t = a.avg;
+            const grams = t.carbs + t.fat + t.protein;
+            return `<div class="section-header">
+                    <h2 class="section-title">${g ? 'Macros goal' : 'Macros'}</h2>
+                    <button type="button" class="text-btn" id="fullNutrients">View full nutrients</button>
+                </div>
+                <p class="section-text">Daily average for ${weekLabel(weekStart())}. Balancing carbs, protein, and fat is key for energy, recovery, and overall health.</p>
+                <div class="macros">
+                    ${macroHtml('carbs', 'Carbs', t.carbs, g && g.carbs, grams)}
+                    ${macroHtml('fat', 'Fat', t.fat, g && g.fat, grams)}
+                    ${macroHtml('protein', 'Protein', t.protein, g && g.protein, grams)}
+                </div>`;
+        }
+
+        /* ---------------- Render: loading / empty ---------------- */
+        function skeletonHtml() {
+            return `<div aria-hidden="true">
+                <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+                    <span class="sk" style="width:62%;height:56px;border-radius:12px"></span>
+                    <span class="sk" style="width:90%;height:16px"></span>
+                    <span class="sk" style="width:70%;height:16px"></span>
+                </div>
+                <div style="margin-top:28px;height:232px;display:grid;grid-template-columns:repeat(7,1fr) 40px;align-items:end;gap:0">
+                    ${[54, 70, 38, 62, 46, 30, 58].map((h) => `<span style="display:flex;justify-content:center"><span class="sk" style="width:30px;height:${h * 2}px;border-radius:15px"></span></span>`).join('')}
+                    <span></span>
+                </div>
+                <div style="margin-top:16px;display:flex;justify-content:center;gap:8px">
+                    <span class="sk" style="width:84px;height:32px"></span><span class="sk" style="width:120px;height:32px"></span>
+                </div>
+                <div style="margin-top:40px;display:flex;flex-direction:column;gap:2px">
+                    <span class="sk" style="width:40%;height:24px;margin-bottom:12px"></span>
+                    ${[0, 1, 2].map((i) => `<span class="sk" style="height:80px;border-radius:${i === 0 ? '24px 24px 4px 4px' : i === 2 ? '4px 4px 24px 24px' : '4px'}"></span>`).join('')}
+                </div>
+            </div>`;
+        }
+
+        function emptyHtml() {
+            const current = weeksBack === 0;
+            return `<div class="empty">
+                <span class="empty-title">No data</span>
+                <p class="empty-text">No meals logged for ${current ? 'this week' : weekLabel(weekStart())}. ${current
+                    ? 'Take a photo of your meal and Snackshot will estimate calories and macros.'
+                    : 'Weekly averages appear once at least one meal is logged in the week.'}</p>
+                <button type="button" class="filled-btn" data-route="camera">
+                    <span class="material-symbols-rounded" aria-hidden="true">photo_camera</span> Take a photo
+                </button>
+                <button type="button" class="text-btn" data-route="search" style="margin-right:0">Search for a food</button>
+            </div>`;
+        }
+
+        /* ---------------- Main render ---------------- */
+        function renderWeek() {
+            const start = weekStart();
+            $('dateLabel').textContent = weekLabel(start);
+            $('dateBtn').setAttribute('aria-label', `Choose week. ${weekSpoken(start)}${weeksBack === 0 ? ', this week' : ''}`);
+            $('nextWeek').disabled = weeksBack === 0;
+            $('currentWeek').disabled = weeksBack === 0;
+            $('prevWeek').disabled = state === 'loading' || weeksBack >= MAX_WEEKS_BACK;
+            $('datePicker').value = iso(weeksBack === 0 ? TODAY : start);
+
+            const slot = $('weekSlot');
+            if (state === 'loading') { slot.innerHTML = skeletonHtml(); slot.setAttribute('aria-busy', 'true'); return; }
+            slot.removeAttribute('aria-busy');
+
+            const days = weekDays();
+            const a = averages(days);
+            if (!a.count) { slot.innerHTML = emptyHtml(); return; }
+
+            const g = goals();
+            slot.innerHTML = insightHtml(a, g) + chartHtml(days, g) + selectorHtml(g) + legendHtml(g) +
+                dayRowsHtml(days, g) + macrosHtml(a, g) +
+                `<button type="button" class="history-cta" data-route="history">
+                    <span class="material-symbols-rounded" aria-hidden="true">history</span> See all meals in History
+                </button>`;
+        }
+
+        function goToWeek(next) {
+            weeksBack = Math.max(0, Math.min(MAX_WEEKS_BACK, next));
+            menuOpen = false;
+            renderWeek();
+            const a = averages(weekDays());
+            announce(`${weekSpoken(weekStart())}${weeksBack === 0 ? ', this week' : ''} selected. ` +
+                (state === 'loading' ? 'Loading' : a.count ? `${fmt(a.avg[metric])} ${METRICS[metric].spoken} per day on average` : 'No data'));
+        }
+
+        function setMetric(next, focusId) {
+            metric = next;
+            menuOpen = false;
+            renderWeek();
+            if (focusId) { const el = $(focusId); if (el) el.focus({ preventScroll: true }); }
+            const a = averages(weekDays());
+            announce(`Showing ${METRICS[metric].name}. ${fmt(a.avg[metric])} ${METRICS[metric].spoken} per day on average`);
+        }
+
+        function openMenu(open) {
+            menuOpen = open;
+            const menu = $('macroMenu'), chip = $('macroChip');
+            if (!menu) return;
+            menu.hidden = !open;
+            chip.setAttribute('aria-expanded', String(open));
+            // Center the menu under the chip
+            if (open) {
+                menu.style.left = `${chip.offsetLeft + chip.offsetWidth / 2 - menu.offsetWidth / 2}px`;
+                const checked = menu.querySelector('[aria-checked="true"]') || menu.querySelector('.menu-item');
+                checked.focus();
+            }
+        }
+
+        function openDay(offset) {
+            // s12_daily_dashboard.html supports ?day=N (N days before today)
+            window.location.href = offset > 0 ? `s12_daily_dashboard.html?day=${offset}` : 's12_daily_dashboard.html';
+        }
+
+        /* ---------------- Events ---------------- */
+        $('prevWeek').addEventListener('click', () => goToWeek(weeksBack + 1));
+        $('nextWeek').addEventListener('click', () => goToWeek(weeksBack - 1));
+        $('currentWeek').addEventListener('click', () => goToWeek(0));
+        $('dateBtn').addEventListener('click', () => {
+            const picker = $('datePicker');
+            try { picker.showPicker(); } catch (e) { picker.click(); }
+        });
+        $('datePicker').addEventListener('change', (e) => {
+            const [y, m, d] = e.target.value.split('-').map(Number);
+            if (!y) return;
+            const diff = Math.round((CURRENT_MONDAY - mondayOf(new Date(y, m - 1, d))) / (7 * 86400000));
+            goToWeek(diff);
+        });
+
+        $('weekSlot').addEventListener('click', (e) => {
+            const day = e.target.closest('[data-day-offset]');
+            if (day) { openDay(Number(day.dataset.dayOffset)); return; }
+            if (e.target.closest('#intakeChip')) { setMetric('kcal', 'intakeChip'); return; }
+            if (e.target.closest('#macroChip')) { openMenu(!menuOpen); return; }
+            const item = e.target.closest('.menu-item');
+            if (item) { setMetric(item.dataset.metric, 'macroChip'); return; }
+            if (e.target.closest('#fullNutrients')) showSnackbar('Full nutrients will be available in a later version');
+        });
+
+        // Menu keyboard support: arrows move, Escape / Tab close and return focus to the chip
+        $('weekSlot').addEventListener('keydown', (e) => {
+            if (!menuOpen) return;
+            const items = [...document.querySelectorAll('.menu-item')];
+            const i = items.indexOf(document.activeElement);
+            if (e.key === 'Escape' || e.key === 'Tab') {
+                e.preventDefault(); openMenu(false); $('macroChip').focus();
+            } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const n = (i + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+                items[n].focus();
+            }
+        });
+        document.addEventListener('click', (e) => {
+            if (menuOpen && !e.target.closest('#macroMenu') && !e.target.closest('#macroChip')) openMenu(false);
+        });
+
+        function showSnackbar(text) {
+            const bar = $('snackbar');
+            bar.textContent = text;
+            bar.classList.add('show');
+            later(() => bar.classList.remove('show'), 3000);
+        }
+
+        function render(next) {
+            if (next === 'nogoals' || next === 'no-goals') next = 'local';
+            state = ['default', 'loading', 'empty', 'local'].includes(next) ? next : 'default';
+            clearTimers();
+            $('snackbar').classList.remove('show');
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            weeksBack = 0;
+            metric = 'kcal';
+            menuOpen = false;
+            renderWeek();
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        const params = new URLSearchParams(location.search);
+        render(params.get('state') || 'default');
+        // ?week=N (N weeks before this one) or ?week=YYYY-MM-DD (any date in the week; used by the
+        // M range rows in s12_range_dashboard.html), ?metric=carbs|fat|protein
+        const rawWeek = params.get('week') || '';
+        let weekParam = parseInt(rawWeek, 10);
+        const isoMatch = rawWeek.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (isoMatch) {
+            const target = mondayOf(new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3])));
+            weekParam = Math.round((CURRENT_MONDAY - target) / (7 * 86400000));
+        }
+        if (weekParam > 0) { weeksBack = Math.min(weekParam, MAX_WEEKS_BACK); }
+        if (METRICS[params.get('metric')]) { metric = params.get('metric'); }
+        if (weekParam > 0 || params.get('metric')) renderWeek();
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

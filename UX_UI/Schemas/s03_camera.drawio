@@ -1,0 +1,73 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="_DiroX8sYhSqAtI5pFAQ">
+    <mxGraphModel dx="3115" dy="2485" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="0" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="2856" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-61" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=6;strokeWidth=18;" value="" vertex="1">
+          <mxGeometry height="2820" width="1260" x="11" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-1" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;fillStyle=solid;fillColor=#000000;" value="" vertex="1">
+          <mxGeometry height="60" width="60" x="610" y="61" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRoboto;fontSize=36;" value="&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Robotics&quot;&gt;11:17&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="240" y="11" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-5" connectable="0" parent="1" style="group;fillColor=default;container=0;" value="" vertex="1">
+          <mxGeometry height="60" width="130" x="1097" y="51" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;container=0;fontFamily=Roboto;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRoboto;fontSize=36;" value="&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Robotics&quot;&gt;64&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="1097" y="51" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;container=0;" value="" vertex="1">
+          <mxGeometry height="40" width="10" x="1217" y="61" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-12" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="50" width="66.66" x="992" y="53" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-6" parent="SaqyXlzIVLo5muv4s1iV-12" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="33.333333333333336" width="16.665" x="-1" y="16.666666666666668" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-7" parent="SaqyXlzIVLo5muv4s1iV-12" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="40" width="16.665" x="16.665" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-9" parent="SaqyXlzIVLo5muv4s1iV-12" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="46.66666666666667" width="16.665" x="33.33" y="3.3333333333333335" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-11" parent="SaqyXlzIVLo5muv4s1iV-12" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="50" width="16.665" x="49.995" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-187" parent="1" style="html=1;verticalLabelPosition=bottom;align=center;labelBackgroundColor=#ffffff;verticalAlign=top;strokeWidth=2;shadow=0;dashed=0;shape=mxgraph.ios7.icons.flash;" value="" vertex="1">
+          <mxGeometry height="75.35" width="45.21" x="1100" y="309.83000000000004" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-189" parent="1" style="rounded=1;whiteSpace=wrap;html=1;arcSize=50;" value="" vertex="1">
+          <mxGeometry height="100" width="349.08" x="486.46" y="297.5" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-190" parent="1" style="shape=mxgraph.atlassian2.icon;html=1;aspect=fixed;strokeColor=none;labelBackgroundColor=none;verticalLabelPosition=bottom;verticalAlign=top;align=center;atlassian2Icon=mxgraph.atlassian2.object_idea;tileColor=light-dark(#ffffff, #5c4300);fillColor=#292A2E;" value="" vertex="1">
+          <mxGeometry height="48" width="48" x="513.54" y="320.5" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-191" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Roboto&quot; style=&quot;font-size: 48px;&quot; face=&quot;Roboto&quot;&gt;Photo tips&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="240" x="573" y="301.5" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-192" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;aspect=fixed;strokeWidth=14;" value="" vertex="1">
+          <mxGeometry height="253.54" width="253.54" x="514.23" y="2280" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-193" parent="1" style="ellipse;whiteSpace=wrap;html=1;shapeInside=1;aspect=fixed;strokeWidth=14;strokeColor=none;fillColor=#000000;gradientColor=none;" value="" vertex="1">
+          <mxGeometry height="210" width="210" x="536" y="2301.77" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-194" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="196.46" width="196.46" x="900.54" y="2301.77" as="geometry" />
+        </mxCell>
+        <mxCell id="SaqyXlzIVLo5muv4s1iV-195" parent="1" style="sketch=0;outlineConnect=0;fontColor=#333333;fillColor=#f5f5f5;strokeColor=#666666;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.container_registry_image;" value="" vertex="1">
+          <mxGeometry height="950" width="950" x="166" y="870" as="geometry" />
+        </mxCell>
+        <mxCell id="9BJHK86WtcmIbJ898dsk-1" parent="1" style="sketch=0;outlineConnect=0;fontColor=#333333;fillColor=#f5f5f5;strokeColor=#666666;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.container_registry_image;" value="" vertex="1">
+          <mxGeometry height="155" width="155" x="921.27" y="2325.27" as="geometry" />
+        </mxCell>
+        <mxCell id="9BJHK86WtcmIbJ898dsk-2" parent="1" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/icon-cache1/Arrows_and_Universal_Actions-2216/plus-1387.svg;rotation=45;" value="" vertex="1">
+          <mxGeometry height="90" width="90" x="120.00000000000001" y="299.5" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

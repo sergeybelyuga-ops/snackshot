@@ -1,0 +1,109 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Page-1" id="s14">
+    <mxGraphModel dx="3115" dy="2485" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1280" pageHeight="2856" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="a" parent="1" style="rounded=1;arcSize=6;strokeWidth=18;fillColor=#ffffff;" value="" vertex="1">
+          <mxGeometry height="2820" width="1260" x="11" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="b" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;" value="&lt;font face=&quot;Google Sans Flex&quot; style=&quot;font-size:72px&quot;&gt;History&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="750" x="220" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="d" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;" value="&lt;font face=&quot;Google Sans Flex&quot; style=&quot;font-size: 56px;&quot;&gt;Today&lt;/font&gt;" vertex="1">
+          <mxGeometry height="70" width="900" x="92" y="380" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-1" parent="1" style="ellipse;fillColor=#000000;strokeColor=none;" value="" vertex="1">
+          <mxGeometry height="60" width="60" x="610" y="61" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-2" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;rounded=0;" value="&lt;font face=&quot;Robotics&quot; data-font-src=&quot;https://fonts.googleapis.com/css?family=Robotics&quot; style=&quot;font-size: 48px;&quot;&gt;11:17&lt;/font&gt;" vertex="1">
+          <mxGeometry height="155" width="240" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-3" connectable="0" parent="1" style="group;fillColor=default;container=0;" value="" vertex="1">
+          <mxGeometry height="60" width="130" x="1097" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;container=0;" value="&lt;font style=&quot;font-size: 36px;&quot; face=&quot;Robotics&quot; data-font-src=&quot;https://fonts.googleapis.com/css?family=Robotics&quot;&gt;64&lt;/font&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="1097" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;container=0;" value="" vertex="1">
+          <mxGeometry height="40" width="10" x="1217" y="70" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-6" connectable="0" parent="1" style="group" value="" vertex="1">
+          <mxGeometry height="50" width="66.66" x="992" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-7" parent="noogVJroSITZOvg16b6Z-6" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="33.333333333333336" width="16.665" x="-1" y="16.666666666666668" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-8" parent="noogVJroSITZOvg16b6Z-6" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="40" width="16.665" x="16.665" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-9" parent="noogVJroSITZOvg16b6Z-6" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="46.66666666666667" width="16.665" x="33.33" y="3.3333333333333335" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-10" parent="noogVJroSITZOvg16b6Z-6" style="rounded=0;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="50" width="16.665" x="49.995" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-11" parent="1" style="shape=image;html=1;verticalAlign=top;verticalLabelPosition=bottom;labelBackgroundColor=#ffffff;imageAspect=0;aspect=fixed;image=https://icons.diagrams.net/assets/material-symbols/1/Arrow_Back.svg" value="" vertex="1">
+          <mxGeometry height="96" width="96" x="90" y="204" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-16" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="155" width="1090" x="95" y="742" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-17" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 48px;&quot;&gt;Grilled chicken salad&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="662" x="283.3399999999999" y="772" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-18" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="117.5" width="120" x="123.33999999999992" y="760.75" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-19" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 36px;&quot;&gt;Lunch&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;font-size: 40px; white-space: nowrap;&quot;&gt;• 9:56&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="460" x="288.3399999999999" y="832" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-20" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 48px;&quot;&gt;450 kCal&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="250" x="934.9999999999999" y="804.5" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-24" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="155" width="1090" x="95" y="520" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-25" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 48px;&quot;&gt;Oatmeal &amp;amp; Berries&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="662" x="283.3399999999999" y="550" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-26" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="117.5" width="120" x="123.33999999999992" y="538.75" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-27" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 36px;&quot;&gt;Breakfast&amp;nbsp;&lt;/font&gt;&lt;span style=&quot;font-size: 40px; white-space: nowrap;&quot;&gt;• 7:12&lt;/span&gt;" vertex="1">
+          <mxGeometry height="30" width="460" x="288.3399999999999" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-28" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 48px;&quot;&gt;320 kCal&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="250" x="922.9999999999997" y="582.5" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-29" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontStyle=0;fontFamily=Google Sans Flex;fontSource=https://fonts.googleapis.com/css?family=Google+Sans+Flex;fontSize=56;" value="&lt;font data-font-src=&quot;https://fonts.googleapis.com/css?family=Robotics&quot;&gt;Sep 22&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="468.34" x="95" y="1070" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-32" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="155" width="1090" x="92" y="1181" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-33" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 48px;&quot;&gt;Chicken soup&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="662" x="280.34000000000015" y="1211" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-34" parent="1" style="rounded=1;whiteSpace=wrap;html=1;" value="" vertex="1">
+          <mxGeometry height="117.5" width="120" x="120.34000000000015" y="1199.75" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-35" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 36px;&quot;&gt;Dinner&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="460" x="285.34000000000015" y="1271" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-36" parent="1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;fontFamily=Roboto;fontSource=https://fonts.googleapis.com/css?family=Roboto;" value="&lt;font style=&quot;font-size: 48px;&quot;&gt;120 kCal&lt;/font&gt;" vertex="1">
+          <mxGeometry height="30" width="250" x="932.0000000000001" y="1247.58" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-81" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#CCCCCC;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.container_registry_image;" value="" vertex="1">
+          <mxGeometry height="85.05" width="85.05" x="140.80999999999995" y="784" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-82" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#CCCCCC;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.container_registry_image;" value="" vertex="1">
+          <mxGeometry height="85.05" width="85.05" x="142.66000000000008" y="554.98" as="geometry" />
+        </mxCell>
+        <mxCell id="noogVJroSITZOvg16b6Z-83" parent="1" style="sketch=0;outlineConnect=0;fontColor=#232F3E;gradientColor=none;fillColor=#CCCCCC;strokeColor=none;dashed=0;verticalLabelPosition=bottom;verticalAlign=top;align=center;html=1;fontSize=12;fontStyle=0;aspect=fixed;pointerEvents=1;shape=mxgraph.aws4.container_registry_image;" value="" vertex="1">
+          <mxGeometry height="85.05" width="85.05" x="137.19000000000005" y="1220.0500000000002" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

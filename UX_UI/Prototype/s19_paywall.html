@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-19 | AI paywall - Snackshot</title>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-19 AI paywall and S-20 AI waitlist — UX spec §4.13, F-32:
+         * ModalBottomSheet over the dimmed Home -> abstract Icon -> TitleLarge -> BodyLarge
+         * -> FilledButton Search food -> OutlinedButton Quick add -> TextButton Close.
+         * MVP: no price, no payment SDK. Manual logging always stays available.
+         * Color tokens come from prototype-theme.css; this file only adds layout.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+        body {
+            display: flex; justify-content: center; align-items: center;
+            min-height: 100vh; flex-direction: column; gap: 16px; padding: 24px 16px;
+        }
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1; user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        button { border: none; background: none; color: inherit; font: inherit; text-align: inherit; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%); display: flex; flex-wrap: wrap;
+            align-items: center; justify-content: center; gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px; padding: 0 12px; border-radius: 8px;
+            border: 1px solid var(--outline-variant); background: var(--surface-container);
+            color: var(--on-surface-variant); font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary); background: var(--primary-container); color: var(--on-surface);
+        }
+
+        /* ---------- Device frame 412x892 ---------- */
+        .device-frame {
+            width: 412px; height: 892px; flex-shrink: 0; background-color: var(--surface);
+            border-radius: 36px; border: 12px solid #202124; box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative; display: flex; flex-direction: column; overflow: hidden; color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px; flex-shrink: 0; display: flex; justify-content: space-between; align-items: center;
+            padding: 0 24px; font-size: 14px; font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px; background-color: #000; border-radius: 50%;
+            position: absolute; left: 50%; transform: translateX(-50%);
+        }
+
+        /* ---------- Dimmed Home behind the sheet (decorative) ---------- */
+        .backdrop-home { flex: 1; padding: 16px; display: flex; flex-direction: column; gap: 12px; opacity: .5; }
+        .ghost-title { height: 32px; width: 45%; border-radius: 8px; background: var(--surface-container-high); }
+        .ghost-card { height: 120px; border-radius: 12px; background: var(--surface-container-high); }
+        .ghost-row { height: 56px; border-radius: 12px; background: var(--surface-container); }
+        .scrim { position: absolute; inset: 0; background: rgba(0,0,0,.32); }
+
+        /* ---------- M3 ModalBottomSheet ---------- */
+        .sheet {
+            position: absolute; left: 0; right: 0; bottom: 0;
+            max-height: calc(100% - 72px); overflow-y: auto; scrollbar-width: none;
+            background: var(--surface-container); border-radius: 28px 28px 0 0;
+            padding: 8px 24px 32px; display: flex; flex-direction: column; gap: 16px;
+            box-shadow: 0 -2px 12px rgba(0,0,0,.18);
+        }
+        .sheet::-webkit-scrollbar { display: none; }
+        .drag-handle { width: 32px; height: 4px; border-radius: 2px; background: var(--on-surface-variant); opacity: .4; align-self: center; margin-bottom: 8px; }
+        .sheet-icon {
+            width: 64px; height: 64px; border-radius: 20px; align-self: center;
+            display: flex; justify-content: center; align-items: center;
+            background: var(--primary-container); color: var(--primary);
+        }
+        .sheet-icon .material-symbols-rounded { font-size: 32px; }
+        .sheet-title {
+            font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 400;
+            text-align: center; overflow-wrap: anywhere;
+        }
+        .sheet-body {
+            font: 400 16px/24px var(--font-text); letter-spacing: .5px;
+            color: var(--on-surface-variant); text-align: center; overflow-wrap: anywhere;
+        }
+        .free-list { list-style: none; display: flex; flex-direction: column; gap: 8px; padding: 12px 16px; border-radius: 12px; background: var(--surface-container-high); }
+        .free-list li { display: flex; gap: 12px; align-items: center; font: 400 14px/20px var(--font-text); letter-spacing: .25px; }
+        .free-list .material-symbols-rounded { color: var(--tertiary); font-size: 20px; }
+        .usage-pill {
+            align-self: center; display: inline-flex; gap: 6px; align-items: center;
+            padding: 6px 12px; border-radius: 8px; border: 1px solid var(--outline-variant);
+            font: 500 12px/16px var(--font-text); color: var(--on-surface-variant);
+        }
+        .usage-pill .material-symbols-rounded { font-size: 16px; }
+
+        /* State surfaces */
+        .state-surface { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-radius: 12px; background: var(--surface-container-high); }
+        .state-surface .material-symbols-rounded { font-size: 24px; flex-shrink: 0; }
+        .state-title { font: 500 16px/24px var(--font-text); letter-spacing: .15px; }
+        .state-text { font: 400 14px/20px var(--font-text); letter-spacing: .25px; color: var(--on-surface-variant); }
+        .error-surface { background: color-mix(in srgb, var(--error) 10%, var(--surface)); border: 1px solid var(--error); }
+        .error-surface .material-symbols-rounded { color: var(--error); }
+        .skeleton { height: 16px; border-radius: 8px; background: var(--surface-container-high); }
+        .skeleton.w80 { width: 80%; align-self: center; height: 24px; }
+        .skeleton.w100 { width: 100%; }
+        .skeleton.w60 { width: 60%; align-self: center; }
+
+        /* Actions */
+        .actions { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; }
+        .btn {
+            min-height: 48px; padding: 12px 24px; border-radius: 24px; width: 100%;
+            display: flex; justify-content: center; align-items: center; gap: 8px; text-align: center;
+            font: 500 14px/20px var(--font-text); letter-spacing: .1px;
+        }
+        .btn .material-symbols-rounded { font-size: 18px; }
+        .btn-filled { background: var(--primary); color: var(--on-primary); }
+        .btn-outlined { border: 1px solid var(--outline); color: var(--primary); }
+        .btn-text { color: var(--primary); }
+        .btn-filled:hover { background: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        .btn-outlined:hover, .btn-text:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+
+        .nav-bar { height: 24px; flex-shrink: 0; display: flex; justify-content: center; align-items: center; padding-bottom: 8px; position: absolute; bottom: 0; left: 0; right: 0; }
+        .nav-pill { width: 108px; height: 4px; background-color: var(--on-surface); border-radius: 2px; opacity: .8; }
+
+        .large-text .sheet-title { font-size: 28px; line-height: 34px; }
+        .large-text .sheet-body { font-size: 20px; line-height: 30px; }
+        .large-text .btn { font-size: 18px; line-height: 24px; }
+
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    </style>
+</head>
+<body>
+    <div class="state-switcher" role="group" aria-label="Prototype state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">S-19 Paywall (MVP)</button>
+        <button type="button" data-state-choice="waitlist">S-20 Waitlist</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="error">Error</button>
+        <button type="button" data-state-choice="large-text">Large text</button>
+    </div>
+
+    <div class="device-frame" id="frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <div class="backdrop-home" aria-hidden="true">
+            <div class="ghost-title"></div>
+            <div class="ghost-card"></div>
+            <div class="ghost-row"></div>
+            <div class="ghost-row"></div>
+            <div class="ghost-row"></div>
+        </div>
+        <div class="scrim" aria-hidden="true" data-route="home"></div>
+
+        <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+            <div class="drag-handle" aria-hidden="true"></div>
+
+            <!-- Loading: checking AI access with the broker -->
+            <div id="loadingBlock" hidden aria-busy="true">
+                <div style="display:flex;flex-direction:column;gap:12px;">
+                    <div class="skeleton w80"></div>
+                    <div class="skeleton w100"></div>
+                    <div class="skeleton w100"></div>
+                    <div class="skeleton w60"></div>
+                </div>
+            </div>
+
+            <!-- Content (paywall or waitlist) -->
+            <div id="contentBlock" style="display:flex;flex-direction:column;gap:16px;">
+                <div class="sheet-icon" aria-hidden="true"><span class="material-symbols-rounded icon-filled" id="sheetIcon">photo_camera</span></div>
+                <h1 class="sheet-title" id="sheetTitle">You've used your 90 free AI pictures</h1>
+                <p class="sheet-body" id="sheetBody">
+                    Thanks for trying Snackshot AI. Subscriptions are coming soon.
+                    You can keep logging meals with search and quick add.
+                </p>
+                <span class="usage-pill" id="usagePill">
+                    <span class="material-symbols-rounded" aria-hidden="true">photo_library</span>
+                    90 of 90 free pictures used
+                </span>
+                <ul class="free-list" aria-label="Always free">
+                    <li><span class="material-symbols-rounded" aria-hidden="true">check_circle</span>Search food and quick add</li>
+                    <li><span class="material-symbols-rounded" aria-hidden="true">check_circle</span>History and dashboards</li>
+                    <li><span class="material-symbols-rounded" aria-hidden="true">check_circle</span>Google Health Connect sync</li>
+                </ul>
+            </div>
+
+            <!-- Error: broker unreachable -->
+            <div class="state-surface error-surface" id="errorBlock" role="alert" hidden>
+                <span class="material-symbols-rounded icon-filled" aria-hidden="true">error</span>
+                <div>
+                    <p class="state-title">Couldn't check AI access</p>
+                    <p class="state-text">Check your connection and try again. You can still log meals with search or quick add.</p>
+                </div>
+            </div>
+
+            <div class="actions">
+                <button type="button" class="btn btn-filled" id="retryBtn" hidden>
+                    <span class="material-symbols-rounded" aria-hidden="true">refresh</span>Try again
+                </button>
+                <button type="button" class="btn btn-filled" id="searchBtn" data-route="search">
+                    <span class="material-symbols-rounded" aria-hidden="true">search</span>Search food
+                </button>
+                <button type="button" class="btn btn-outlined" data-route="quickAdd">
+                    <span class="material-symbols-rounded" aria-hidden="true">edit_note</span>Quick add
+                </button>
+                <button type="button" class="btn btn-text" data-route="home">Close</button>
+            </div>
+        </section>
+
+        <div class="nav-bar" aria-hidden="true"><div class="nav-pill"></div></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        const $ = (id) => document.getElementById(id);
+        const COPY = {
+            paywall: {
+                icon: 'photo_camera',
+                title: "You've used your 90 free AI pictures",
+                body: 'Thanks for trying Snackshot AI. Subscriptions are coming soon. You can keep logging meals with search and quick add.',
+                pill: '90 of 90 free pictures used'
+            },
+            waitlist: {
+                icon: 'hourglass_top',
+                title: 'AI recognition is in a closed pilot',
+                body: "All pilot places are taken right now. You're on the waitlist and AI will turn on automatically when a place frees up. Meanwhile, log meals with search or quick add.",
+                pill: 'On the waitlist'
+            }
+        };
+
+        function announce(msg) {
+            $('announcer').textContent = '';
+            window.setTimeout(() => { $('announcer').textContent = msg; }, 50);
+        }
+
+        let timers = [];
+        function render(state) {
+            timers.forEach(clearTimeout); timers = [];
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            const variant = state === 'waitlist' ? 'waitlist' : 'paywall';
+            const c = COPY[variant];
+            $('sheetIcon').textContent = c.icon;
+            $('sheetTitle').textContent = c.title;
+            $('sheetBody').textContent = c.body;
+            $('usagePill').lastChild.textContent = ' ' + c.pill;
+            document.title = (variant === 'waitlist' ? 'S-20 | AI waitlist' : 'S-19 | AI paywall') + ' - Snackshot';
+
+            $('frame').classList.toggle('large-text', state === 'large-text');
+            $('loadingBlock').hidden = state !== 'loading';
+            $('contentBlock').hidden = state === 'loading' || state === 'error';
+            $('errorBlock').hidden = state !== 'error';
+            $('retryBtn').hidden = state !== 'error';
+            $('searchBtn').classList.toggle('btn-filled', state !== 'error');
+            $('searchBtn').classList.toggle('btn-outlined', state === 'error');
+
+            if (state === 'loading') {
+                announce('Checking AI access');
+                timers.push(window.setTimeout(() => render('default'), 1400));
+            } else if (state !== 'error') {
+                announce(c.title);
+            }
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            try { window.history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        $('retryBtn').addEventListener('click', () => render('loading'));
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(window.location.search).get('state') || 'default');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

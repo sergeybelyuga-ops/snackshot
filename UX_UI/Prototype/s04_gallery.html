@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-04 | Gallery Picker - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, chart colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-04 Gallery picker — UX spec §4.5, F-09, F-01.
+         * Represents the Android system photo picker: TopAppBar (cancel) -> Photos / Collections tabs
+         * -> date-grouped 3-column photo grid (single select) -> privacy helper + "Choose image".
+         * Choose image -> S-05 Recognition. Cancel -> S-03 Camera (or Home when opened from Home).
+         * States: Default, Loading (stable placeholders), Empty (no photos), Error (unsupported image).
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: default; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar h1 {
+            flex: 1;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Photos / Collections tabs (filter-chip look from the schema) ---------- */
+        .tabs {
+            flex-shrink: 0;
+            display: flex;
+            gap: 8px;
+            padding: 0 16px 4px;
+        }
+        .tab {
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+        }
+        .tab-inner {
+            height: 32px;
+            padding: 0 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--outline);
+            color: var(--on-surface);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .tab-inner .material-symbols-rounded { font-size: 18px; display: none; margin-left: -6px; }
+        .tab[aria-selected="true"] .tab-inner {
+            border-color: transparent;
+            background: var(--primary-container);
+        }
+        :root[data-theme="dark"] .tab[aria-selected="true"] .tab-inner { color: #FFFFFF; }
+        .tab[aria-selected="true"] .tab-inner .material-symbols-rounded { display: inline-block; }
+        .tab:disabled .tab-inner { opacity: .38; }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0 16px 24px;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        /* ---------- Error banner (invalid / unsupported image) ---------- */
+        .error-banner {
+            margin: 8px 0 4px;
+            padding: 16px;
+            border-radius: 16px;
+            background: color-mix(in srgb, var(--error) 12%, var(--surface-container));
+            border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
+            display: grid;
+            grid-template-columns: 24px 1fr;
+            gap: 4px 12px;
+        }
+        .error-banner:focus { outline: none; }
+        .error-banner:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+        .error-banner > .material-symbols-rounded { color: var(--error); grid-row: span 2; }
+        .error-title { font: 500 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .error-text { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); overflow-wrap: anywhere; }
+
+        /* ---------- Album filter row ---------- */
+        .album-row {
+            min-height: 48px;
+            margin-top: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+        .album-row h2 { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; }
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            margin-right: -12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 20px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+
+        /* ---------- Date-grouped photo grid ---------- */
+        .day-header {
+            margin: 16px 0 8px;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            color: var(--on-surface-variant);
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+        }
+        .photo {
+            position: relative;
+            aspect-ratio: 1;
+            border-radius: 4px;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            transition: border-radius 160ms ease, transform 160ms ease;
+        }
+        .grid .photo:first-child { border-top-left-radius: 16px; }
+        .grid .photo:nth-child(3) { border-top-right-radius: 16px; }
+        .photo:hover .photo-art { filter: brightness(.96); }
+        .photo-art {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .photo-art .material-symbols-rounded { font-size: 44px; font-variation-settings: 'FILL' 1, 'wght' 300, 'GRAD' 0, 'opsz' 48; }
+        .photo[data-tint="warm"]  .photo-art { background: color-mix(in srgb, var(--chart-warning) 30%, var(--surface-container-high)); }
+        .photo[data-tint="green"] .photo-art { background: color-mix(in srgb, var(--chart-in-range) 28%, var(--surface-container-high)); }
+        .photo[data-tint="blue"]  .photo-art { background: color-mix(in srgb, var(--chart-below-range) 30%, var(--surface-container-high)); }
+        .photo[data-tint="coral"] .photo-art { background: color-mix(in srgb, var(--chart-above-range) 28%, var(--surface-container-high)); }
+
+        /* Selected: inset outline + check badge (shape + icon, not color alone) */
+        .photo[aria-pressed="true"] { border-radius: 16px; transform: scale(.92); }
+        .photo[aria-pressed="true"]::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            border: 3px solid var(--primary);
+            pointer-events: none;
+        }
+        .photo-check {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background: var(--primary);
+            color: var(--on-primary);
+            box-shadow: 0 0 0 2px var(--surface);
+        }
+        .photo-check .material-symbols-rounded { font-size: 18px; font-variation-settings: 'FILL' 0, 'wght' 600, 'GRAD' 0, 'opsz' 20; }
+        .photo[aria-pressed="true"] .photo-check { display: flex; }
+
+        /* File-type label (e.g. RAW) */
+        .photo-tag {
+            position: absolute;
+            left: 6px;
+            bottom: 6px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: var(--surface);
+            color: var(--on-surface);
+            font: 500 11px/16px var(--font-text);
+            letter-spacing: 0.5px;
+        }
+        /* Image that failed validation */
+        .photo[data-failed="true"] .photo-art { opacity: .55; }
+        .photo-failed {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            background: var(--error);
+            color: var(--surface);
+            box-shadow: 0 0 0 2px var(--surface);
+        }
+        .photo-failed .material-symbols-rounded { font-size: 18px; }
+        .photo[data-failed="true"] .photo-failed { display: flex; }
+
+        /* ---------- Collections (albums) ---------- */
+        .albums {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px 12px;
+        }
+        .album { display: flex; flex-direction: column; gap: 8px; border-radius: 16px; }
+        .album-cover {
+            aspect-ratio: 1;
+            border-radius: 16px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+        }
+        .album:hover .album-cover { background: color-mix(in srgb, var(--on-surface) 6%, var(--surface-container-high)); }
+        .album-cover .material-symbols-rounded { font-size: 44px; }
+        .album-name { font: 500 16px/22px var(--font-text); letter-spacing: 0.15px; padding: 0 4px; }
+        .album-count { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); padding: 0 4px; margin-top: -6px; }
+
+        /* ---------- Empty state ---------- */
+        .empty {
+            margin-top: 72px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+            padding: 0 12px;
+        }
+        .empty-icon {
+            width: 96px; height: 96px;
+            border-radius: 32px;
+            display: flex; justify-content: center; align-items: center;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            margin-bottom: 8px;
+        }
+        .empty-icon .material-symbols-rounded { font-size: 48px; }
+        .empty-title { font-family: var(--font-display); font-size: 32px; line-height: 40px; font-weight: 400; }
+        .empty-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .filled-btn {
+            margin-top: 12px;
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            background: var(--primary);
+            color: var(--on-primary);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+        }
+        .filled-btn:hover { box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+
+        /* ---------- Skeletons (stable placeholders, same geometry as tiles) ---------- */
+        .sk { display: block; background: var(--surface-container-high); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
+        .grid .sk { aspect-ratio: 1; border-radius: 4px; }
+        .grid .sk:first-child { border-top-left-radius: 16px; }
+        .grid .sk:nth-child(3) { border-top-right-radius: 16px; }
+        @keyframes pulse { 50% { opacity: .5; } }
+        .loading-bar {
+            height: 4px;
+            margin: 0 16px;
+            border-radius: 2px;
+            background: var(--surface-container-high);
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+        .loading-bar span {
+            display: block;
+            width: 40%;
+            height: 100%;
+            border-radius: 2px;
+            background: var(--primary);
+            animation: indeterminate 1.4s cubic-bezier(.4,0,.2,1) infinite;
+        }
+        @keyframes indeterminate { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+        /* ---------- Bottom action area ---------- */
+        .bottom-bar {
+            flex-shrink: 0;
+            padding: 12px 16px 36px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background: var(--surface);
+            border-top: 1px solid var(--outline-variant);
+        }
+        .privacy-note {
+            display: grid;
+            grid-template-columns: 20px 1fr;
+            gap: 8px;
+            align-items: start;
+            font: 400 12px/16px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .privacy-note .material-symbols-rounded { font-size: 18px; margin-top: -1px; }
+        .btn-pill {
+            width: 100%;
+            min-height: 52px;
+            border-radius: 26px;
+            background: var(--primary);
+            color: var(--on-primary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font: 500 15px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .btn-pill:hover:not(:disabled) { box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+        .btn-pill:disabled {
+            background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 50%, transparent);
+        }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            .loading-bar span { transform: none; width: 100%; opacity: .5; }
+        }
+    </style>
+</head>
+<body data-prototype-screen="gallery">
+
+    <!-- Prototype-only control: switch between the S-04 states required by spec §4.1 / §4.5 -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <button type="button" data-state-choice="error">Error</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <header class="top-app-bar">
+            <button type="button" class="icon-btn" id="cancelBtn" aria-label="Cancel" data-route="camera">
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+            </button>
+            <h1>Select image</h1>
+        </header>
+
+        <div class="tabs" role="tablist" aria-label="Photo picker views" id="tabs">
+            <button type="button" class="tab" role="tab" id="tab-photos" data-tab="photos" aria-controls="content" aria-selected="true">
+                <span class="tab-inner"><span class="material-symbols-rounded" aria-hidden="true">check</span>Photos</span>
+            </button>
+            <button type="button" class="tab" role="tab" id="tab-collections" data-tab="collections" aria-controls="content" aria-selected="false" tabindex="-1">
+                <span class="tab-inner"><span class="material-symbols-rounded" aria-hidden="true">check</span>Collections</span>
+            </button>
+        </div>
+
+        <div class="loading-bar" id="loadingBar" role="progressbar" aria-label="Loading photos" hidden><span></span></div>
+
+        <main class="scaffold-content" id="content" role="tabpanel" aria-labelledby="tab-photos">
+            <div class="error-banner" id="errorBanner" role="alert" tabindex="-1" hidden>
+                <span class="material-symbols-rounded icon-filled" aria-hidden="true">error</span>
+                <p class="error-title">Can't use this image</p>
+                <p class="error-text" id="errorText"></p>
+            </div>
+            <div id="slot"></div>
+        </main>
+
+        <div class="bottom-bar" id="bottomBar">
+            <p class="privacy-note">
+                <span class="material-symbols-rounded" aria-hidden="true">lock</span>
+                <span>Snackshot gets a copy of only the photo you choose. The original in your gallery stays untouched.</span>
+            </p>
+            <button type="button" class="btn-pill" id="chooseBtn" data-route="recognition">Choose image</button>
+        </div>
+
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Demo data (today = Thu, Sep 24, 2026, 11:17) ---------------- */
+        // Thumbnails are stand-ins for device photos; the icon hints at the content.
+        const PHOTOS = [
+            { id: 'p1',  day: 'Today',          time: '11:02', icon: 'eco',               tint: 'green', album: 'Camera' },
+            { id: 'p2',  day: 'Today',          time: '09:40', icon: 'local_cafe',        tint: 'warm',  album: 'Camera' },
+            { id: 'p3',  day: 'Today',          time: '07:12', icon: 'breakfast_dining',  tint: 'coral', album: 'Camera' },
+            { id: 'p4',  day: 'Yesterday',      time: '19:30', icon: 'soup_kitchen',      tint: 'warm',  album: 'Camera' },
+            { id: 'p5',  day: 'Yesterday',      time: '16:05', icon: 'landscape',         tint: 'blue',  album: 'Camera' },
+            { id: 'p6',  day: 'Yesterday',      time: '13:15', icon: 'rice_bowl',         tint: 'warm',  album: 'Camera' },
+            { id: 'p7',  day: 'Tue, Sep 22',    time: '21:30', icon: 'screenshot_region', tint: 'blue',  album: 'Screenshots' },
+            { id: 'p8',  day: 'Tue, Sep 22',    time: '19:05', icon: 'dinner_dining',     tint: 'coral', album: 'Camera' },
+            { id: 'p9',  day: 'Tue, Sep 22',    time: '16:10', icon: 'nutrition',         tint: 'green', album: 'Camera' },
+            { id: 'p10', day: 'Tue, Sep 22',    time: '12:50', icon: 'set_meal',          tint: 'coral', album: 'Camera' },
+            { id: 'p11', day: 'Tue, Sep 22',    time: '12:48', icon: 'image',             tint: 'none',  album: 'Camera',
+              file: 'PXL_20260922_124812.dng', tag: 'RAW', invalid: 'RAW photos aren’t supported.' },
+            { id: 'p12', day: 'Tue, Sep 22',    time: '07:40', icon: 'breakfast_dining',  tint: 'warm',  album: 'Camera' },
+            { id: 'p13', day: 'Sun, Sep 20',    time: '18:22', icon: 'local_pizza',       tint: 'coral', album: 'Downloads' }
+        ];
+        const ALBUMS = [
+            { name: 'Camera', icon: 'photo_camera' },
+            { name: 'Screenshots', icon: 'screenshot_region' },
+            { name: 'Downloads', icon: 'download' }
+        ];
+        const STATES = ['default', 'loading', 'empty', 'error'];
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        const byId = (id) => PHOTOS.find((p) => p.id === id);
+        const dayPhrase = (p) => `${p.day} at ${p.time}`;
+
+        /* ---------------- State ---------------- */
+        let state = 'default';
+        let tab = 'photos';
+        let album = null;      // null = all photos
+        let selected = null;   // photo id
+        let failed = null;     // photo id that failed validation
+
+        /* ---------------- Render pieces ---------------- */
+        function photoHtml(p) {
+            const isSel = selected === p.id;
+            const isFailed = failed === p.id;
+            let label = `Photo, ${dayPhrase(p)}`;
+            if (p.tag) label += `, ${p.tag} format`;
+            if (isFailed) label += ', cannot be used';
+            return `<button type="button" class="photo" data-photo="${p.id}" data-tint="${p.tint}"
+                        aria-pressed="${isSel}" data-failed="${isFailed}" aria-label="${label}">
+                <span class="photo-art" aria-hidden="true"><span class="material-symbols-rounded">${p.icon}</span></span>
+                ${p.tag ? `<span class="photo-tag" aria-hidden="true">${p.tag}</span>` : ''}
+                <span class="photo-check" aria-hidden="true"><span class="material-symbols-rounded">check</span></span>
+                <span class="photo-failed" aria-hidden="true"><span class="material-symbols-rounded">priority_high</span></span>
+            </button>`;
+        }
+
+        function photosHtml() {
+            const list = PHOTOS.filter((p) => !album || p.album === album);
+            const days = [...new Set(list.map((p) => p.day))];
+            const head = album
+                ? `<div class="album-row"><h2>${album}</h2>
+                       <button type="button" class="text-btn" id="allPhotos">All photos</button></div>`
+                : '';
+            return head + days.map((d, i) => `
+                <h2 class="day-header" id="day-${i}">${d}</h2>
+                <div class="grid" role="group" aria-labelledby="day-${i}">
+                    ${list.filter((p) => p.day === d).map(photoHtml).join('')}
+                </div>`).join('');
+        }
+
+        function collectionsHtml() {
+            return `<div class="albums">${ALBUMS.map((a) => {
+                const n = PHOTOS.filter((p) => p.album === a.name).length;
+                const count = `${n} ${n === 1 ? 'photo' : 'photos'}`;
+                return `<button type="button" class="album" data-album="${a.name}" aria-label="${a.name}, ${count}">
+                    <span class="album-cover" aria-hidden="true"><span class="material-symbols-rounded">${a.icon}</span></span>
+                    <span class="album-name" aria-hidden="true">${a.name}</span>
+                    <span class="album-count" aria-hidden="true">${count}</span>
+                </button>`;
+            }).join('')}</div>`;
+        }
+
+        function skeletonHtml() {
+            const section = (w, n) => `<span class="sk" style="width:${w}px;height:16px;margin:18px 0 10px"></span>
+                <div class="grid">${Array.from({ length: n }, () => '<span class="sk"></span>').join('')}</div>`;
+            return `<div aria-hidden="true">${section(48, 3)}${section(76, 3)}${section(92, 6)}</div>`;
+        }
+
+        function emptyHtml() {
+            return `<div class="empty">
+                <span class="empty-icon" aria-hidden="true"><span class="material-symbols-rounded">hide_image</span></span>
+                <h2 class="empty-title">No photos yet</h2>
+                <p class="empty-text">There are no photos on this device to choose from. Take a photo of your meal and Snackshot will estimate calories and macros.</p>
+                <button type="button" class="filled-btn" data-route="camera">
+                    <span class="material-symbols-rounded" aria-hidden="true">photo_camera</span> Take a photo
+                </button>
+                <button type="button" class="text-btn" data-route="search" style="margin-right:0">Search for a food</button>
+            </div>`;
+        }
+
+        /* ---------------- Main render ---------------- */
+        function renderBody() {
+            const loading = state === 'loading';
+            const empty = state === 'empty';
+
+            document.querySelectorAll('[data-tab]').forEach((t) => {
+                const on = t.dataset.tab === tab;
+                t.setAttribute('aria-selected', String(on));
+                t.tabIndex = on ? 0 : -1;
+                t.disabled = loading;
+            });
+            $('content').setAttribute('aria-labelledby', `tab-${tab}`);
+            $('content').setAttribute('aria-busy', String(loading));
+            $('tabs').hidden = empty;
+            $('loadingBar').hidden = !loading;
+            $('bottomBar').hidden = empty;
+
+            const f = failed && byId(failed);
+            $('errorBanner').hidden = !f || tab !== 'photos';
+            if (f) $('errorText').textContent = `${f.file}: ${f.invalid} Choose another photo in JPG, PNG, HEIC or WebP format.`;
+
+            if (loading) $('slot').innerHTML = skeletonHtml();
+            else if (empty) $('slot').innerHTML = emptyHtml();
+            else $('slot').innerHTML = tab === 'photos' ? photosHtml() : collectionsHtml();
+
+            const sel = selected && byId(selected);
+            const btn = $('chooseBtn');
+            btn.disabled = loading || !sel;
+            btn.setAttribute('aria-label', sel ? `Choose image, photo from ${dayPhrase(sel)}` : 'Choose image. Select a photo first');
+        }
+
+        function focusPhoto(id) {
+            const el = document.querySelector(`[data-photo="${id}"]`);
+            if (el) el.focus({ preventScroll: true });
+        }
+
+        /* ---------------- Events ---------------- */
+        $('tabs').addEventListener('click', (e) => {
+            const t = e.target.closest('[data-tab]');
+            if (!t || t.disabled) return;
+            tab = t.dataset.tab;
+            renderBody();
+            $('content').scrollTop = 0;
+        });
+        $('tabs').addEventListener('keydown', (e) => {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            tab = tab === 'photos' ? 'collections' : 'photos';
+            renderBody();
+            $(`tab-${tab}`).focus();
+        });
+
+        $('slot').addEventListener('click', (e) => {
+            const photo = e.target.closest('[data-photo]');
+            if (photo) {
+                const id = photo.dataset.photo;
+                selected = selected === id ? null : id;
+                // Picking another photo clears the previous validation error
+                if (selected && selected !== failed) failed = null;
+                renderBody();
+                focusPhoto(id);
+                announce(selected ? `Photo from ${dayPhrase(byId(id))} selected` : 'Selection cleared');
+                return;
+            }
+            const a = e.target.closest('[data-album]');
+            if (a) {
+                album = a.dataset.album;
+                tab = 'photos';
+                renderBody();
+                $('content').scrollTop = 0;
+                announce(`${album} album, ${PHOTOS.filter((p) => p.album === album).length} photos`);
+                return;
+            }
+            if (e.target.closest('#allPhotos')) {
+                album = null;
+                renderBody();
+                announce('All photos');
+            }
+        });
+
+        // Choose image: an invalid file stays on S-04 with an error; a valid one continues to S-05
+        // (handled at the button, before prototype-navigation.js's document-level data-route listener).
+        $('chooseBtn').addEventListener('click', (e) => {
+            const sel = selected && byId(selected);
+            if (sel && sel.invalid) {
+                e.stopPropagation();
+                failed = sel.id;
+                selected = null;
+                renderBody();
+                $('errorBanner').focus();
+                $('content').scrollTop = 0;
+            }
+        });
+
+        // Cancel returns to where the picker was opened: Home if launched from Home, otherwise Camera
+        $('cancelBtn').addEventListener('click', (e) => {
+            if (/s02_home\.html/.test(document.referrer)) {
+                e.stopPropagation();
+                window.location.href = 's02_home.html';
+            }
+        });
+
+        /* ---------------- Prototype states ---------------- */
+        function render(next) {
+            state = STATES.includes(next) ? next : 'default';
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            tab = 'photos';
+            album = null;
+            selected = state === 'default' ? 'p1' : null;
+            failed = state === 'error' ? 'p11' : null;
+            renderBody();
+            $('content').scrollTop = 0;
+            if (state === 'loading') announce('Loading photos');
+            if (state === 'empty') announce('No photos on this device');
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            try { history.replaceState(null, '', url); } catch (err) { /* file:// */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(location.search).get('state') || 'default');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

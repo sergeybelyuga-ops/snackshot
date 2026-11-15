@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-12 | Food & Drink Dashboard - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, chart, macro and status colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-12 Daily dashboard (D range) — UX spec §3.2 / §4.10, visual reference GoogleHealth (5).png:
+         * TopAppBar -> D/W/M/3M/Y segments -> day label + prev/next/today -> metric insight header
+         * -> grouped calorie rows -> Macros goal (label, range badge, bar, goal-range marker)
+         * -> meal filter chips -> meal group cards -> History CTA.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: default; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar h1 {
+            flex: 1;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        /* ---------- D / W / M / 3M / Y segments (Google Health style) ---------- */
+        .segments {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 4px;
+        }
+        .segment {
+            height: 48px;
+            border-radius: 12px;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            text-align: center;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            transition: background-color 200ms ease, border-radius 200ms ease;
+        }
+        .segment:first-child { border-radius: 24px 12px 12px 24px; }
+        .segment:last-child  { border-radius: 12px 24px 24px 12px; }
+        .segment[aria-pressed="true"] {
+            background: var(--primary);
+            color: var(--on-primary);
+            border-radius: 24px;
+        }
+        .segment:hover:not([aria-pressed="true"]) { background: color-mix(in srgb, var(--on-surface) 8%, var(--surface-container-high)); }
+
+        /* ---------- Day navigation ---------- */
+        .range-nav {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 16px;
+        }
+        .date-btn {
+            flex: 1;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 12px;
+            padding-right: 8px;
+            font-family: var(--font-display);
+            font-size: 28px;
+            line-height: 36px;
+            font-weight: 400;
+        }
+        .date-btn .material-symbols-rounded { font-size: 22px; color: var(--on-surface-variant); }
+        .tonal-icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .tonal-icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 10%, var(--surface-container-high)); }
+        .tonal-icon-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+        #datePicker { position: absolute; opacity: 0; pointer-events: none; width: 0; height: 0; }
+
+        /* ---------- Metric insight header ---------- */
+        .insight { margin-top: 20px; display: flex; flex-direction: column; gap: 8px; }
+        .insight-value { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .insight-number {
+            font-family: var(--font-display);
+            font-size: 57px;
+            line-height: 64px;
+            font-weight: 400;
+            letter-spacing: -0.25px;
+            font-variant-numeric: tabular-nums;
+        }
+        .insight-unit { font-family: var(--font-display); font-size: 20px; line-height: 28px; font-weight: 500; }
+        .insight-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+
+        /* ---------- Your calorie target: Under | On target | Over (Google Health style) ---------- */
+        .target-title { margin-top: 32px; font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; }
+        .target-chart { margin-top: 12px; }
+        .target-thresholds {
+            position: relative;
+            height: 20px;
+            font: 500 13px/20px var(--font-text);
+            font-variant-numeric: tabular-nums;
+        }
+        .target-thresholds span { position: absolute; transform: translateX(-50%); }
+        .target-thresholds span:nth-child(1) { left: 33.333%; }
+        .target-thresholds span:nth-child(2) { left: 66.666%; }
+        .target-track {
+            position: relative;
+            margin-top: 6px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 4px;
+            height: 28px;
+        }
+        .target-seg {
+            border-radius: 6px;
+            background: var(--macro-track);
+            overflow: hidden;
+        }
+        .target-seg:first-child { border-radius: 14px 6px 6px 14px; }
+        .target-seg:last-child  { border-radius: 6px 14px 14px 6px; }
+        .target-seg-fill { display: block; height: 100%; background: var(--primary); }
+        .target-seg[data-seg="in"]   .target-seg-fill { background: var(--chart-in-range); }
+        .target-seg[data-seg="over"] .target-seg-fill { background: var(--chart-above-range); }
+        .target-marker {
+            position: absolute;
+            top: 50%;
+            width: 6px;
+            height: 38px;
+            border-radius: 3px;
+            background: var(--on-surface);
+            border: 2px solid var(--surface);
+            transform: translate(-50%, -50%);
+            box-sizing: content-box;
+        }
+        .target-labels {
+            margin-top: 8px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            font: 400 14px/20px var(--font-text);
+            color: var(--on-surface-variant);
+        }
+        .target-labels span:nth-child(2) { text-align: center; }
+        .target-labels span:nth-child(3) { text-align: right; }
+        .target-labels span[data-current="true"] { color: var(--on-surface); font-weight: 500; }
+
+        /* ---------- Section header ---------- */
+        .section-header {
+            margin-top: 32px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 48px;
+        }
+        .section-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; }
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            margin-right: -12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 20px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .section-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); margin-bottom: 8px; }
+
+        /* ---------- Macros goal (Google Health style) ---------- */
+        .macros { display: flex; flex-direction: column; gap: 18px; margin-top: 4px; }
+        .macro { display: flex; flex-direction: column; gap: 10px; }
+        .macro[data-macro="carbs"]   { --macro-color: var(--macro-carbs); }
+        .macro[data-macro="fat"]     { --macro-color: var(--macro-fat); }
+        .macro[data-macro="protein"] { --macro-color: var(--macro-protein); }
+        .macro-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+        .macro-label { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; font-variant-numeric: tabular-nums; }
+        .badge {
+            flex-shrink: 0;
+            padding: 4px 12px;
+            border-radius: 14px;
+            font: 500 13px/18px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .badge[data-status="below"] { background: var(--status-below-bg); color: var(--status-below-fg); }
+        .badge[data-status="in"]    { background: var(--status-in-bg);    color: var(--status-in-fg); }
+        .badge[data-status="above"] { background: var(--status-above-bg); color: var(--status-above-fg); }
+        .macro-bar { position: relative; height: 24px; display: flex; align-items: center; }
+        .macro-track {
+            position: absolute;
+            left: 0; right: 0;
+            height: 16px;
+            border-radius: 8px;
+            background: var(--macro-track);
+            overflow: hidden;
+        }
+        .macro-fill {
+            display: block;
+            height: 100%;
+            border-radius: 8px;
+            background: var(--macro-color);
+            transition: width 400ms cubic-bezier(.2,0,0,1);
+        }
+        .macro-fill[data-zero="false"] { min-width: 8px; }
+        /* Personal goal range: dashed band on the track */
+        .macro-range {
+            position: absolute;
+            top: 0;
+            height: 24px;
+            min-width: 12px;
+            border-radius: 12px;
+            border: 1.5px dashed color-mix(in srgb, var(--on-surface) 70%, transparent);
+            background: color-mix(in srgb, var(--macro-color) 22%, transparent);
+            pointer-events: none;
+        }
+
+        /* ---------- Meal filter chips ---------- */
+        .chips {
+            margin-top: 28px;
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            margin-left: -16px;
+            margin-right: -16px;
+            padding: 0 16px;
+            scrollbar-width: none;
+        }
+        .chips::-webkit-scrollbar { display: none; }
+        .chip {
+            flex-shrink: 0;
+            min-height: 48px;
+            display: flex;
+            align-items: center;
+        }
+        .chip-inner {
+            height: 32px;
+            padding: 0 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--outline);
+            color: var(--on-surface);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .chip-inner .material-symbols-rounded { font-size: 18px; display: none; margin-left: -6px; }
+        .chip[aria-pressed="true"] .chip-inner {
+            border-color: transparent;
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+        :root[data-theme="dark"] .chip[aria-pressed="true"] .chip-inner { color: #FFFFFF; }
+        .chip[aria-pressed="true"] .chip-inner .material-symbols-rounded { display: inline-block; }
+
+        /* ---------- Meal group cards ---------- */
+        .meals { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+        .meal-group {
+            background: var(--surface-container);
+            border-radius: 24px;
+            overflow: hidden;
+        }
+        :root:not([data-theme="dark"]) .meal-group { border: 1px solid var(--outline-variant); }
+        .meal-group-head {
+            width: 100%;
+            min-height: 88px;
+            padding: 16px 12px 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .meal-group-head:hover { background: color-mix(in srgb, var(--on-surface) 4%, transparent); }
+        .meal-group-titles { flex: 1; display: flex; flex-direction: column; }
+        .meal-group-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 400; }
+        .meal-group-sub { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .meal-group-kcal {
+            font-family: var(--font-display);
+            font-size: 32px;
+            line-height: 40px;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .meal-group-kcal small { font-size: 18px; margin-left: 4px; }
+        .meal-group-head .chev {
+            width: 40px; height: 40px;
+            display: flex; justify-content: center; align-items: center;
+            transition: transform 200ms ease;
+        }
+        .meal-group-head[aria-expanded="true"] .chev { transform: rotate(180deg); }
+        .meal-items { padding: 0 8px 8px; display: flex; flex-direction: column; gap: 2px; }
+        .meal-item {
+            width: 100%;
+            min-height: 64px;
+            padding: 10px 12px;
+            display: grid;
+            grid-template-columns: 40px 1fr auto;
+            gap: 12px;
+            align-items: center;
+            border-radius: 16px;
+            background: var(--surface-container-high);
+        }
+        .meal-item:hover { background: color-mix(in srgb, var(--on-surface) 6%, var(--surface-container-high)); }
+        .meal-thumb {
+            width: 40px; height: 40px;
+            border-radius: 10px;
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .meal-thumb .material-symbols-rounded { font-size: 20px; }
+        .meal-item-info { display: flex; flex-direction: column; min-width: 0; }
+        .meal-item-name { font: 400 16px/22px var(--font-text); letter-spacing: 0.15px; overflow-wrap: anywhere; }
+        .meal-item-meta { font: 400 12px/16px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+        .meal-item-kcal { font: 500 14px/20px var(--font-text); font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .filter-empty { padding: 16px 4px; font: 400 14px/20px var(--font-text); color: var(--on-surface-variant); }
+
+        .history-cta {
+            width: 100%;
+            margin-top: 16px;
+            min-height: 48px;
+            border-radius: 24px;
+            border: 1px solid var(--outline);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+        }
+        .history-cta:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+
+        /* ---------- Empty state ---------- */
+        .empty {
+            margin-top: 40px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+            padding: 0 12px;
+        }
+        .empty-title { font-family: var(--font-display); font-size: 36px; line-height: 44px; font-weight: 400; }
+        .empty-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .filled-btn {
+            margin-top: 12px;
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            background: var(--primary);
+            color: var(--on-primary);
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+        }
+
+        /* ---------- Skeletons ---------- */
+        .sk { background: var(--surface-container-high); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: .5; } }
+
+        /* ---------- Snackbar ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px; right: 16px; bottom: 32px;
+            min-height: 48px;
+            padding: 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+        }
+        .snackbar.show { transform: none; opacity: 1; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        /* Macro-dots layout: kcal sits top-right beside the name; meta and macro lines
+           span the full text width under it, so "Carbs · Fat · Protein" fits on one line. */
+        .meal-item { grid-template-rows: auto auto auto; row-gap: 1px; column-gap: 12px; }
+        .meal-item > :first-child { grid-row: 1 / span 3; align-self: center; }
+        .meal-item-info { display: contents; }
+        .meal-item-name { grid-column: 2; grid-row: 1; align-self: start; }
+        .meal-item-meta:not(.macro-dots) { grid-column: 2 / span 2; grid-row: 2; }
+        .meal-item-meta.macro-dots { grid-column: 2 / span 2; grid-row: 3; margin-top: 2px; }
+        .meal-item-kcal { grid-column: 3; grid-row: 1; align-self: start; }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-12 states required by spec §4.1 / §4.10 -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <button type="button" data-state-choice="local">No goals</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <header class="top-app-bar">
+            <button type="button" class="icon-btn" aria-label="Back to Home" data-route="home">
+                <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+            </button>
+            <h1>Food &amp; drink</h1>
+            <button type="button" class="icon-btn" aria-label="Log a meal" data-route="camera">
+                <span class="material-symbols-rounded" aria-hidden="true">add</span>
+            </button>
+        </header>
+
+        <main class="scaffold-content" id="content">
+            <!-- Range segments -->
+            <div class="segments" role="group" aria-label="Time range">
+                <button type="button" class="segment" aria-pressed="true" aria-label="Day">D</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Week" data-route="weeklyDashboard">W</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Month" data-route="monthDashboard">M</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Three months" data-route="threeMonthDashboard">3M</button>
+                <button type="button" class="segment" aria-pressed="false" aria-label="Year" data-route="yearDashboard">Y</button>
+            </div>
+
+            <!-- Day navigation -->
+            <div class="range-nav">
+                <button type="button" class="date-btn" id="dateBtn" aria-label="Choose date">
+                    <span id="dateLabel">Today</span>
+                    <span class="material-symbols-rounded" aria-hidden="true">arrow_drop_down</span>
+                </button>
+                <input type="date" id="datePicker" tabindex="-1" aria-hidden="true" max="2026-09-24">
+                <button type="button" class="tonal-icon-btn" id="prevDay" aria-label="Previous day">
+                    <span class="material-symbols-rounded" aria-hidden="true">chevron_left</span>
+                </button>
+                <button type="button" class="tonal-icon-btn" id="nextDay" aria-label="Next day">
+                    <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                </button>
+                <button type="button" class="tonal-icon-btn" id="todayBtn" aria-label="Return to today">
+                    <span class="material-symbols-rounded" aria-hidden="true">history</span>
+                </button>
+            </div>
+
+            <!-- Rendered per selected day and state -->
+            <div id="daySlot" aria-live="polite"></div>
+        </main>
+
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite"></div>
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data (consistent with S-02 Home) ---------------- */
+        const TODAY = new Date(2026, 8, 24); // Thu, Sep 24, 2026
+        const GOALS = { kcal: 2300, carbs: 220, fat: 70, protein: 150 };
+        const RANGE = 0.10; // personal range = goal ±10%
+
+        // Meals keyed by day offset (0 = today)
+        const DAYS = {
+            0: [
+                { type: 'Breakfast', name: 'Oatmeal & berries', time: '07:12', g: 280, kcal: 320, p: 10, c: 54, f: 7, src: 'photo' },
+                { type: 'Lunch', name: 'Grilled chicken salad', time: '11:02', g: 350, kcal: 450, p: 38, c: 14, f: 26, src: 'photo' }
+            ],
+            1: [
+                { type: 'Lunch', name: 'Buckwheat with mushrooms', time: '13:15', g: 300, kcal: 410, p: 14, c: 68, f: 9, src: 'photo' },
+                { type: 'Dinner', name: 'Chicken soup', time: '19:30', g: 400, kcal: 120, p: 11, c: 9, f: 4, src: 'search' }
+            ],
+            2: [
+                { type: 'Breakfast', name: 'Greek yogurt & granola', time: '07:40', g: 200, kcal: 380, p: 20, c: 48, f: 11, src: 'photo' },
+                { type: 'Lunch', name: 'Roast salmon with rice', time: '12:50', g: 380, kcal: 760, p: 46, c: 70, f: 30, src: 'photo' },
+                { type: 'Dinner', name: 'Pasta bolognese', time: '19:05', g: 350, kcal: 640, p: 32, c: 82, f: 20, src: 'photo' },
+                { type: 'Snack', name: 'Apple', time: '16:10', g: 180, kcal: 95, p: 0, c: 25, f: 0, src: 'manual' },
+                { type: 'Snack', name: 'Nut mix', time: '21:30', g: 45, kcal: 260, p: 8, c: 10, f: 22, src: 'search' }
+            ]
+        };
+        // Older days (offset 3 = Mon Sep 21 ... offset 10 = Mon Sep 14): day totals shared with
+        // s12_weekly_dashboard.html TOTALS. Meals are derived so each day sums exactly to that total.
+        const OLDER_TOTALS = {
+            3:  { kcal: 2190, c: 248, f: 74, p: 132 },
+            4:  { kcal: 1890, c: 190, f: 60, p: 118 },
+            5:  { kcal: 2280, c: 228, f: 75, p: 150 },
+            6:  { kcal: 2610, c: 280, f: 92, p: 120 },
+            7:  { kcal: 2420, c: 262, f: 80, p: 142 },
+            8:  { kcal: 2350, c: 250, f: 78, p: 135 },
+            9:  { kcal: 1980, c: 205, f: 64, p: 128 },
+            10: { kcal: 2210, c: 230, f: 68, p: 140 }
+        };
+        const OLDER_MENU = [
+            { type: 'Breakfast', share: 0.25, time: '07:30', names: ['Scrambled eggs on toast', 'Oatmeal & berries', 'Greek yogurt & granola', 'Cottage cheese pancakes'] },
+            { type: 'Lunch',     share: 0.35, time: '12:45', names: ['Chicken & rice bowl', 'Grilled chicken salad', 'Buckwheat with mushrooms', 'Tuna wrap'] },
+            { type: 'Dinner',    share: 0.30, time: '19:10', names: ['Roast salmon with rice', 'Beef stew', 'Pasta bolognese', 'Chicken soup'] },
+            { type: 'Snack',     share: 0.10, time: '16:00', names: ['Apple', 'Nut mix', 'Banana', 'Protein bar'] }
+        ];
+        Object.keys(OLDER_TOTALS).forEach((offset) => {
+            const t = OLDER_TOTALS[offset];
+            const used = { kcal: 0, c: 0, f: 0, p: 0 };
+            DAYS[offset] = OLDER_MENU.map((slot, i) => {
+                const last = i === OLDER_MENU.length - 1;
+                const part = (key) => last ? t[key] - used[key] : Math.round(t[key] * slot.share);
+                const m = { kcal: part('kcal'), c: part('c'), f: part('f'), p: part('p') };
+                Object.keys(used).forEach((k) => { used[k] += m[k]; });
+                return {
+                    type: slot.type, time: slot.time,
+                    name: slot.names[Number(offset) % slot.names.length],
+                    g: Math.round(m.kcal / 1.6), // plausible portion weight
+                    kcal: m.kcal, c: m.c, f: m.f, p: m.p,
+                    src: slot.type === 'Snack' ? 'manual' : 'photo'
+                };
+            });
+        });
+        const MEAL_TYPES = ['Breakfast', 'Lunch', 'Dinner', 'Snack'];
+        const SRC_ICON = { photo: 'image', search: 'search', manual: 'edit_note' };
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        let timers = [];
+        function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+        function dateFor(offset) { const d = new Date(TODAY); d.setDate(d.getDate() - offset); return d; }
+        function dayLabel(offset) {
+            if (offset === 0) return 'Today';
+            if (offset === 1) return 'Yesterday';
+            return dateFor(offset).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        }
+        function iso(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+        function totals(meals) {
+            return meals.reduce((t, m) => ({ kcal: t.kcal + m.kcal, p: t.p + m.p, c: t.c + m.c, f: t.f + m.f }), { kcal: 0, p: 0, c: 0, f: 0 });
+        }
+        function statusOf(value, goal) {
+            if (value < goal * (1 - RANGE)) return 'below';
+            if (value > goal * (1 + RANGE)) return 'above';
+            return 'in';
+        }
+        const STATUS_TEXT = { below: 'Below range', in: 'In range', above: 'Above range' };
+
+        /* ---------------- State ---------------- */
+        let state = 'default';
+        let offset = 0;
+        let filter = 'all';
+        const expanded = new Set();
+
+        function mealsForDay() {
+            if (state === 'empty' && offset === 0) return [];
+            return DAYS[offset] || [];
+        }
+        const goals = () => (state === 'local' ? null : GOALS);
+
+        /* ---------------- Render: header + calorie rows ---------------- */
+        function insightHtml(t, g) {
+            const isToday = offset === 0;
+            if (!g) {
+                return `<div class="insight">
+                    <div class="insight-value"><span class="insight-number">${fmt(t.kcal)}</span><span class="insight-unit">kcal eaten</span></div>
+                    <p class="insight-text">No calorie goal set, so intake can't be compared with a target.</p>
+                </div>`;
+            }
+            const diff = t.kcal - g.kcal;
+            const status = statusOf(t.kcal, g.kcal);
+            let number, unit, text;
+            if (status === 'below') {
+                number = fmt(-diff); unit = 'kcal under target';
+                text = isToday
+                    ? 'Keep fueling your body to stay energized for the rest of the day.'
+                    : 'Your intake was below your target. Eating too little can leave you low on energy.';
+            } else if (status === 'above') {
+                number = fmt(diff); unit = 'kcal over target';
+                text = 'Your intake was above your target. A lighter next meal can help balance the day.';
+            } else {
+                number = fmt(t.kcal); unit = 'kcal eaten';
+                text = 'You stayed within your calorie target. Nicely balanced day.';
+            }
+            return `<div class="insight">
+                <div class="insight-value"><span class="insight-number">${number}</span><span class="insight-unit">${unit}</span></div>
+                <p class="insight-text">${text}</p>
+            </div>`;
+        }
+
+        // "Your calorie target": three equal segments Under | On target | Over.
+        // Thresholds are the personal range (goal ±10%); the marker shows the day's intake.
+        function targetChartHtml(t, g) {
+            if (!g) return ''; // no goal -> no target chart
+            const lo = Math.round(g.kcal * (1 - RANGE)), hi = Math.round(g.kcal * (1 + RANGE));
+            const span = hi - lo;
+            let pos, seg; // pos in % of full track width
+            if (t.kcal < lo) { seg = 'under'; pos = (t.kcal / lo) * 33.333; }
+            else if (t.kcal <= hi) { seg = 'in'; pos = 33.333 + ((t.kcal - lo) / span) * 33.333; }
+            else { seg = 'over'; pos = 66.666 + Math.min((t.kcal - hi) / span, 1) * 33.333; }
+            // Per-segment fill (0-100%) up to the marker position
+            const fills = [0, 1, 2].map((i) => Math.max(0, Math.min(1, (pos - i * 33.333) / 33.333)) * 100);
+            const segText = { under: 'under target', in: 'on target', over: 'over target' }[seg];
+            return `<h2 class="target-title">Your calorie target</h2>
+                <div class="target-chart" role="img"
+                     aria-label="Calorie target ${fmt(lo)} to ${fmt(hi)} kcal. Intake ${fmt(t.kcal)} kcal, ${segText}">
+                    <div class="target-thresholds" aria-hidden="true"><span>${fmt(lo)}</span><span>${fmt(hi)}</span></div>
+                    <div class="target-track" aria-hidden="true">
+                        <span class="target-seg" data-seg="under"><span class="target-seg-fill" style="width:${fills[0]}%"></span></span>
+                        <span class="target-seg" data-seg="in"><span class="target-seg-fill" style="width:${fills[1]}%"></span></span>
+                        <span class="target-seg" data-seg="over"><span class="target-seg-fill" style="width:${fills[2]}%"></span></span>
+                        <span class="target-marker" style="left:${Math.max(1, Math.min(99, pos))}%"></span>
+                    </div>
+                    <div class="target-labels" aria-hidden="true">
+                        <span data-current="${seg === 'under'}">Under</span>
+                        <span data-current="${seg === 'in'}">On target</span>
+                        <span data-current="${seg === 'over'}">Over</span>
+                    </div>
+                </div>`;
+        }
+
+        /* ---------------- Render: macros goal ---------------- */
+        function macroHtml(key, name, value, goal, totalGrams) {
+            if (!goal) {
+                // No goal: label + share of today's macro grams, no range badge or marker
+                const share = totalGrams ? Math.round(value / totalGrams * 100) : 0;
+                return `<div class="macro" data-macro="${key}" role="img" aria-label="${name}: ${value} grams, ${share}% of today's macros. No goal">
+                    <div class="macro-head" aria-hidden="true"><span class="macro-label">${name} · ${share}% · ${value} g</span></div>
+                    <div class="macro-bar" aria-hidden="true"><span class="macro-track"><span class="macro-fill" data-zero="${value === 0}" style="width:${share}%"></span></span></div>
+                </div>`;
+            }
+            const pct = Math.round(value / goal * 100);
+            const status = statusOf(value, goal);
+            const scale = goal * 2; // track spans 0..2x goal so the range sits mid-track
+            const fill = Math.min(value / scale, 1) * 100;
+            const lo = goal * (1 - RANGE) / scale * 100, hi = goal * (1 + RANGE) / scale * 100;
+            return `<div class="macro" data-macro="${key}" role="img"
+                    aria-label="${name}: ${value} of ${goal} grams, ${pct}% of goal. ${STATUS_TEXT[status]}">
+                <div class="macro-head" aria-hidden="true">
+                    <span class="macro-label">${name} · ${pct}% · ${value} of ${goal} g</span>
+                    <span class="badge" data-status="${status}">${STATUS_TEXT[status]}</span>
+                </div>
+                <div class="macro-bar" aria-hidden="true">
+                    <span class="macro-track"><span class="macro-fill" data-zero="${value === 0}" style="width:${fill}%"></span></span>
+                    <span class="macro-range" style="left:${lo}%;width:${hi - lo}%"></span>
+                </div>
+            </div>`;
+        }
+
+        function macrosHtml(t, g) {
+            const grams = t.p + t.c + t.f;
+            return `<div class="section-header">
+                    <h2 class="section-title">${g ? 'Macros goal' : 'Macros'}</h2>
+                    <button type="button" class="text-btn" id="fullNutrients">View full nutrients</button>
+                </div>
+                <p class="section-text">Balancing carbs, protein, and fat is key for energy, recovery, and overall health.</p>
+                <div class="macros">
+                    ${macroHtml('carbs', 'Carbs', t.c, g && g.carbs, grams)}
+                    ${macroHtml('fat', 'Fat', t.f, g && g.fat, grams)}
+                    ${macroHtml('protein', 'Protein', t.p, g && g.protein, grams)}
+                </div>`;
+        }
+
+        /* ---------------- Render: meals ---------------- */
+        function chipsHtml() {
+            const opts = ['All', ...MEAL_TYPES];
+            return `<div class="chips" role="group" aria-label="Filter meals">
+                ${opts.map((o) => {
+                    const key = o.toLowerCase();
+                    return `<button type="button" class="chip" data-filter="${key}" aria-pressed="${filter === key}">
+                        <span class="chip-inner"><span class="material-symbols-rounded" aria-hidden="true">check</span>${o}</span>
+                    </button>`;
+                }).join('')}
+            </div>`;
+        }
+
+        function mealsHtml(meals) {
+            const groups = MEAL_TYPES
+                .filter((type) => filter === 'all' || filter === type.toLowerCase())
+                .map((type) => ({ type, items: meals.filter((m) => m.type === type) }))
+                .filter((g) => g.items.length);
+
+            if (!groups.length) {
+                const label = filter === 'all' ? 'meals' : filter;
+                return `<div class="meals"><p class="filter-empty" role="status">No ${label} logged on this day.</p></div>`;
+            }
+
+            return `<div class="meals">${groups.map((g) => {
+                const kcal = g.items.reduce((s, m) => s + m.kcal, 0);
+                const open = expanded.has(g.type);
+                const id = `group-${g.type.toLowerCase()}`;
+                return `<div class="meal-group">
+                    <button type="button" class="meal-group-head" data-group="${g.type}" aria-expanded="${open}" aria-controls="${id}"
+                            aria-label="${g.type}, ${g.items.length} ${g.items.length === 1 ? 'item' : 'items'}, ${fmt(kcal)} kilocalories">
+                        <span class="meal-group-titles" aria-hidden="true">
+                            <span class="meal-group-title">${g.type}</span>
+                            <span class="meal-group-sub">${g.items.length} ${g.items.length === 1 ? 'item' : 'items'}</span>
+                        </span>
+                        <span class="meal-group-kcal" aria-hidden="true">${fmt(kcal)}<small>kcal</small></span>
+                        <span class="chev" aria-hidden="true"><span class="material-symbols-rounded">expand_more</span></span>
+                    </button>
+                    <div class="meal-items" id="${id}" ${open ? '' : 'hidden'}>
+                        ${g.items.map((m) => `
+                            <button type="button" class="meal-item" data-route="mealReviewSaved"
+                                    aria-label="${m.name}, ${m.time}, ${m.g} grams, ${m.kcal} kilocalories. Carbs ${m.c}, fat ${m.f}, protein ${m.p} grams. Open meal">
+                                <span class="meal-thumb" aria-hidden="true"><span class="material-symbols-rounded">${SRC_ICON[m.src]}</span></span>
+                                <span class="meal-item-info" aria-hidden="true">
+                                    <span class="meal-item-name">${m.name}</span>
+                                    <span class="meal-item-meta">${m.time} · ${m.g} g</span>
+                                    <span class="meal-item-meta macro-dots"><span><i data-m="carbs"></i>Carbs ${m.c}</span><span><i data-m="fat"></i>Fat ${m.f}</span><span><i data-m="protein"></i>Protein ${m.p} g</span></span>
+                                </span>
+                                <span class="meal-item-kcal" aria-hidden="true">${m.kcal} kcal</span>
+                            </button>`).join('')}
+                    </div>
+                </div>`;
+            }).join('')}</div>`;
+        }
+
+        /* ---------------- Render: loading / empty ---------------- */
+        function skeletonHtml() {
+            return `<div aria-hidden="true">
+                <div style="margin-top:20px;display:flex;flex-direction:column;gap:10px">
+                    <span class="sk" style="width:62%;height:56px;border-radius:12px"></span>
+                    <span class="sk" style="width:90%;height:16px"></span>
+                    <span class="sk" style="width:70%;height:16px"></span>
+                </div>
+                <div style="margin-top:32px;display:flex;flex-direction:column;gap:12px">
+                    <span class="sk" style="width:55%;height:24px"></span>
+                    <span class="sk" style="height:28px;border-radius:14px"></span>
+                    <span class="sk" style="width:100%;height:16px"></span>
+                </div>
+                <div style="margin-top:40px;display:flex;flex-direction:column;gap:20px">
+                    <span class="sk" style="width:40%;height:24px"></span>
+                    ${[0,1,2].map(() => `<span style="display:flex;flex-direction:column;gap:10px">
+                        <span class="sk" style="width:60%;height:18px"></span>
+                        <span class="sk" style="height:16px;border-radius:8px"></span></span>`).join('')}
+                </div>
+                <div class="meals" style="margin-top:32px">
+                    ${[0,1].map(() => '<span class="sk" style="height:88px;border-radius:24px"></span>').join('')}
+                </div>
+            </div>`;
+        }
+
+        function emptyHtml() {
+            return `<div class="empty">
+                <span class="empty-title">No data</span>
+                <p class="empty-text">No meals logged for ${offset === 0 ? 'today' : 'this day'}. Take a photo of your meal and Snackshot will estimate calories and macros.</p>
+                <button type="button" class="filled-btn" data-route="camera">
+                    <span class="material-symbols-rounded" aria-hidden="true">photo_camera</span> Take a photo
+                </button>
+                <button type="button" class="text-btn" data-route="search" style="margin-right:0">Search for a food</button>
+            </div>`;
+        }
+
+        /* ---------------- Main render ---------------- */
+        function renderDay() {
+            $('dateLabel').textContent = dayLabel(offset);
+            $('nextDay').disabled = offset === 0;
+            $('todayBtn').disabled = offset === 0;
+            $('prevDay').disabled = state === 'loading';
+            $('datePicker').value = iso(dateFor(offset));
+
+            if (state === 'loading') { $('daySlot').innerHTML = skeletonHtml(); return; }
+
+            const meals = mealsForDay();
+            if (!meals.length) { $('daySlot').innerHTML = emptyHtml(); return; }
+
+            const t = totals(meals);
+            const g = goals();
+            $('daySlot').innerHTML = insightHtml(t, g) + targetChartHtml(t, g) + macrosHtml(t, g) +
+                chipsHtml() + mealsHtml(meals) +
+                `<button type="button" class="history-cta" data-route="history">
+                    <span class="material-symbols-rounded" aria-hidden="true">history</span> See all meals in History
+                </button>`;
+        }
+
+        function goTo(nextOffset) {
+            offset = Math.max(0, nextOffset);
+            filter = 'all';
+            expanded.clear();
+            renderDay();
+            announce(`${dayLabel(offset)} selected`);
+        }
+
+        /* ---------------- Events ---------------- */
+        $('prevDay').addEventListener('click', () => goTo(offset + 1));
+        $('nextDay').addEventListener('click', () => goTo(offset - 1));
+        $('todayBtn').addEventListener('click', () => goTo(0));
+        $('dateBtn').addEventListener('click', () => {
+            const picker = $('datePicker');
+            try { picker.showPicker(); } catch (e) { picker.click(); }
+        });
+        $('datePicker').addEventListener('change', (e) => {
+            const [y, m, d] = e.target.value.split('-').map(Number);
+            if (!y) return;
+            const diff = Math.round((TODAY - new Date(y, m - 1, d)) / 86400000);
+            goTo(diff);
+        });
+
+        $('daySlot').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-filter]');
+            if (chip) { filter = chip.dataset.filter; renderDay(); return; }
+            const head = e.target.closest('[data-group]');
+            if (head) {
+                const type = head.dataset.group;
+                if (expanded.has(type)) expanded.delete(type); else expanded.add(type);
+                renderDay();
+                const again = document.querySelector(`[data-group="${type}"]`);
+                if (again) again.focus({ preventScroll: true });
+                return;
+            }
+            if (e.target.closest('#fullNutrients')) showSnackbar('Full nutrients will be available in a later version');
+        });
+
+        function showSnackbar(text) {
+            const bar = $('snackbar');
+            bar.textContent = text;
+            bar.classList.add('show');
+            later(() => bar.classList.remove('show'), 3000);
+        }
+
+        function render(next) {
+            state = ['default', 'loading', 'empty', 'local'].includes(next) ? next : 'default';
+            clearTimers();
+            $('snackbar').classList.remove('show');
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            offset = 0;
+            filter = 'all';
+            expanded.clear();
+            renderDay();
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        const params = new URLSearchParams(location.search);
+        render(params.get('state') || 'default');
+        // Optional ?day=N opens N days before today (prototype review convenience)
+        const dayParam = parseInt(params.get('day'), 10);
+        if (dayParam > 0) { offset = dayParam; renderDay(); }
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

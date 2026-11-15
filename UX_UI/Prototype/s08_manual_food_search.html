@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-08 | Manual Food Search - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens: color roles, macro colors, typography -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-08 Manual food search — UX spec §4.8 / F-10:
+         * Scaffold -> M3 SearchBar (back, query, clear) -> LazyColumn of result ListItems
+         * with nutrition preview (kcal per 100 g or per serving + Carbs/Fat/Protein)
+         * -> select result -> portion bottom sheet (grams, computed kcal/macros) -> Save (S-10).
+         * Quick add (S-09) is always one tap away; back returns to Home.
+         * Color tokens come from prototype-theme.css; this file only adds layout.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: not-allowed; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Device frame ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- M3 SearchBar ---------- */
+        .search-header { flex-shrink: 0; padding: 4px 16px 8px; position: relative; }
+        .search-bar {
+            height: 56px;
+            border-radius: 28px;
+            background: var(--surface-container-high);
+            display: flex;
+            align-items: center;
+            padding: 0 4px;
+            gap: 4px;
+        }
+        .search-bar:focus-within { outline: 2px solid var(--primary); outline-offset: 0; }
+        .search-bar label { display: contents; }
+        .search-input {
+            flex: 1;
+            min-width: 0;
+            height: 48px;
+            border: none;
+            background: transparent;
+            color: var(--on-surface);
+            font: 400 16px/24px var(--font-text);
+            letter-spacing: 0.5px;
+            outline: none;
+        }
+        .search-input::placeholder { color: var(--on-surface-variant); }
+        .search-input::-webkit-search-cancel-button { display: none; }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface);
+            flex-shrink: 0;
+        }
+        .icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .search-bar .lead-icon { width: 24px; margin: 0 12px 0 8px; color: var(--on-surface-variant); flex-shrink: 0; }
+
+        /* Indeterminate linear progress under the search bar (Loading) */
+        .linear-progress {
+            position: absolute;
+            left: 44px; right: 44px; bottom: 2px;
+            height: 4px;
+            border-radius: 2px;
+            background: var(--primary-container);
+            overflow: hidden;
+        }
+        .linear-progress::after {
+            content: "";
+            position: absolute;
+            top: 0; bottom: 0;
+            width: 40%;
+            border-radius: 2px;
+            background: var(--primary);
+            animation: indeterminate 1.2s cubic-bezier(.4,0,.2,1) infinite;
+        }
+        @keyframes indeterminate { from { left: -40%; } to { left: 100%; } }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 16px 40px;
+            display: flex;
+            flex-direction: column;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        .quick-add-row {
+            width: 100%;
+            min-height: 64px;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            border-radius: 20px;
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+        :root[data-theme="dark"] .quick-add-row { color: #FFFFFF; }
+        .quick-add-row:hover { background: color-mix(in srgb, var(--on-surface) 8%, var(--primary-container)); }
+        .quick-add-row .qa-text { flex: 1; display: flex; flex-direction: column; }
+        .quick-add-row .qa-title { font: 500 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .quick-add-row .qa-sub { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; opacity: .86; }
+
+        .section-header {
+            margin-top: 24px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .section-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; }
+        .section-meta { font: 400 12px/16px var(--font-text); letter-spacing: 0.4px; color: var(--on-surface-variant); }
+        .results-summary { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); margin: 8px 4px 8px; }
+        .results-summary strong { color: var(--on-surface); font-weight: 500; }
+
+        /* ---------- Result ListItems (grouped surface rows) ---------- */
+        .results { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+        .results > li { display: block; }
+        .result {
+            width: 100%;
+            min-height: 72px;
+            padding: 12px 16px 12px 12px;
+            display: grid;
+            grid-template-columns: 40px 1fr auto;
+            grid-template-areas: "thumb name kcal" "thumb meta meta" "thumb macros macros";
+            column-gap: 12px;
+            row-gap: 2px;
+            align-items: center;
+            border-radius: 6px;
+            background: var(--surface-container);
+        }
+        :root:not([data-theme="dark"]) .results { border-radius: 20px; }
+        .results > li:first-child .result { border-radius: 20px 20px 6px 6px; }
+        .results > li:last-child .result { border-radius: 6px 6px 20px 20px; }
+        .results > li:only-child .result { border-radius: 20px; }
+        :root:not([data-theme="dark"]) .result { box-shadow: inset 0 0 0 1px var(--outline-variant); }
+        .result:hover { background: color-mix(in srgb, var(--on-surface) 6%, var(--surface-container)); }
+        .result-thumb {
+            grid-area: thumb;
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .result-thumb .material-symbols-rounded { font-size: 22px; }
+        .result-info { display: contents; }
+        .result-meta { grid-area: meta; font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .result-name { grid-area: name; align-self: end; min-width: 0; font: 400 16px/22px var(--font-text); letter-spacing: 0.15px; overflow-wrap: anywhere; }
+        .result-name mark {
+            background: color-mix(in srgb, var(--primary) 18%, transparent);
+            color: inherit;
+            font-weight: 700;
+            border-radius: 3px;
+            padding: 0 1px;
+        }
+        .result-macros { grid-area: macros; margin-top: 2px; font: 400 12px/16px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+        .result-kcal { grid-area: kcal; align-self: end; text-align: right; }
+        .result-kcal b { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 400; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .result-kcal b small { font-size: 14px; margin-left: 3px; }
+
+        .outlined-btn {
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            border: 1px solid var(--outline);
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+        }
+        .outlined-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .outlined-btn .material-symbols-rounded, .filled-btn .material-symbols-rounded, .text-btn .material-symbols-rounded { font-size: 18px; }
+        .filled-btn {
+            min-height: 48px;
+            padding: 0 24px;
+            border-radius: 24px;
+            background: var(--primary);
+            color: var(--on-primary);
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+        }
+        .filled-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-primary) 8%, var(--primary)); }
+        .filled-btn:disabled {
+            background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 50%, transparent);
+        }
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            gap: 4px;
+            border-radius: 24px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn:hover { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .list-footer { margin-top: 20px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+        .list-footer p { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+
+        /* ---------- Empty / error message blocks ---------- */
+        .message {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 12px;
+            padding: 0 8px;
+        }
+        .message-icon {
+            width: 64px; height: 64px;
+            border-radius: 50%;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            display: flex; justify-content: center; align-items: center;
+        }
+        .message-icon .material-symbols-rounded { font-size: 32px; }
+        .message[data-kind="error"] .message-icon { color: var(--error); }
+        .message-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; overflow-wrap: anywhere; }
+        .message-text { font: 400 16px/24px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); max-width: 320px; }
+        .message-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 4px; }
+
+        /* ---------- Skeletons ---------- */
+        .sk { display: block; background: var(--surface-container-high); border-radius: 8px; animation: pulse 1.4s ease-in-out infinite; }
+        @keyframes pulse { 50% { opacity: .5; } }
+        .sk-row {
+            min-height: 72px;
+            padding: 12px 16px 12px 12px;
+            display: grid;
+            grid-template-columns: 40px 1fr 56px;
+            gap: 12px;
+            align-items: center;
+            border-radius: 6px;
+            background: var(--surface-container);
+        }
+        .sk-row:first-child { border-radius: 20px 20px 6px 6px; }
+        .sk-row:last-child { border-radius: 6px 6px 20px 20px; }
+        :root:not([data-theme="dark"]) .sk-row { box-shadow: inset 0 0 0 1px var(--outline-variant); }
+
+        /* ---------- Portion bottom sheet ---------- */
+        .scrim {
+            position: absolute;
+            inset: 0;
+            background: rgb(0 0 0 / 40%);
+            z-index: 20;
+            opacity: 0;
+            transition: opacity 200ms ease;
+        }
+        .scrim.show { opacity: 1; }
+        .sheet {
+            position: absolute;
+            left: 0; right: 0; bottom: 0;
+            max-height: calc(100% - 56px);
+            display: flex;
+            flex-direction: column;
+            background: var(--surface-container);
+            border-radius: 28px 28px 0 0;
+            box-shadow: 0 -4px 16px rgb(0 0 0 / 18%);
+            z-index: 21;
+            transform: translateY(24px);
+            opacity: 0;
+            transition: transform 250ms cubic-bezier(.2,0,0,1), opacity 200ms ease;
+        }
+        :root[data-theme="dark"] .sheet { background: var(--surface-container); }
+        .sheet.show { transform: none; opacity: 1; }
+        .sheet-handle { width: 32px; height: 4px; border-radius: 2px; background: var(--outline); opacity: .6; margin: 16px auto 4px; flex-shrink: 0; }
+        .sheet-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 4px 24px 16px; scrollbar-width: none; }
+        .sheet-body::-webkit-scrollbar { display: none; }
+        .sheet-head { display: flex; align-items: flex-start; gap: 8px; }
+        .sheet-head-text { flex: 1; min-width: 0; padding-top: 6px; }
+        .sheet-title { font-family: var(--font-display); font-size: 22px; line-height: 28px; font-weight: 500; overflow-wrap: anywhere; outline-offset: 4px; }
+        .sheet-meta { margin-top: 4px; font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+        .sheet-head .icon-btn { margin-right: -12px; }
+
+        .field-label { margin-top: 20px; font: 500 14px/20px var(--font-text); letter-spacing: 0.1px; color: var(--on-surface-variant); }
+        .grams-row { margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+        .tonal-icon-btn {
+            width: 48px; height: 48px;
+            border-radius: 50%;
+            background: var(--surface-container-high);
+            color: var(--on-surface);
+            display: flex; justify-content: center; align-items: center;
+            flex-shrink: 0;
+        }
+        .tonal-icon-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 10%, var(--surface-container-high)); }
+        .tonal-icon-btn:disabled { color: color-mix(in srgb, var(--on-surface) 38%, transparent); }
+        .text-field {
+            flex: 1;
+            min-width: 0;
+            height: 56px;
+            display: flex;
+            align-items: center;
+            border: 1px solid var(--outline);
+            border-radius: 4px;
+            padding: 0 16px;
+            gap: 8px;
+            background: transparent;
+        }
+        .text-field:focus-within { border-color: var(--primary); box-shadow: inset 0 0 0 1px var(--primary); }
+        .text-field[data-invalid="true"] { border-color: var(--error); box-shadow: inset 0 0 0 1px var(--error); }
+        .text-field input {
+            flex: 1;
+            min-width: 0;
+            border: none;
+            background: transparent;
+            outline: none;
+            color: var(--on-surface);
+            font: 400 22px/28px var(--font-display);
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+        }
+        .text-field .suffix { font: 400 16px/24px var(--font-text); color: var(--on-surface-variant); }
+        .supporting { margin: 4px 16px 0 76px; min-height: 16px; font: 400 12px/16px var(--font-text); letter-spacing: 0.4px; color: var(--on-surface-variant); display: flex; gap: 4px; align-items: flex-start; }
+        .supporting[data-invalid="true"] { color: var(--error); }
+        .supporting .material-symbols-rounded { font-size: 16px; }
+
+        .portion-chips { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 0 8px; }
+        .chip { min-height: 48px; display: flex; align-items: center; }
+        .chip-inner {
+            min-height: 32px;
+            padding: 6px 16px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--outline);
+            color: var(--on-surface);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .chip-inner .material-symbols-rounded { font-size: 18px; display: none; margin-left: -6px; }
+        .chip[aria-pressed="true"] .chip-inner { border-color: transparent; background: var(--primary-container); }
+        :root[data-theme="dark"] .chip[aria-pressed="true"] .chip-inner { color: #FFFFFF; }
+        .chip[aria-pressed="true"] .chip-inner .material-symbols-rounded { display: inline-block; }
+
+        .portion-total { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--outline-variant); }
+        .portion-kcal { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+        .portion-kcal b { font-family: var(--font-display); font-size: 32px; line-height: 40px; font-weight: 400; font-variant-numeric: tabular-nums; }
+        .portion-kcal span { font-family: var(--font-display); font-size: 18px; line-height: 24px; font-weight: 500; }
+        .portion-today { margin-top: 2px; font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+
+        .macros { margin-top: 16px; display: flex; flex-direction: column; gap: 14px; }
+        .macro { display: flex; flex-direction: column; gap: 8px; }
+        .macro[data-macro="carbs"]   { --macro-color: var(--macro-carbs); }
+        .macro[data-macro="fat"]     { --macro-color: var(--macro-fat); }
+        .macro[data-macro="protein"] { --macro-color: var(--macro-protein); }
+        .macro-label { font: 400 16px/24px var(--font-text); letter-spacing: 0.15px; font-variant-numeric: tabular-nums; }
+        .macro-track { display: block; height: 16px; border-radius: 8px; background: var(--macro-track); overflow: hidden; }
+        .macro-fill {
+            display: block;
+            height: 100%;
+            border-radius: 8px;
+            background: var(--macro-color);
+            transition: width 300ms cubic-bezier(.2,0,0,1);
+        }
+        .macro-fill[data-zero="false"] { min-width: 8px; }
+        .macro-caption { margin-top: 10px; font: 400 12px/16px var(--font-text); letter-spacing: 0.4px; color: var(--on-surface-variant); }
+
+        /* Sticky footer: Save always visible even with large text, body scrolls above it */
+        .sheet-footer {
+            flex-shrink: 0;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            gap: 8px;
+            padding: 12px 24px 32px;
+            border-top: 1px solid var(--outline-variant);
+            background: inherit;
+        }
+        .sheet-footer .filled-btn { flex: 1 1 160px; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+            pointer-events: none;
+        }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            .linear-progress::after { left: 0; width: 100%; opacity: .6; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-08 states required by spec §4.1 / §4.8 -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <button type="button" data-state-choice="error">Offline</button>
+        <button type="button" data-state-choice="success">Selected</button>
+    </div>
+
+    <div class="device-frame">
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <header class="search-header" id="searchHeader">
+            <h1 class="sr-only">Search food</h1>
+            <form class="search-bar" role="search" id="searchForm" autocomplete="off">
+                <button type="button" class="icon-btn" aria-label="Back to Home" data-route="home">
+                    <span class="material-symbols-rounded" aria-hidden="true">arrow_back</span>
+                </button>
+                <label>
+                    <span class="sr-only">Search food database</span>
+                    <input type="search" class="search-input" id="query" placeholder="What did you eat?"
+                           enterkeyhint="search" spellcheck="false" aria-controls="content">
+                </label>
+                <button type="button" class="icon-btn" id="clearBtn" aria-label="Clear search" hidden>
+                    <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                </button>
+                <span class="material-symbols-rounded lead-icon" id="searchIcon" aria-hidden="true">search</span>
+            </form>
+            <div class="linear-progress" id="progress" role="progressbar" aria-label="Searching food database" hidden></div>
+        </header>
+
+        <main class="scaffold-content" id="content" aria-live="polite" aria-busy="false"></main>
+
+        <!-- Portion bottom sheet (selected result) -->
+        <div class="scrim" id="scrim" hidden></div>
+        <section class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle" hidden>
+            <div class="sheet-handle" aria-hidden="true"></div>
+            <div class="sheet-body">
+                <div class="sheet-head">
+                    <div class="sheet-head-text">
+                        <h2 class="sheet-title" id="sheetTitle" tabindex="-1"></h2>
+                        <p class="sheet-meta" id="sheetMeta"></p>
+                    </div>
+                    <button type="button" class="icon-btn" id="sheetClose" aria-label="Close portion and return to results">
+                        <span class="material-symbols-rounded" aria-hidden="true">close</span>
+                    </button>
+                </div>
+
+                <p class="field-label" id="gramsLabel">Portion</p>
+                <div class="grams-row">
+                    <button type="button" class="tonal-icon-btn" id="minusBtn" aria-label="Decrease portion by 10 grams">
+                        <span class="material-symbols-rounded" aria-hidden="true">remove</span>
+                    </button>
+                    <div class="text-field" id="gramsField">
+                        <input type="text" id="grams" inputmode="decimal" autocomplete="off"
+                               aria-labelledby="gramsLabel" aria-describedby="gramsHelp">
+                        <span class="suffix" aria-hidden="true">g</span>
+                    </div>
+                    <button type="button" class="tonal-icon-btn" id="plusBtn" aria-label="Increase portion by 10 grams">
+                        <span class="material-symbols-rounded" aria-hidden="true">add</span>
+                    </button>
+                </div>
+                <p class="supporting" id="gramsHelp"></p>
+                <div class="portion-chips" id="portionChips" role="group" aria-label="Portion presets"></div>
+
+                <div class="portion-total" id="portionTotal"></div>
+            </div>
+            <div class="sheet-footer">
+                <button type="button" class="text-btn" id="sheetCancel">Cancel</button>
+                <button type="button" class="filled-btn" id="saveBtn" data-route="savePrompt">
+                    <span class="material-symbols-rounded" aria-hidden="true">check</span> Save to log
+                </button>
+            </div>
+        </section>
+
+        <div class="system-nav-pill" aria-hidden="true"></div>
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data ----------------
+         * Each food stores nutrition for a reference amount `g` (100 g or one serving).
+         * Values scale linearly with grams. Recent foods reuse the exact portions logged
+         * on Today / Yesterday / Tue Sep 22 so totals match S-02, S-12 and S-14.
+         */
+        const GOALS = { kcal: 2300, carbs: 220, fat: 70, protein: 150 };
+        const TODAY_EATEN = { kcal: 770, c: 68, f: 33, p: 48 }; // Breakfast 320 + Lunch 450
+        const FOODS = [
+            { id: 'salad',    name: 'Grilled chicken salad',     icon: 'eco',             g: 350, serving: 'last time', kcal: 450, c: 14, f: 26, p: 38, recent: 'Lunch · Today 11:02' },
+            { id: 'oatmeal',  name: 'Oatmeal & berries',         icon: 'breakfast_dining', g: 280, serving: 'last time', kcal: 320, c: 54, f: 7,  p: 10, recent: 'Breakfast · Today 07:12' },
+            { id: 'soup',     name: 'Chicken soup',              icon: 'soup_kitchen',    g: 400, serving: 'last time', kcal: 120, c: 9,  f: 4,  p: 11, recent: 'Dinner · Yesterday 19:30' },
+            { id: 'buckwheat',name: 'Buckwheat with mushrooms',  icon: 'rice_bowl',       g: 300, serving: 'last time', kcal: 410, c: 68, f: 9,  p: 14, recent: 'Lunch · Yesterday 13:15' },
+            { id: 'kefir',    name: 'Kefir 1%',                  icon: 'local_drink',     g: 250, serving: '1 glass',   kcal: 100, c: 10, f: 2.5,p: 8.5, frequent: true },
+            { id: 'apple',    name: 'Apple',                     icon: 'nutrition',       g: 180, serving: '1 medium',  kcal: 95,  c: 25, f: 0,  p: 0,  frequent: true },
+            { id: 'nuts',     name: 'Nut mix',                   icon: 'grain',           g: 45,  serving: '1 handful', kcal: 260, c: 10, f: 22, p: 8,  frequent: true },
+            { id: 'bigtasty', name: "Big Tasty | McDonald's",    icon: 'lunch_dining',    g: 500, serving: '1 burger',  kcal: 950, c: 60, f: 58, p: 45, frequent: true },
+            { id: 'yogurt',   name: 'Greek yogurt & granola',    icon: 'icecream',        g: 200, serving: '1 bowl',    kcal: 380, c: 48, f: 11, p: 20 },
+            { id: 'salmonrice',name:'Roast salmon with rice',    icon: 'set_meal',        g: 380, serving: '1 plate',   kcal: 760, c: 70, f: 30, p: 46 },
+            { id: 'bolognese',name: 'Pasta bolognese',           icon: 'ramen_dining',    g: 350, serving: '1 plate',   kcal: 640, c: 82, f: 20, p: 32 },
+            { id: 'breast',   name: 'Chicken breast, grilled',   icon: 'kebab_dining',    g: 100, kcal: 165, c: 0,   f: 3.6, p: 31 },
+            { id: 'thigh',    name: 'Chicken thigh, roasted',    icon: 'kebab_dining',    g: 100, kcal: 209, c: 0,   f: 10.9,p: 26 },
+            { id: 'caesar',   name: 'Chicken Caesar salad',      icon: 'eco',             g: 100, kcal: 150, c: 7,   f: 10,  p: 9 },
+            { id: 'chickpeas',name: 'Chickpeas, boiled',         icon: 'grain',           g: 100, kcal: 164, c: 27,  f: 2.6, p: 8.9 },
+            { id: 'nuggets',  name: 'Chicken nuggets',           icon: 'lunch_dining',    g: 100, kcal: 296, c: 15,  f: 19,  p: 15 },
+            { id: 'buckplain',name: 'Buckwheat, boiled',         icon: 'rice_bowl',       g: 100, kcal: 92,  c: 19.9,f: 0.6, p: 3.4 },
+            { id: 'rice',     name: 'Brown rice, cooked',        icon: 'rice_bowl',       g: 100, kcal: 123, c: 25.6,f: 1,   p: 2.7 },
+            { id: 'oats',     name: 'Oatmeal, cooked with water',icon: 'breakfast_dining', g: 100, kcal: 71,  c: 12,  f: 1.5, p: 2.5 },
+            { id: 'blueberry',name: 'Blueberries',               icon: 'nutrition',       g: 100, kcal: 57,  c: 14.5,f: 0.3, p: 0.7 },
+            { id: 'banana',   name: 'Banana',                    icon: 'nutrition',       g: 118, serving: '1 medium',  kcal: 105, c: 27, f: 0.4, p: 1.3 },
+            { id: 'egg',      name: 'Egg, boiled',               icon: 'egg',             g: 50,  serving: '1 large',   kcal: 78,  c: 0.6, f: 5.3, p: 6.3 },
+            { id: 'salmon',   name: 'Salmon fillet, baked',      icon: 'set_meal',        g: 100, kcal: 206, c: 0,   f: 12,  p: 22 },
+            { id: 'cottage',  name: 'Cottage cheese 5%',         icon: 'icecream',        g: 100, kcal: 121, c: 3,   f: 5,   p: 17 },
+            { id: 'bread',    name: 'Whole wheat bread',         icon: 'bakery_dining',   g: 32,  serving: '1 slice',   kcal: 80,  c: 14, f: 1,  p: 4 },
+            { id: 'borscht',  name: 'Borscht with sour cream',   icon: 'soup_kitchen',    g: 100, kcal: 57,  c: 6.5, f: 2.6, p: 2 },
+            { id: 'mushsoup', name: 'Mushroom soup',             icon: 'soup_kitchen',    g: 100, kcal: 39,  c: 4.2, f: 1.8, p: 1.4 }
+        ];
+        const byId = Object.fromEntries(FOODS.map((f) => [f.id, f]));
+        const DEBOUNCE_MS = 300;
+        const LATENCY_MS = 450; // simulated food-database lookup
+        const MAX_GRAMS = 5000;
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => Math.round(n).toLocaleString('en-US');
+        const fmtG = (n) => (n < 10 ? String(Math.round(n * 10) / 10) : fmt(n));
+        const esc = (s) => s.replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+        const norm = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+        function announce(msg) { $('announcer').textContent = ''; setTimeout(() => { $('announcer').textContent = msg; }, 50); }
+        let timers = [];
+        function later(fn, ms) { const t = setTimeout(fn, ms); timers.push(t); return t; }
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+
+        function scaled(food, grams) {
+            const k = grams / food.g;
+            return { kcal: food.kcal * k, c: food.c * k, f: food.f * k, p: food.p * k };
+        }
+        function perLabel(food) {
+            if (food.g === 100 && !food.serving) return 'Per 100 g';
+            if (food.serving === 'last time') return `Last portion · ${food.g} g`;
+            return `Per ${food.serving} · ${food.g} g`;
+        }
+
+        /* Search: substring match on name, ranked prefix > word start > anywhere */
+        function search(q) {
+            const nq = norm(q.trim());
+            return FOODS
+                .map((f) => {
+                    const n = norm(f.name);
+                    const at = n.indexOf(nq);
+                    if (at < 0) return null;
+                    const rank = at === 0 ? 0 : /[\s,&|(-]/.test(n[at - 1]) ? 1 : 2;
+                    return { f, at, rank };
+                })
+                .filter(Boolean)
+                .sort((a, b) => a.rank - b.rank || (b.f.recent ? 1 : 0) - (a.f.recent ? 1 : 0) || a.f.name.localeCompare(b.f.name));
+        }
+        function highlight(name, at, len) {
+            if (at < 0 || !len) return esc(name);
+            return esc(name.slice(0, at)) + '<mark>' + esc(name.slice(at, at + len)) + '</mark>' + esc(name.slice(at + len));
+        }
+
+        /* ---------------- State ---------------- */
+        let state = 'default';
+        let offline = false;       // food database unavailable (Error state)
+        let query = '';
+        let debounceTimer = null;
+        let requestTimer = null;
+        let selected = null;       // { food, grams (string as typed) }
+        let returnFocus = null;
+
+        /* ---------------- Render: content ---------------- */
+        function resultRow(food, at, len) {
+            const meta = food.recent && !len ? `${food.recent} · ${food.g} g` : perLabel(food);
+            return `<li><button type="button" class="result" data-food="${food.id}"
+                    aria-label="${esc(food.name)}. ${fmt(food.kcal)} kilocalories ${esc(perLabel(food))}. Carbs ${fmtG(food.c)}, fat ${fmtG(food.f)}, protein ${fmtG(food.p)} grams.${food.recent ? ' Logged ' + esc(food.recent) + '.' : ''} Choose portion">
+                <span class="result-thumb" aria-hidden="true"><span class="material-symbols-rounded">${food.recent && !len ? 'history' : food.icon}</span></span>
+                <span class="result-info" aria-hidden="true">
+                    <span class="result-name">${highlight(food.name, at, len)}</span>
+                    <span class="result-meta">${esc(meta)}</span>
+                    <span class="result-macros macro-dots"><span><i data-m="carbs"></i>Carbs ${fmtG(food.c)}</span><span><i data-m="fat"></i>Fat ${fmtG(food.f)}</span><span><i data-m="protein"></i>Protein ${fmtG(food.p)} g</span></span>
+                </span>
+                <span class="result-kcal" aria-hidden="true"><b>${fmt(food.kcal)}<small>kcal</small></b></span>
+            </button></li>`;
+        }
+
+        const quickAddRow = `<button type="button" class="quick-add-row" data-route="quickAdd">
+                <span class="material-symbols-rounded" aria-hidden="true">bolt</span>
+                <span class="qa-text">
+                    <span class="qa-title">Quick add</span>
+                    <span class="qa-sub">Know the calories? Enter kcal and macros directly.</span>
+                </span>
+                <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+            </button>`;
+
+        function idleHtml() {
+            const recent = FOODS.filter((f) => f.recent);
+            const frequent = FOODS.filter((f) => f.frequent);
+            return quickAddRow +
+                `<div class="section-header"><h2 class="section-title">Recent</h2><span class="section-meta">Your last portion</span></div>
+                <ul class="results" aria-label="Recent foods">${recent.map((f) => resultRow(f, -1, 0)).join('')}</ul>
+                <div class="section-header"><h2 class="section-title">Frequent</h2><span class="section-meta">Per serving</span></div>
+                <ul class="results" aria-label="Frequent foods">${frequent.map((f) => resultRow(f, -1, 0)).join('')}</ul>`;
+        }
+
+        function skeletonHtml() {
+            return `<p class="results-summary">Searching for <strong>“${esc(query.trim())}”</strong>…</p>
+                <div class="results" aria-hidden="true">${[0, 1, 2, 3, 4].map((i) => `<div class="sk-row">
+                    <span class="sk" style="width:40px;height:40px;border-radius:12px"></span>
+                    <span style="display:flex;flex-direction:column;gap:8px">
+                        <span class="sk" style="width:${[72, 58, 80, 64, 50][i]}%;height:16px"></span>
+                        <span class="sk" style="width:88%;height:12px"></span>
+                    </span>
+                    <span style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
+                        <span class="sk" style="width:48px;height:22px"></span>
+                        <span class="sk" style="width:56px;height:12px"></span>
+                    </span>
+                </div>`).join('')}</div>`;
+        }
+
+        function resultsHtml(matches) {
+            const q = query.trim();
+            return `<p class="results-summary"><strong>${matches.length}</strong> ${matches.length === 1 ? 'result' : 'results'} for <strong>“${esc(q)}”</strong></p>
+                <ul class="results" aria-label="Search results">${matches.map((m) => resultRow(m.f, m.at, q.length)).join('')}</ul>
+                <div class="list-footer">
+                    <p>Can't find your food?</p>
+                    <button type="button" class="outlined-btn" data-route="quickAdd">
+                        <span class="material-symbols-rounded" aria-hidden="true">bolt</span> Quick add calories
+                    </button>
+                </div>`;
+        }
+
+        function emptyHtml() {
+            return `<div class="message" data-kind="empty" role="status">
+                <span class="message-icon" aria-hidden="true"><span class="material-symbols-rounded">search_off</span></span>
+                <h2 class="message-title">No results for “${esc(query.trim())}”</h2>
+                <p class="message-text">Try a shorter or more general name, like “chicken” or “soup”. If you know the calories, add them directly.</p>
+                <div class="message-actions">
+                    <button type="button" class="filled-btn" data-route="quickAdd">
+                        <span class="material-symbols-rounded" aria-hidden="true">bolt</span> Quick add
+                    </button>
+                    <button type="button" class="text-btn" data-action="clear">Clear search</button>
+                </div>
+            </div>`;
+        }
+
+        function errorHtml() {
+            const recent = FOODS.filter((f) => f.recent);
+            return `<div class="message" data-kind="error" role="alert">
+                <span class="message-icon" aria-hidden="true"><span class="material-symbols-rounded">cloud_off</span></span>
+                <h2 class="message-title">Food database unavailable</h2>
+                <p class="message-text">Couldn't search for “${esc(query.trim())}”. Check your connection and try again, or log the calories with Quick add.</p>
+                <div class="message-actions">
+                    <button type="button" class="filled-btn" data-action="retry">
+                        <span class="material-symbols-rounded" aria-hidden="true">refresh</span> Retry
+                    </button>
+                    <button type="button" class="outlined-btn" data-route="quickAdd">
+                        <span class="material-symbols-rounded" aria-hidden="true">bolt</span> Quick add
+                    </button>
+                </div>
+            </div>
+            <div class="section-header"><h2 class="section-title">Recent</h2><span class="section-meta">Saved on this device</span></div>
+            <ul class="results" aria-label="Recent foods">${recent.map((f) => resultRow(f, -1, 0)).join('')}</ul>`;
+        }
+
+        function setBusy(busy) {
+            $('progress').hidden = !busy;
+            $('content').setAttribute('aria-busy', String(busy));
+        }
+
+        function syncSearchChrome() {
+            const has = query.length > 0;
+            $('clearBtn').hidden = !has;
+            $('searchIcon').hidden = has;
+        }
+
+        // view: 'idle' | 'loading' | 'results' | 'empty' | 'error'
+        function show(view) {
+            const c = $('content');
+            setBusy(view === 'loading');
+            if (view === 'idle') c.innerHTML = idleHtml();
+            else if (view === 'loading') c.innerHTML = skeletonHtml();
+            else if (view === 'error') c.innerHTML = errorHtml();
+            else {
+                const matches = search(query);
+                c.innerHTML = matches.length ? resultsHtml(matches) : emptyHtml();
+                return matches.length;
+            }
+            return null;
+        }
+
+        /* Debounced lookup: idle when blank, else placeholders -> results/empty/error */
+        function runSearch(immediate) {
+            clearTimeout(debounceTimer);
+            clearTimeout(requestTimer);
+            syncSearchChrome();
+            if (!query.trim()) { show('idle'); return; }
+            const start = () => {
+                show('loading');
+                requestTimer = setTimeout(() => {
+                    if (offline) { show('error'); announce('Food database unavailable. Retry or use Quick add.'); return; }
+                    const n = show('results');
+                    announce(n ? `${n} ${n === 1 ? 'result' : 'results'} for ${query.trim()}` : `No results for ${query.trim()}`);
+                }, LATENCY_MS);
+            };
+            if (immediate) start(); else debounceTimer = setTimeout(start, DEBOUNCE_MS);
+        }
+
+        /* ---------------- Portion sheet ---------------- */
+        function parseGrams(raw) {
+            const s = String(raw).trim().replace(',', '.');
+            if (s === '') return { ok: false, msg: 'Enter the portion in grams' };
+            if (/^-/.test(s)) return { ok: false, msg: "Grams can't be negative" };
+            if (!/^\d+(\.\d+)?$/.test(s)) return { ok: false, msg: 'Use numbers only, for example 150' };
+            const n = parseFloat(s);
+            if (n === 0) return { ok: false, msg: 'Enter a portion above 0 g' };
+            if (n > MAX_GRAMS) return { ok: false, msg: `Enter ${fmt(MAX_GRAMS)} g or less` };
+            return { ok: true, value: n };
+        }
+
+        function macroRowHtml(key, name, value, goal) {
+            const pct = Math.round(value / goal * 100);
+            return `<div class="macro" data-macro="${key}" role="img" aria-label="${name}: ${fmtG(value)} of ${goal} grams daily goal, ${pct}%">
+                <span class="macro-label" aria-hidden="true">${name} · ${pct}% · ${fmtG(value)} of ${goal} g</span>
+                <span class="macro-track" aria-hidden="true"><span class="macro-fill" data-zero="${value === 0}" style="width:${Math.min(pct, 100)}%"></span></span>
+            </div>`;
+        }
+
+        function renderSheet() {
+            if (!selected) return;
+            const food = selected.food;
+            const v = parseGrams(selected.grams);
+            const field = $('gramsField'), help = $('gramsHelp'), input = $('grams');
+            field.dataset.invalid = String(!v.ok);
+            input.setAttribute('aria-invalid', String(!v.ok));
+            help.dataset.invalid = String(!v.ok);
+            help.innerHTML = v.ok
+                ? 'Grams of food as eaten'
+                : `<span class="material-symbols-rounded" aria-hidden="true">error</span><span>${v.msg}</span>`;
+            const grams = v.ok ? v.value : 0;
+            $('minusBtn').disabled = !v.ok || grams <= 10;
+            $('plusBtn').disabled = v.ok && grams + 10 > MAX_GRAMS;
+            $('saveBtn').disabled = !v.ok;
+
+            document.querySelectorAll('#portionChips [data-grams]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(v.ok && Number(b.dataset.grams) === grams)));
+
+            if (!v.ok) {
+                $('portionTotal').innerHTML = `<div class="portion-kcal"><b>—</b><span>kcal</span></div>
+                    <p class="portion-today">Enter a valid portion to see calories and macros.</p>`;
+                return;
+            }
+            const n = scaled(food, grams);
+            $('portionTotal').innerHTML = `
+                <div class="portion-kcal" aria-label="${fmt(n.kcal)} kilocalories for ${fmtG(grams)} grams"><b aria-hidden="true">${fmt(n.kcal)}</b><span aria-hidden="true">kcal for ${fmtG(grams)} g</span></div>
+                <p class="portion-today">Today after saving: ${fmt(TODAY_EATEN.kcal + n.kcal)} of ${fmt(GOALS.kcal)} kcal</p>
+                <div class="macros">
+                    ${macroRowHtml('carbs', 'Carbs', n.c, GOALS.carbs)}
+                    ${macroRowHtml('fat', 'Fat', n.f, GOALS.fat)}
+                    ${macroRowHtml('protein', 'Protein', n.p, GOALS.protein)}
+                </div>
+                <p class="macro-caption">Percent of your daily macro goals for this portion.</p>`;
+        }
+
+        function openSheet(food, grams, opts) {
+            opts = opts || {};
+            selected = { food, grams: String(grams) };
+            returnFocus = opts.returnFocus || null;
+            $('sheetTitle').textContent = food.name;
+            const per100 = scaled(food, 100);
+            $('sheetMeta').textContent = `${fmt(per100.kcal)} kcal per 100 g · Logged now, today 11:17`;
+            $('grams').value = String(grams);
+
+            const presets = [{ label: '100 g', g: 100 }];
+            if (food.serving) presets.push({ label: food.serving === 'last time' ? `Last time · ${food.g} g` : `${food.serving[0].toUpperCase()}${food.serving.slice(1)} · ${food.g} g`, g: food.g });
+            if (!food.serving) presets.push({ label: '150 g', g: 150 }, { label: '200 g', g: 200 });
+            $('portionChips').innerHTML = presets.map((p) => `<button type="button" class="chip" data-grams="${p.g}" aria-pressed="false">
+                <span class="chip-inner"><span class="material-symbols-rounded" aria-hidden="true">check</span>${esc(p.label)}</span></button>`).join('');
+
+            renderSheet();
+            $('scrim').hidden = false;
+            $('sheet').hidden = false;
+            $('searchHeader').inert = true;
+            $('content').inert = true;
+            requestAnimationFrame(() => { $('scrim').classList.add('show'); $('sheet').classList.add('show'); });
+            if (opts.focus !== false) $('sheetTitle').focus({ preventScroll: true });
+            announce(`${food.name} selected. Choose portion, then save.`);
+        }
+
+        function closeSheet() {
+            if (!selected) return;
+            selected = null;
+            $('scrim').classList.remove('show');
+            $('sheet').classList.remove('show');
+            $('scrim').hidden = true;
+            $('sheet').hidden = true;
+            $('searchHeader').inert = false;
+            $('content').inert = false;
+            if (returnFocus && document.contains(returnFocus)) returnFocus.focus();
+            else if (returnFocus) $('query').focus();
+            returnFocus = null;
+        }
+
+        /* ---------------- Events ---------------- */
+        $('query').addEventListener('input', (e) => { query = e.target.value; runSearch(false); });
+        $('searchForm').addEventListener('submit', (e) => { e.preventDefault(); runSearch(true); });
+        $('clearBtn').addEventListener('click', () => { query = ''; $('query').value = ''; runSearch(true); $('query').focus(); });
+
+        $('content').addEventListener('click', (e) => {
+            const row = e.target.closest('[data-food]');
+            if (row) {
+                const food = byId[row.dataset.food];
+                openSheet(food, food.g === 100 && !food.serving ? 100 : food.g, { returnFocus: row });
+                return;
+            }
+            const action = e.target.closest('[data-action]');
+            if (!action) return;
+            if (action.dataset.action === 'clear') { query = ''; $('query').value = ''; runSearch(true); $('query').focus(); }
+            if (action.dataset.action === 'retry') { offline = false; announce('Retrying search'); runSearch(true); }
+        });
+
+        $('grams').addEventListener('input', (e) => { if (selected) { selected.grams = e.target.value; renderSheet(); } });
+        function step(delta) {
+            const v = parseGrams(selected.grams);
+            const base = v.ok ? v.value : 0;
+            const next = Math.max(0, Math.min(MAX_GRAMS, Math.round(base + delta)));
+            selected.grams = String(next);
+            $('grams').value = selected.grams;
+            renderSheet();
+            announce(`${fmtG(next)} grams`);
+        }
+        $('minusBtn').addEventListener('click', () => step(-10));
+        $('plusBtn').addEventListener('click', () => step(10));
+        $('portionChips').addEventListener('click', (e) => {
+            const chip = e.target.closest('[data-grams]');
+            if (!chip) return;
+            selected.grams = chip.dataset.grams;
+            $('grams').value = selected.grams;
+            renderSheet();
+            announce(`${chip.dataset.grams} grams`);
+        });
+        $('sheetClose').addEventListener('click', closeSheet);
+        $('sheetCancel').addEventListener('click', closeSheet);
+        $('scrim').addEventListener('click', closeSheet);
+
+        // Bottom sheet: Escape closes, Tab stays inside while open
+        document.addEventListener('keydown', (e) => {
+            if (!selected) return;
+            if (e.key === 'Escape') { e.preventDefault(); closeSheet(); return; }
+            if (e.key !== 'Tab') return;
+            const items = [...$('sheet').querySelectorAll('button:not(:disabled), input, [tabindex="0"]')].filter((el) => el.offsetParent !== null);
+            if (!items.length) return;
+            const first = items[0], last = items[items.length - 1];
+            if (e.shiftKey && (document.activeElement === first || document.activeElement === $('sheetTitle'))) { e.preventDefault(); last.focus(); }
+            else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        });
+
+        /* ---------------- Prototype states ---------------- */
+        const STATES = ['default', 'loading', 'empty', 'error', 'success'];
+        function render(next) {
+            state = STATES.includes(next) ? next : 'default';
+            clearTimers();
+            clearTimeout(debounceTimer);
+            clearTimeout(requestTimer);
+            if (selected) { returnFocus = null; closeSheet(); }
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            offline = state === 'error';
+            query = { default: '', loading: 'chicken', empty: 'dragon fruit smoothie', error: 'chicken', success: 'chicken' }[state];
+            $('query').value = query;
+            syncSearchChrome();
+
+            if (state === 'default') show('idle');
+            else if (state === 'loading') show('loading'); // held for review; typing resumes live search
+            else if (state === 'error') show('error');
+            else show('results');
+            if (state === 'success') openSheet(byId.breast, 150, { focus: false });
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state'); else url.searchParams.set('state', state);
+            try { history.replaceState(null, '', url); } catch (e) { /* file:// */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(location.search).get('state') || 'default');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

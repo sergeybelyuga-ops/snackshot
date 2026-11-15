@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-05 | Recognition Progress - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens (light/dark color roles, chart colors, typography) -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-05 Recognition progress — implements UX spec §4.6 and §5.4:
+         * Scaffold -> image preview -> validation status row -> LinearProgressIndicator
+         * -> provider progress text -> Cancel (OutlinedButton, keeps draft) -> retry/alternative action row.
+         * Color tokens come from prototype-theme.css; this file only adds layout.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        button:disabled { cursor: default; }
+        :focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label { color: var(--on-surface-variant); font: 500 12px/16px var(--font-text); margin-right: 4px; }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Pixel 9 Pro device frame: 412x892 ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px; height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .top-app-bar h1 {
+            flex: 1;
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            flex-shrink: 0;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface-variant);
+        }
+        .icon-btn:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+
+        /* ---------- Content ---------- */
+        .scaffold-content {
+            flex: 1;
+            min-height: 0;
+            overflow-y: auto;
+            padding: 4px 16px 32px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        /* Image preview: the processed photo stays visible in every state (draft is never discarded) */
+        .preview {
+            position: relative;
+            flex-shrink: 0;
+            width: 100%;
+            aspect-ratio: 4 / 3;
+            border-radius: 28px;
+            overflow: hidden;
+            background: var(--surface-container-high);
+        }
+        .preview-img {
+            position: absolute;
+            inset: 0;
+            background-image: url('https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=800&q=80');
+            background-size: cover;
+            background-position: center;
+            transition: filter 200ms ease;
+        }
+        /* Empty state: simulate an unusable (too dark) capture */
+        .preview[data-quality="dark"] .preview-img { filter: brightness(0.18) saturate(0.4); }
+        .preview-chip {
+            position: absolute;
+            left: 12px;
+            bottom: 12px;
+            min-height: 32px;
+            padding: 6px 12px 6px 8px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgb(18 19 20 / 72%);
+            color: #F1F3F4;
+            font: 500 12px/16px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .preview-chip .material-symbols-rounded { font-size: 18px; }
+
+        /* Grouped status surface: validation row + provider row */
+        .status-group {
+            flex-shrink: 0;
+            border-radius: 20px;
+            background: var(--surface-container);
+            border: 1px solid var(--outline-variant);
+            overflow: hidden;
+        }
+        .status-row {
+            display: grid;
+            grid-template-columns: 24px 1fr;
+            column-gap: 16px;
+            align-items: start;
+            padding: 16px;
+        }
+        .status-row + .status-row { border-top: 1px solid var(--outline-variant); }
+        .status-icon {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--on-surface-variant);
+        }
+        .status-icon .material-symbols-rounded { font-size: 22px; }
+        .status-row[data-tone="ok"] .status-icon { color: var(--tertiary); }
+        .status-row[data-tone="error"] .status-icon { color: var(--error); }
+        .status-row[data-tone="busy"] .status-icon { color: var(--primary); }
+        .status-row[data-tone="idle"] { opacity: .72; }
+        .status-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+        .status-title {
+            font: 500 16px/24px var(--font-text);
+            letter-spacing: 0.15px;
+            overflow-wrap: anywhere;
+        }
+        .status-row[data-tone="error"] .status-title { color: var(--error); }
+        .status-meta {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .status-meta strong { color: var(--on-surface); font-weight: 500; }
+        .elapsed { font-variant-numeric: tabular-nums; }
+
+        /* Small M3 circular indicator for "in progress" rows */
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            border: 2.5px solid color-mix(in srgb, var(--primary) 22%, transparent);
+            border-top-color: var(--primary);
+            animation: spin 900ms linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* M3 LinearProgressIndicator (indeterminate while waiting for the provider; no fake percentage) */
+        .linear-progress {
+            position: relative;
+            height: 4px;
+            margin: 12px 0 10px;
+            border-radius: 2px;
+            overflow: hidden;
+            background: color-mix(in srgb, var(--primary) 20%, transparent);
+        }
+        .linear-progress-bar {
+            position: absolute;
+            top: 0; bottom: 0; left: 0;
+            border-radius: 2px;
+            background: var(--primary);
+        }
+        .linear-progress[data-mode="indeterminate"] .linear-progress-bar {
+            width: 40%;
+            animation: indeterminate 1.6s cubic-bezier(.4,0,.2,1) infinite;
+        }
+        .linear-progress[data-mode="done"] .linear-progress-bar { width: 100%; }
+        .linear-progress[data-mode="waiting"] .linear-progress-bar { width: 0; }
+        @keyframes indeterminate {
+            0%   { transform: translateX(-100%); }
+            100% { transform: translateX(250%); }
+        }
+
+        /* ---------- Actions ---------- */
+        .actions {
+            margin-top: auto;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            padding-top: 8px;
+        }
+        .action-row { display: flex; gap: 12px; }
+        .action-row > .btn { flex: 1; }
+        .btn {
+            min-height: 48px;
+            padding: 0 20px;
+            border-radius: 24px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            text-align: center;
+            transition: background-color 150ms ease, box-shadow 150ms ease;
+        }
+        .btn .material-symbols-rounded { font-size: 18px; }
+        .btn-filled { background: var(--primary); color: var(--on-primary); }
+        .btn-filled:hover:not(:disabled) { box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+        .btn-tonal { background: var(--primary-container); color: var(--on-surface); }
+        .btn-tonal:hover:not(:disabled) { background: color-mix(in srgb, var(--on-surface) 8%, var(--primary-container)); }
+        .btn-outlined { border: 1px solid var(--outline); color: var(--primary); }
+        .btn-outlined:hover:not(:disabled) { background: color-mix(in srgb, var(--primary) 8%, transparent); }
+        .btn:disabled {
+            background: color-mix(in srgb, var(--on-surface) 12%, transparent);
+            color: color-mix(in srgb, var(--on-surface) 50%, transparent);
+            border-color: transparent;
+            box-shadow: none;
+        }
+        .action-note {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font: 400 12px/16px var(--font-text);
+            letter-spacing: 0.4px;
+            color: var(--on-surface-variant);
+            text-align: center;
+        }
+        .action-note .material-symbols-rounded { font-size: 16px; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+            /* No sweeping motion: indeterminate work is shown as a static bar; the text carries progress */
+            .linear-progress[data-mode="indeterminate"] .linear-progress-bar {
+                animation: none !important;
+                width: 100%;
+                opacity: .55;
+            }
+            .spinner { animation: none !important; border-color: var(--primary); }
+        }
+    </style>
+</head>
+<body data-screen="recognition">
+
+    <!-- Prototype-only control: switch between the S-05 states required by spec §4.1 / §4.6 / §5.4 -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="slow">Slow</button>
+        <button type="button" data-state-choice="error">Error</button>
+        <button type="button" data-state-choice="retry-failed">Retry failed</button>
+        <button type="button" data-state-choice="quota">Quota</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <button type="button" data-state-choice="success">Success</button>
+    </div>
+
+    <!-- Pixel 9 UI Board -->
+    <div class="device-frame">
+        <!-- Status Bar -->
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" id="netIcon" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <!-- Top App Bar -->
+        <header class="top-app-bar">
+            <button type="button" class="icon-btn" id="closeBtn" aria-label="Cancel and keep draft" data-route="camera">
+                <span class="material-symbols-rounded" aria-hidden="true">close</span>
+            </button>
+            <h1 id="screenTitle">Recognizing meal</h1>
+        </header>
+
+        <!-- S-05 Scaffold Content -->
+        <main class="scaffold-content">
+            <!-- Image preview -->
+            <div class="preview" id="preview" role="img" aria-label="Photo of your meal">
+                <div class="preview-img"></div>
+                <span class="preview-chip" id="previewChip" hidden aria-hidden="true">
+                    <span class="material-symbols-rounded" id="previewChipIcon">brightness_low</span>
+                    <span id="previewChipText">Too dark</span>
+                </span>
+            </div>
+
+            <!-- Validation status row + provider progress -->
+            <section class="status-group" aria-labelledby="screenTitle">
+                <div class="status-row" id="validationRow" data-tone="busy">
+                    <span class="status-icon" id="validationIcon" aria-hidden="true"></span>
+                    <span class="status-text">
+                        <span class="status-title" id="validationTitle">Checking image</span>
+                        <span class="status-meta" id="validationMeta">Sharpness, lighting and format</span>
+                    </span>
+                </div>
+                <div class="status-row" id="providerRow" data-tone="idle">
+                    <span class="status-icon" id="providerIcon" aria-hidden="true"></span>
+                    <span class="status-text">
+                        <span class="status-title" id="providerTitle">LogMeal recognition</span>
+                        <span class="linear-progress" id="progress" data-mode="waiting" role="progressbar"
+                              aria-label="Recognition progress" aria-valuemin="0" aria-valuemax="100">
+                            <span class="linear-progress-bar"></span>
+                        </span>
+                        <span class="status-meta" id="providerMeta">Starts after the image check</span>
+                    </span>
+                </div>
+            </section>
+
+            <!-- Cancel (keeps draft) -> retry / alternative actions -->
+            <div class="actions">
+                <button type="button" class="btn btn-outlined" id="cancelBtn" data-route="camera">Cancel and keep draft</button>
+                <div class="action-row" id="actionRow"></div>
+                <p class="action-note" id="actionNote" hidden>
+                    <span class="material-symbols-rounded" aria-hidden="true">draft</span>
+                    <span id="actionNoteText">Photo kept as a draft on this device</span>
+                </p>
+            </div>
+        </main>
+
+        <div class="system-nav-pill" aria-hidden="true"></div>
+
+        <!-- Screen-reader announcements: phase changes, errors, completion -->
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+        <div class="sr-only" aria-live="assertive" id="alertAnnouncer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data ---------------- */
+        const MEAL_NAME = 'Grilled chicken salad';       // the S-15 meal review result (shared demo meal)
+        const IMAGE_META = '1000 px · JPG · 412 KB';      // processed image (spec §4.5: max side ~1000 px, < 1 MB)
+        // Loading timeline (ms). p98 target is < 3 s (spec §5.4); the flow completes within it.
+        const T = { validated: 900, recognized: 2600, route: 3400, retryFails: 1800 };
+        const SLOW_START_S = 3.4;                          // slow state begins just past the 3 s window
+
+        const CAUSES = {
+            network: {
+                title: 'No internet connection',
+                meta: 'Recognition needs a connection to LogMeal. Airplane mode may be on.'
+            },
+            quota: {
+                title: 'Recognition limit reached',
+                meta: 'LogMeal isn’t accepting more requests right now (provider quota). Retrying won’t help yet.'
+            }
+        };
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        function announce(msg, urgent) {
+            const el = $(urgent ? 'alertAnnouncer' : 'announcer');
+            el.textContent = '';
+            window.setTimeout(() => { el.textContent = msg; }, 50);
+        }
+
+        let state = 'loading';
+        let timers = [];
+        function clearTimers() { timers.forEach((t) => { clearTimeout(t); clearInterval(t); }); timers = []; }
+        function later(fn, ms) { timers.push(window.setTimeout(fn, ms)); }
+        function every(fn, ms) { timers.push(window.setInterval(fn, ms)); }
+
+        const ICON = {
+            ok: '<span class="material-symbols-rounded icon-filled">check_circle</span>',
+            error: '<span class="material-symbols-rounded icon-filled">error</span>',
+            busy: '<span class="spinner"></span>',
+            idle: '<span class="material-symbols-rounded">schedule</span>',
+            pending: '<span class="material-symbols-rounded">hourglass_top</span>',
+            off: '<span class="material-symbols-rounded">cloud_off</span>'
+        };
+
+        function setRow(prefix, tone, icon, title, meta) {
+            const row = $(prefix + 'Row');
+            row.dataset.tone = tone;
+            $(prefix + 'Icon').innerHTML = ICON[icon];
+            $(prefix + 'Title').textContent = title;
+            $(prefix + 'Meta').innerHTML = meta;
+        }
+
+        // mode: waiting | indeterminate | done | hidden
+        function setProgress(mode, label) {
+            const p = $('progress');
+            p.hidden = mode === 'hidden';
+            p.dataset.mode = mode;
+            p.setAttribute('aria-valuetext', label || '');
+            if (mode === 'done') p.setAttribute('aria-valuenow', '100');
+            else p.removeAttribute('aria-valuenow');
+        }
+
+        function validated() {
+            setRow('validation', 'ok', 'ok', 'Image checked', `Sharp and well lit · ${IMAGE_META}`);
+        }
+
+        // Action row buttons: { label, icon, route?, kind, id?, disabled? }
+        function setActions(list, note) {
+            $('actionRow').innerHTML = list.map((a) => `
+                <button type="button" class="btn btn-${a.kind}"${a.id ? ` id="${a.id}"` : ''}${a.route ? ` data-route="${a.route}"` : ''}${a.disabled ? ' disabled' : ''}>
+                    ${a.icon ? `<span class="material-symbols-rounded" aria-hidden="true">${a.icon}</span>` : ''}${a.label}
+                </button>`).join('');
+            $('actionRow').hidden = list.length === 0;
+            $('actionNote').hidden = !note;
+            if (note) $('actionNoteText').textContent = note;
+        }
+
+        const FALLBACKS = [
+            { label: 'Search food', icon: 'search', route: 'search', kind: 'tonal' },
+            { label: 'Quick add', icon: 'edit_note', route: 'quickAdd', kind: 'tonal' }
+        ];
+
+        function setCancel(visible, label) {
+            $('cancelBtn').hidden = !visible;
+            if (label) $('cancelBtn').textContent = label;
+        }
+
+        function setPreview(quality, chip) {
+            $('preview').dataset.quality = quality;
+            $('previewChip').hidden = !chip;
+            if (chip) {
+                $('previewChipIcon').textContent = chip.icon;
+                $('previewChipText').textContent = chip.text;
+            }
+            $('preview').setAttribute('aria-label', quality === 'dark'
+                ? 'Photo of your meal, too dark to recognize food'
+                : 'Photo of your meal');
+        }
+
+        function base(title) {
+            $('screenTitle').textContent = title;
+            $('netIcon').textContent = 'wifi';
+            $('closeBtn').dataset.route = 'camera';
+            setPreview('ok', null);
+            setCancel(true, 'Cancel and keep draft');
+        }
+
+        /* ---------------- States ---------------- */
+        function renderLoading() {
+            base('Recognizing meal');
+            // Phase 1: background validation; recognition waits. Retry is not offered: duplicate requests are disabled.
+            setRow('validation', 'busy', 'busy', 'Checking image', 'Sharpness, lighting and format');
+            setRow('provider', 'idle', 'idle', 'LogMeal recognition', 'Starts after the image check');
+            setProgress('waiting', 'Waiting for image check');
+            setActions([]);
+            announce('Checking image');
+
+            later(() => {
+                // Phase 2: request sent to the provider
+                validated();
+                setRow('provider', 'busy', 'busy', 'Recognizing foods',
+                    'Identifying foods and estimating portions with LogMeal');
+                setProgress('indeterminate', 'Recognizing foods');
+                announce('Image checked. Recognizing foods');
+            }, T.validated);
+
+            later(() => renderSuccess(true), T.recognized);
+        }
+
+        function renderSlow() {
+            base('Taking longer than usual');
+            $('netIcon').textContent = 'network_wifi_1_bar';
+            validated();
+            setRow('provider', 'busy', 'pending', 'Still recognizing',
+                `Waiting <span class="elapsed" id="elapsed">${SLOW_START_S.toFixed(0)} s</span> · slow connection. You can keep waiting or log this meal another way.`);
+            setProgress('indeterminate', 'Still recognizing');
+            setActions(FALLBACKS, 'Photo kept as a draft on this device');
+            announce('Recognition is taking longer than usual. You can keep waiting, search for food, or quick add.');
+            const start = Date.now();
+            every(() => {
+                const el = $('elapsed');
+                if (el) el.textContent = `${Math.floor(SLOW_START_S + (Date.now() - start) / 1000)} s`;
+            }, 1000);
+        }
+
+        function renderError() {
+            // First failure: one immediate retry is offered.
+            base('Recognition failed');
+            $('netIcon').textContent = 'airplanemode_active';
+            validated();
+            setRow('provider', 'error', 'error', CAUSES.network.title, CAUSES.network.meta);
+            setProgress('hidden');
+            setActions([{ label: 'Retry', icon: 'refresh', kind: 'filled', id: 'retryBtn' }],
+                'Photo kept as a draft · 1 retry available');
+            announce(`Recognition failed. ${CAUSES.network.title}. Retry available.`, true);
+        }
+
+        function renderRetrying() {
+            // The single retry is in flight: button disabled so a duplicate request can't be sent.
+            base('Retrying recognition');
+            $('netIcon').textContent = 'airplanemode_active';
+            validated();
+            setRow('provider', 'busy', 'busy', 'Retrying', 'Sending the photo to LogMeal again');
+            setProgress('indeterminate', 'Retrying');
+            setActions([{ label: 'Retrying…', icon: 'refresh', kind: 'filled', disabled: true }],
+                'Photo kept as a draft on this device');
+            announce('Retrying recognition');
+            later(() => show('retry-failed'), T.retryFails);
+        }
+
+        function renderFallback(causeKey, title) {
+            // After the retry fails (or when a retry can't help): keep the draft, route to Search / Quick add.
+            const cause = CAUSES[causeKey];
+            base(title);
+            if (causeKey === 'network') $('netIcon').textContent = 'airplanemode_active';
+            validated();
+            setRow('provider', 'error', 'error', cause.title,
+                causeKey === 'network' ? 'Retried once without success. Recognition needs a connection to LogMeal.' : cause.meta);
+            setProgress('hidden');
+            setActions(FALLBACKS, 'Photo kept as a draft · log it another way');
+            announce(`${title}. ${cause.title}. Your photo is kept. Search food or quick add.`, true);
+        }
+
+        function renderEmpty() {
+            // No usable image: nothing is sent to the provider; route back to capture.
+            base('Photo can’t be used');
+            setPreview('dark', { icon: 'brightness_low', text: 'Too dark' });
+            setRow('validation', 'error', 'error', 'No food visible',
+                'The photo is too dark to recognize. Retake it in brighter light or choose another photo.');
+            setRow('provider', 'idle', 'off', 'Not sent for recognition', 'Nothing left this device');
+            setProgress('hidden');
+            setCancel(false);
+            setActions([
+                { label: 'Gallery', icon: 'photo_library', route: 'gallery', kind: 'outlined' },
+                { label: 'Retake photo', icon: 'photo_camera', route: 'camera', kind: 'filled' }
+            ]);
+            announce('Photo can’t be used. It is too dark to recognize food. Retake photo or choose from gallery.', true);
+        }
+
+        function renderSuccess(autoRoute) {
+            base('Meal recognized');
+            validated();
+            setRow('provider', 'ok', 'ok', 'Recognition complete',
+                `Found <strong>${MEAL_NAME}</strong>. Check foods and grams in the review.`);
+            setProgress('done', 'Recognition complete');
+            setCancel(false);
+            setActions([{ label: 'Review meal', icon: 'arrow_forward', route: 'mealReview', kind: 'filled' }],
+                autoRoute ? 'Opening meal review…' : null);
+            announce(`Recognition complete. ${MEAL_NAME}. ${autoRoute ? 'Opening meal review.' : 'Review meal.'}`);
+            // Only the live loading flow advances on its own (replaces prototype-navigation.js's 5 s timer).
+            if (autoRoute) later(() => { window.location.href = 's15_meal_review.html'; }, T.route - T.recognized);
+        }
+
+        const STATES = ['loading', 'slow', 'error', 'retry-failed', 'quota', 'empty', 'success'];
+
+        function show(next) {
+            state = next;
+            clearTimers();
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === (state === 'retrying' ? 'error' : state))));
+
+            switch (state) {
+                case 'slow': renderSlow(); break;
+                case 'error': renderError(); break;
+                case 'retrying': renderRetrying(); break;
+                case 'retry-failed': renderFallback('network', 'Recognition unavailable'); break;
+                case 'quota': renderFallback('quota', 'Recognition unavailable'); break;
+                case 'empty': renderEmpty(); break;
+                case 'success': renderSuccess(false); break;
+                default: state = 'loading'; renderLoading();
+            }
+
+            const url = new URL(window.location.href);
+            if (state === 'loading') url.searchParams.delete('state');
+            else if (state !== 'retrying') url.searchParams.set('state', state);
+            try { window.history.replaceState(null, '', url); } catch (e) { /* file:// in some browsers */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const choice = e.target.closest('[data-state-choice]');
+            if (choice) { show(choice.dataset.stateChoice); return; }
+            if (e.target.closest('#retryBtn')) show('retrying');
+        });
+
+        const initial = new URLSearchParams(window.location.search).get('state');
+        show(STATES.includes(initial) ? initial : 'loading');
+    })();
+    </script>
+    <!--
+        prototype-navigation.js auto-routes to S-15 after 5 s whenever body[data-screen="recognition"].
+        That timer can't be cancelled, so it would also fire in the Slow/Error/Empty/Success states and after
+        switching state in-page. Hide the attribute while the shared script initialises, then restore it;
+        the loading flow above advances to S-15 itself (within the 3 s p98 window).
+    -->
+    <script>document.body.removeAttribute('data-screen');</script>
+    <script src="prototype-navigation.js"></script>
+    <script>document.body.dataset.screen = 'recognition';</script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>

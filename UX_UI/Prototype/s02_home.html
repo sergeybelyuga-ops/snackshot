@@ -1,0 +1,1145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S-02 | Home - Snackshot</title>
+    <!-- Google Fonts: Google Sans Flex & Roboto (fallbacks defined in prototype-theme.css) -->
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:wght@300;400;500;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <!-- Shared design tokens (light/dark color roles, chart colors, typography) -->
+    <link rel="stylesheet" href="prototype-theme.css">
+    <style>
+        /*
+         * S-02 Home — implements UX spec §4.4:
+         * Scaffold -> TopAppBar with sync status -> daily summary (opens S-12)
+         * -> compact meal-entry carousel -> recent meal rows -> NavigationBar.
+         * Color tokens come from prototype-theme.css; this file only adds layout.
+         */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        [hidden] { display: none !important; }
+        /* Macro colors (--macro-*) come from prototype-theme.css */
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            gap: 16px;
+            padding: 24px 16px;
+        }
+
+        .material-symbols-rounded {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            line-height: 1;
+            user-select: none;
+        }
+        .icon-filled { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+
+        button {
+            border: none;
+            background: none;
+            color: inherit;
+            font: inherit;
+            text-align: inherit;
+        }
+        :focus-visible {
+            outline: 2px solid var(--primary);
+            outline-offset: 2px;
+        }
+
+        /* ---------- Prototype state switcher (outside the device) ---------- */
+        .state-switcher {
+            width: min(412px, 100%);
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .state-switcher-label {
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+            margin-right: 4px;
+        }
+        .state-switcher button {
+            height: 30px;
+            padding: 0 12px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+        }
+        .state-switcher button[aria-pressed="true"] {
+            border-color: var(--primary);
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+
+        /* ---------- Pixel 9 Pro device frame: 412x892 ---------- */
+        .device-frame {
+            width: 412px;
+            height: 892px;
+            flex-shrink: 0;
+            background-color: var(--surface);
+            border-radius: 36px;
+            border: 12px solid #202124;
+            box-shadow: 0 24px 48px rgba(0,0,0,0.2);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            color: var(--on-surface);
+        }
+
+        .status-bar {
+            height: 48px;
+            flex-shrink: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 24px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .camera-hole {
+            width: 14px;
+            height: 14px;
+            background-color: #000;
+            border-radius: 50%;
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        /* ---------- Top app bar ---------- */
+        .top-app-bar {
+            height: 64px;
+            flex-shrink: 0;
+            padding: 0 8px 0 4px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+        .brand-title {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+            pointer-events: none;
+        }
+        /* 48dp touch target wrapping a 32dp assist chip */
+        .sync-chip {
+            min-height: 48px;
+            padding: 0 4px;
+            display: flex;
+            align-items: center;
+            border-radius: 16px;
+        }
+        .sync-chip-inner {
+            height: 32px;
+            padding: 0 10px 0 8px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 8px;
+            border: 1px solid var(--outline-variant);
+            color: var(--on-surface-variant);
+            font: 500 12px/16px var(--font-text);
+            letter-spacing: 0.1px;
+            white-space: nowrap;
+        }
+        .sync-chip-inner .material-symbols-rounded { font-size: 18px; }
+        .sync-chip[data-sync="synced"] .sync-chip-inner .material-symbols-rounded { color: var(--tertiary); }
+        .sync-chip[data-sync="error"] .sync-chip-inner {
+            border-color: var(--error);
+            color: var(--error);
+        }
+        .sync-chip[data-sync="syncing"] .sync-chip-inner .material-symbols-rounded {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(-360deg); } }
+
+        .icon-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: var(--on-surface-variant);
+        }
+        .icon-btn:hover { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid var(--outline-variant);
+            background: var(--surface-container-high);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* ---------- Scroll content ---------- */
+        .scaffold-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 4px 16px 200px; /* clears the nav bar + overlaid entry dock */
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            scrollbar-width: none;
+        }
+        .scaffold-content::-webkit-scrollbar { display: none; }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 40px;
+        }
+        .section-title {
+            font-family: var(--font-display);
+            font-size: 22px;
+            line-height: 28px;
+            font-weight: 400;
+        }
+        .text-btn {
+            min-height: 48px;
+            padding: 0 12px;
+            margin-right: -12px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            border-radius: 20px;
+            color: var(--primary);
+            font: 500 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+        }
+        .text-btn .material-symbols-rounded { font-size: 18px; }
+
+        /* ---------- Daily summary (opens S-12 daily dashboard) ---------- */
+        .summary {
+            display: grid;
+            grid-template-columns: 136px 1fr;
+            gap: 16px;
+            align-items: center;
+            padding: 12px;
+            margin: 0 -12px;
+            border-radius: 20px;
+            width: calc(100% + 24px);
+        }
+        .summary:hover { background: color-mix(in srgb, var(--on-surface) 4%, transparent); }
+
+        .ring {
+            position: relative;
+            width: 136px;
+            height: 136px;
+        }
+        /* SVG strokes start at 3 o'clock and run clockwise; +90deg moves the start to 6 o'clock */
+        .ring svg { width: 100%; height: 100%; transform: rotate(90deg); }
+        .ring-track { stroke: var(--surface-container-high); }
+        .ring-value { stroke: var(--primary); transition: stroke-dashoffset 400ms cubic-bezier(.2,0,0,1); }
+        .ring-center {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+        .ring-label {
+            font: 500 11px/16px var(--font-text);
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            color: var(--on-surface-variant);
+        }
+        .ring-kcal {
+            font-family: var(--font-display);
+            font-size: 32px;
+            line-height: 38px;
+            font-weight: 400;
+            font-variant-numeric: tabular-nums;
+        }
+        .ring-goal {
+            font: 400 12px/16px var(--font-text);
+            color: var(--on-surface-variant);
+        }
+        .summary-caption {
+            grid-column: 1 / -1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: -4px;
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .summary-caption strong { color: var(--on-surface); font-weight: 500; }
+        .summary-caption .material-symbols-rounded { font-size: 18px; margin-left: auto; }
+
+        /* Macro split — Google Health style: "Carbs · 31% · 68 g" over a thick pill bar */
+        .macros { display: flex; flex-direction: column; gap: 12px; }
+        .macro { display: flex; flex-direction: column; gap: 6px; }
+        .macro[data-macro="carbs"]   { --macro-color: var(--macro-carbs); }
+        .macro[data-macro="fat"]     { --macro-color: var(--macro-fat); }
+        .macro[data-macro="protein"] { --macro-color: var(--macro-protein); }
+        .macro-label {
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.1px;
+            color: var(--on-surface);
+            font-variant-numeric: tabular-nums;
+        }
+        .macro-label .of { color: var(--on-surface-variant); }
+        .macro-track {
+            display: block;
+            height: 14px;
+            border-radius: 7px;
+            background: var(--macro-track);
+            overflow: hidden;
+        }
+        .macro-fill {
+            display: block;
+            height: 100%;
+            min-width: 14px;
+            border-radius: 7px;
+            background: var(--macro-color);
+            transition: width 400ms cubic-bezier(.2,0,0,1);
+        }
+        .macro-fill[data-zero="true"] { min-width: 0; }
+        .macro[data-over="true"] .macro-label .pct { color: var(--error); font-weight: 500; }
+
+
+        /* ---------- Meal-entry carousel (spec §4.4) ----------
+           Vertical, icon-only stack overlaid bottom-right, in the thumb zone.
+           Swipe/drag vertically (or arrow keys / wheel) to rotate; only the center is enabled.
+           Previous preview sits above the center, next preview below. */
+        .entry-dock {
+            position: absolute;
+            right: 16px;
+            bottom: 86px;
+            width: 64px;
+            height: 180px;
+            z-index: 25;
+            transition: transform 200ms cubic-bezier(.2,0,0,1);
+        }
+        .device-frame.snackbar-open .entry-dock { transform: translateY(-60px); }
+        .entry-track {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            touch-action: none;
+            user-select: none;
+        }
+        .entry-item {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 60px;
+            height: 60px;
+            margin: -30px 0 0 -30px;
+            border-radius: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 260ms cubic-bezier(.2,0,0,1), opacity 260ms ease,
+                        background-color 260ms ease, color 260ms ease, box-shadow 260ms ease;
+        }
+        .entry-item .material-symbols-rounded { font-size: 28px; }
+
+        /* Center: the only enabled action */
+        .entry-item[data-offset="0"] {
+            transform: translateY(0) scale(1);
+            background: var(--primary);
+            color: var(--on-primary);
+            box-shadow: 0 2px 6px rgba(0,0,0,.2), 0 6px 14px rgba(0,0,0,.14);
+            z-index: 2;
+        }
+        .entry-item[data-offset="0"]:hover { box-shadow: 0 4px 12px rgba(0,0,0,.28), 0 8px 18px rgba(0,0,0,.16); }
+        .entry-item[data-offset="0"]:active { transform: scale(.95); }
+        /* Adjacent previews: reduced scale, non-interactive; own surface + shadow so they read over content */
+        .entry-item[data-offset="-1"],
+        .entry-item[data-offset="1"],
+        .entry-item[data-offset="-2"],
+        .entry-item[data-offset="2"] {
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            border: 1px solid var(--outline-variant);
+            box-shadow: 0 1px 4px rgba(0,0,0,.16);
+            pointer-events: none;
+            z-index: 1;
+        }
+        .entry-item[data-offset="-1"] { transform: translateY(-58px) scale(.66); opacity: .9; }
+        .entry-item[data-offset="1"]  { transform: translateY(58px) scale(.66); opacity: .9; }
+        .entry-item[data-offset="-2"] { transform: translateY(-104px) scale(.4); opacity: 0; }
+        .entry-item[data-offset="2"]  { transform: translateY(104px) scale(.4); opacity: 0; }
+        .entry-item.no-anim { transition: none; }
+
+        /* ---------- Recent meals ---------- */
+        .feed { display: flex; flex-direction: column; gap: 8px; }
+        .day-label {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 8px 0 2px;
+            font: 500 12px/16px var(--font-text);
+            letter-spacing: 0.5px;
+            color: var(--on-surface-variant);
+        }
+        .day-label::after {
+            content: '';
+            flex: 1;
+            border-bottom: 1px dashed var(--outline-variant);
+        }
+        .day-label:first-child { margin-top: 0; }
+
+        .meal-row {
+            width: 100%;
+            min-height: 72px;
+            display: grid;
+            grid-template-columns: 48px 1fr auto;
+            gap: 12px;
+            align-items: center;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: var(--surface-container);
+            border: 1px solid var(--outline-variant);
+            transition: background-color 600ms ease, border-color 600ms ease;
+        }
+        .meal-row:hover { background: color-mix(in srgb, var(--on-surface) 4%, var(--surface-container)); }
+        .meal-row.is-new {
+            background: color-mix(in srgb, var(--primary) 10%, var(--surface-container));
+            border-color: var(--primary);
+        }
+        .meal-thumb {
+            width: 48px;
+            height: 48px;
+            border-radius: 10px;
+            background: var(--surface-container-high);
+            color: var(--on-surface-variant);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .meal-thumb .material-symbols-rounded { font-size: 22px; }
+        .meal-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .meal-name {
+            font: 400 16px/22px var(--font-text);
+            letter-spacing: 0.15px;
+            overflow-wrap: anywhere; /* long names wrap, never truncate */
+        }
+        .meal-meta, .meal-macros {
+            font: 400 12px/16px var(--font-text);
+            letter-spacing: 0.25px;
+            color: var(--on-surface-variant);
+        }
+        .meal-macros { font-variant-numeric: tabular-nums; }
+        .meal-kcal {
+            font-family: var(--font-display);
+            font-size: 18px;
+            line-height: 24px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .meal-kcal small { font: 400 12px/16px var(--font-text); color: var(--on-surface-variant); margin-left: 2px; }
+
+        .empty-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            gap: 8px;
+            padding: 28px 24px;
+            border-radius: 12px;
+            background: var(--surface-container);
+            border: 1px dashed var(--outline-variant);
+        }
+        .empty-card .material-symbols-rounded { font-size: 36px; color: var(--primary); }
+        .empty-title { font: 500 16px/24px var(--font-text); letter-spacing: 0.15px; }
+        .empty-text { font: 400 14px/20px var(--font-text); letter-spacing: 0.25px; color: var(--on-surface-variant); }
+
+        /* ---------- Skeletons (loading state) ---------- */
+        .sk {
+            background: var(--surface-container-high);
+            border-radius: 8px;
+            animation: pulse 1.4s ease-in-out infinite;
+        }
+        @keyframes pulse { 50% { opacity: .5; } }
+
+        /* ---------- Snackbar ---------- */
+        .snackbar {
+            position: absolute;
+            left: 16px;
+            right: 16px;
+            bottom: 96px;
+            min-height: 48px;
+            padding: 4px 8px 4px 16px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--on-surface);
+            color: var(--surface);
+            font: 400 14px/20px var(--font-text);
+            letter-spacing: 0.25px;
+            box-shadow: 0 3px 8px rgba(0,0,0,.25);
+            z-index: 40;
+            transform: translateY(16px);
+            opacity: 0;
+            transition: transform 200ms ease, opacity 200ms ease;
+            pointer-events: none;
+        }
+        .snackbar.show { transform: none; opacity: 1; pointer-events: auto; }
+        .snackbar span { flex: 1; }
+        .snackbar button {
+            min-height: 40px;
+            padding: 0 12px;
+            border-radius: 20px;
+            color: var(--primary-container);
+            font: 500 14px/20px var(--font-text);
+        }
+
+        /* ---------- Navigation bar (4 destinations) ---------- */
+        .bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            padding-bottom: 16px;
+            background: var(--surface-container);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            z-index: 15;
+            border-top: 1px solid var(--surface-container-high);
+        }
+        .nav-item {
+            min-height: 56px;
+            width: 80px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 4px;
+            color: var(--on-surface-variant);
+            border-radius: 16px;
+        }
+        .nav-icon-wrap {
+            width: 64px;
+            height: 32px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: 16px;
+            transition: background-color 200ms;
+        }
+        .nav-item:hover .nav-icon-wrap { background: color-mix(in srgb, var(--on-surface) 8%, transparent); }
+        .nav-item[aria-current="page"] { color: var(--on-surface); }
+        .nav-item[aria-current="page"] .nav-icon-wrap {
+            background: var(--primary-container);
+            color: var(--on-surface);
+        }
+        .nav-item[aria-current="page"] .material-symbols-rounded { font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .nav-label { font: 500 12px/16px var(--font-text); letter-spacing: 0.5px; }
+
+        .system-nav-pill {
+            position: absolute;
+            bottom: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 108px;
+            height: 4px;
+            background: var(--on-surface);
+            border-radius: 2px;
+            opacity: .8;
+            z-index: 30;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
+            clip: rect(0 0 0 0);
+            white-space: nowrap;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
+            }
+        }
+        /* Macro-dots layout: kcal sits top-right beside the name; meta and macro lines
+           span the full text width under it, so "Carbs · Fat · Protein" fits on one line. */
+        .meal-row { grid-template-rows: auto auto auto; row-gap: 1px; column-gap: 12px; }
+        .meal-row > :first-child { grid-row: 1 / span 3; align-self: center; }
+        .meal-info { display: contents; }
+        .meal-name { grid-column: 2; grid-row: 1; align-self: start; }
+        .meal-meta { grid-column: 2 / span 2; grid-row: 2; }
+        .meal-macros { grid-column: 2 / span 2; grid-row: 3; margin-top: 2px; }
+        .meal-kcal { grid-column: 3; grid-row: 1; align-self: start; }
+    </style>
+</head>
+<body>
+
+    <!-- Prototype-only control: switch between the S-02 states required by spec §4.1 / §4.4 -->
+    <div class="controls state-switcher" role="group" aria-label="Prototype screen state">
+        <span class="state-switcher-label">State</span>
+        <button type="button" data-state-choice="default">Default</button>
+        <button type="button" data-state-choice="loading">Loading</button>
+        <button type="button" data-state-choice="empty">Empty</button>
+        <button type="button" data-state-choice="error">Sync error</button>
+        <button type="button" data-state-choice="local">Local-only</button>
+        <button type="button" data-state-choice="saved">Just saved</button>
+        <button type="button" data-state-choice="saved-local">Saved on device</button>
+    </div>
+
+    <!-- Pixel 9 UI Board -->
+    <div class="device-frame">
+        <!-- Status Bar -->
+        <div class="status-bar" aria-hidden="true">
+            <span>11:17</span>
+            <div class="camera-hole"></div>
+            <div style="display: flex; gap: 4px; align-items: center;">
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">wifi</span>
+                <span class="material-symbols-rounded icon-filled" style="font-size: 16px;">battery_full</span>
+                <span style="font-size: 12px; font-weight: 500;">64</span>
+            </div>
+        </div>
+
+        <!-- Top App Bar: sync status (left), brand (center), account (right) -->
+        <header class="top-app-bar">
+            <button type="button" class="sync-chip" id="syncChip" data-sync="synced">
+                <span class="sync-chip-inner">
+                    <span class="material-symbols-rounded" id="syncIcon" aria-hidden="true">cloud_done</span>
+                    <span id="syncText">Synced 11:15</span>
+                </span>
+            </button>
+            <h1 class="brand-title">Snackshot</h1>
+            <button type="button" class="icon-btn" aria-label="Account and settings" data-route="settings">
+                <span class="avatar"><span class="material-symbols-rounded" style="font-size: 20px;" aria-hidden="true">person</span></span>
+            </button>
+        </header>
+
+        <!-- S-02 Scaffold Content -->
+        <main class="scaffold-content" id="content">
+            <!-- Daily summary: tap opens S-12 daily dashboard -->
+            <section aria-labelledby="todayHeading">
+                <h2 class="sr-only" id="todayHeading">Today's nutrition</h2>
+                <div id="summarySlot"></div>
+            </section>
+
+            <!-- Recent meals -->
+            <section aria-labelledby="recentHeading">
+                <div class="section-header">
+                    <h2 class="section-title" id="recentHeading">Recent meals</h2>
+                    <button type="button" class="text-btn" data-route="history" id="seeAllBtn">
+                        See all <span class="material-symbols-rounded" aria-hidden="true">chevron_right</span>
+                    </button>
+                </div>
+                <div class="feed" id="feedSlot"></div>
+            </section>
+        </main>
+
+        <!-- Meal-entry carousel: icon-only dock overlaid in the thumb zone -->
+        <div class="entry-dock" id="carouselSlot"></div>
+
+        <!-- Snackbar (S-18) -->
+        <div class="snackbar" id="snackbar" role="status" aria-live="polite">
+            <span id="snackbarText"></span>
+            <button type="button" data-route="mealReviewSaved">View</button>
+        </div>
+
+        <!-- Navigation bar -->
+        <nav class="bottom-nav" aria-label="Main">
+            <button type="button" class="nav-item" aria-current="page" data-route="home">
+                <span class="nav-icon-wrap"><span class="material-symbols-rounded" aria-hidden="true">home</span></span>
+                <span class="nav-label">Home</span>
+            </button>
+            <button type="button" class="nav-item" data-route="dailyDashboard">
+                <span class="nav-icon-wrap"><span class="material-symbols-rounded" aria-hidden="true">bar_chart</span></span>
+                <span class="nav-label">Dashboard</span>
+            </button>
+            <button type="button" class="nav-item" data-route="history">
+                <span class="nav-icon-wrap"><span class="material-symbols-rounded" aria-hidden="true">history</span></span>
+                <span class="nav-label">History</span>
+            </button>
+            <button type="button" class="nav-item" data-route="settings">
+                <span class="nav-icon-wrap"><span class="material-symbols-rounded" aria-hidden="true">settings</span></span>
+                <span class="nav-label">Settings</span>
+            </button>
+        </nav>
+
+        <div class="system-nav-pill" aria-hidden="true"></div>
+
+        <!-- Screen-reader announcements: carousel position, sync results -->
+        <div class="sr-only" aria-live="polite" id="announcer"></div>
+    </div>
+
+    <script>
+    (function () {
+        /* ---------------- Data ---------------- */
+        const GOALS = { kcal: 2300, protein: 150, carbs: 220, fat: 70 };
+
+        const TODAY = [
+            { name: 'Grilled chicken salad', type: 'Lunch', time: '11:02', kcal: 450, p: 38, c: 14, f: 26, src: 'photo' },
+            { name: 'Oatmeal & berries', type: 'Breakfast', time: '07:12', kcal: 320, p: 10, c: 54, f: 7, src: 'photo' }
+        ];
+        const YESTERDAY = [
+            { name: 'Chicken soup', type: 'Dinner', time: '19:30', kcal: 120, p: 11, c: 9, f: 4, src: 'search' },
+            { name: 'Buckwheat with mushrooms', type: 'Lunch', time: '13:15', kcal: 410, p: 14, c: 68, f: 9, src: 'photo' }
+        ];
+        const JUST_SAVED = { name: 'Greek yogurt & honey', type: 'Snack', time: '11:16', kcal: 210, p: 15, c: 24, f: 6, src: 'manual', isNew: true };
+
+        // Order and loop defined by spec §4.4: Take a photo -> Quick search -> Gallery -> Manual add
+        const ENTRY_ACTIONS = [
+            { route: 'camera',   icon: 'photo_camera',  label: 'Take a photo', hint: 'AI recognition' },
+            { route: 'search',   icon: 'search',        label: 'Quick search', hint: 'Food database' },
+            { route: 'gallery',  icon: 'photo_library', label: 'Gallery',      hint: 'Use a saved photo' },
+            { route: 'quickAdd', icon: 'edit_note',     label: 'Manual add',   hint: 'Enter kcal & macros' }
+        ];
+
+        const SRC_ICON = { photo: 'image', search: 'search', manual: 'edit_note' };
+
+        /* ---------------- Helpers ---------------- */
+        const $ = (id) => document.getElementById(id);
+        const fmt = (n) => n.toLocaleString('en-US');
+        const announcer = $('announcer');
+        function announce(msg) {
+            announcer.textContent = '';
+            window.setTimeout(() => { announcer.textContent = msg; }, 50);
+        }
+        function store(key, value) {
+            try { if (value === undefined) return window.localStorage.getItem(key); window.localStorage.setItem(key, value); }
+            catch (e) { return null; }
+        }
+
+        let state = 'default';
+        let timers = [];
+        function clearTimers() { timers.forEach(clearTimeout); timers = []; }
+        function later(fn, ms) { timers.push(window.setTimeout(fn, ms)); }
+
+        /* ---------------- Sync chip ---------------- */
+        const syncChip = $('syncChip');
+        function setSync(kind, text) {
+            const icons = { synced: 'cloud_done', syncing: 'sync', error: 'sync_problem', local: 'smartphone' };
+            syncChip.dataset.sync = kind;
+            $('syncIcon').textContent = icons[kind];
+            $('syncText').textContent = text;
+            const labels = {
+                synced: text + ' with Health Connect. Sync now',
+                syncing: 'Syncing with Health Connect',
+                error: 'Health Connect sync failed. Retry sync',
+                local: 'Stored on this device only. Open Google Health connection'
+            };
+            syncChip.setAttribute('aria-label', labels[kind]);
+            // Local-only: the chip opens Settings -> Google Health connection directly
+            if (kind === 'local') syncChip.dataset.route = 'googleHealthConnection';
+            else delete syncChip.dataset.route;
+            syncChip.disabled = kind === 'syncing';
+        }
+
+        function runSync() {
+            setSync('syncing', 'Syncing…');
+            later(() => {
+                setSync('synced', 'Synced 11:17');
+                announce('Sync complete. All meals saved to Health Connect.');
+            }, 1400);
+        }
+
+        syncChip.addEventListener('click', () => {
+            if (syncChip.dataset.sync === 'local' || syncChip.dataset.sync === 'syncing') return;
+            if (state === 'loading') return;
+            runSync();
+        });
+
+        /* ---------------- Summary ---------------- */
+        function totals(meals) {
+            return meals.reduce((t, m) => ({ kcal: t.kcal + m.kcal, p: t.p + m.p, c: t.c + m.c, f: t.f + m.f }),
+                                { kcal: 0, p: 0, c: 0, f: 0 });
+        }
+
+        // Google Health "Macro split" row: "Carbs · 31% · 68 g" above a colored pill bar.
+        // Without a goal (local-only), the bar shows the share of today's macro grams instead.
+        function macroRow(key, name, value, goal, shareOf) {
+            if (!goal) {
+                const share = shareOf ? Math.round(value / shareOf * 100) : 0;
+                return `<div class="macro" data-macro="${key}">
+                    <span class="macro-label">${name} · ${share}% · ${value} g</span>
+                    <span class="macro-track"><span class="macro-fill" data-zero="${value === 0}" style="width:${share}%"></span></span>
+                </div>`;
+            }
+            const pct = Math.round(value / goal * 100);
+            const over = value > goal;
+            return `<div class="macro" data-macro="${key}" data-over="${over}">
+                <span class="macro-label">${name} · <span class="pct">${pct}%${over ? ' over' : ''}</span> · ${value}<span class="of"> / ${goal}</span> g</span>
+                <span class="macro-track"><span class="macro-fill" data-zero="${value === 0}" style="width:${Math.min(pct, 100)}%"></span></span>
+            </div>`;
+        }
+
+        function renderSummary(meals, goals) {
+            const t = totals(meals);
+            const C = 2 * Math.PI * 58;
+            const pct = goals ? Math.min(t.kcal / goals.kcal, 1) : 0;
+            const left = goals ? goals.kcal - t.kcal : null;
+            const aria = goals
+                ? `Today: ${fmt(t.kcal)} of ${fmt(goals.kcal)} kcal, ${fmt(Math.max(left, 0))} left. Carbs ${t.c} of ${goals.carbs} grams, fat ${t.f} of ${goals.fat} grams, protein ${t.p} of ${goals.protein} grams. Open daily dashboard`
+                : `Today: ${fmt(t.kcal)} kcal, no daily goal. Carbs ${t.c} grams, fat ${t.f} grams, protein ${t.p} grams. Open daily dashboard`;
+
+            const caption = goals
+                ? (left >= 0
+                    ? `<strong>${fmt(left)} kcal</strong> left of your daily goal`
+                    : `<strong>${fmt(-left)} kcal</strong> over your daily goal`)
+                : `No daily goal set`;
+
+            $('summarySlot').innerHTML = `
+                <button type="button" class="summary" data-route="dailyDashboard" aria-label="${aria}">
+                    <span class="ring" aria-hidden="true">
+                        <svg viewBox="0 0 136 136">
+                            <circle class="ring-track" cx="68" cy="68" r="58" fill="none" stroke-width="12"/>
+                            ${goals ? `<circle class="ring-value" cx="68" cy="68" r="58" fill="none" stroke-width="12" stroke-linecap="round"
+                                stroke-dasharray="${C}" stroke-dashoffset="${C * (1 - pct)}"/>` : ''}
+                        </svg>
+                        <span class="ring-center">
+                            <span class="ring-label">Today</span>
+                            <span class="ring-kcal">${fmt(t.kcal)}</span>
+                            <span class="ring-goal">${goals ? `of ${fmt(goals.kcal)} kcal` : 'kcal'}</span>
+                        </span>
+                    </span>
+                    <span class="macros" aria-hidden="true">
+                        ${macroRow('carbs', 'Carbs', t.c, goals && goals.carbs, t.p + t.c + t.f)}
+                        ${macroRow('fat', 'Fat', t.f, goals && goals.fat, t.p + t.c + t.f)}
+                        ${macroRow('protein', 'Protein', t.p, goals && goals.protein, t.p + t.c + t.f)}
+                    </span>
+                    <span class="summary-caption" aria-hidden="true">
+                        ${caption}
+                        <span class="material-symbols-rounded">chevron_right</span>
+                    </span>
+                </button>`;
+        }
+
+        function renderSummarySkeleton() {
+            $('summarySlot').innerHTML = `
+                <div class="summary" aria-hidden="true" style="pointer-events:none">
+                    <span class="sk" style="width:136px;height:136px;border-radius:50%"></span>
+                    <span class="macros">
+                        ${[0,1,2].map(() => `<span style="display:flex;flex-direction:column;gap:6px">
+                            <span class="sk" style="width:70%;height:14px"></span>
+                            <span class="sk" style="width:100%;height:14px;border-radius:7px"></span></span>`).join('')}
+                    </span>
+                    <span class="sk" style="grid-column:1/-1;width:60%;height:16px"></span>
+                </div>`;
+        }
+
+        /* ---------------- Carousel ---------------- */
+        let entryIndex = parseInt(store('snackshot-home-entry'), 10);
+        if (!(entryIndex >= 0 && entryIndex < ENTRY_ACTIONS.length)) entryIndex = 0;
+
+        function offsetFor(i) {
+            const n = ENTRY_ACTIONS.length;
+            return ((i - entryIndex + n + 2) % n) - 2; // -2..1 for 4 items
+        }
+
+        function renderCarousel(disabled) {
+            if (disabled) {
+                $('carouselSlot').innerHTML = `
+                    <div class="entry-track" aria-hidden="true">
+                        <span class="sk" style="position:absolute;top:12px;left:12px;width:40px;height:40px;border-radius:12px;opacity:.6"></span>
+                        <span class="sk" style="position:absolute;top:60px;left:2px;width:60px;height:60px;border-radius:18px"></span>
+                        <span class="sk" style="position:absolute;top:128px;left:12px;width:40px;height:40px;border-radius:12px;opacity:.6"></span>
+                    </div>`;
+                return;
+            }
+
+            $('carouselSlot').innerHTML = `
+                <div class="entry-track" id="entryTrack" role="group" aria-roledescription="carousel"
+                     aria-label="Log a meal. Swipe up or down, or use arrow keys, to change the action">
+                    ${ENTRY_ACTIONS.map((a, i) => `
+                        <button type="button" class="entry-item" data-index="${i}">
+                            <span class="material-symbols-rounded" aria-hidden="true">${a.icon}</span>
+                        </button>`).join('')}
+                </div>`;
+
+            applyCarousel(false);
+            bindCarousel();
+        }
+
+        function applyCarousel(animate) {
+            const items = Array.from(document.querySelectorAll('.entry-item'));
+            const targets = items.map((el) => {
+                const i = Number(el.dataset.index);
+                const prev = el.dataset.offset === undefined ? null : Number(el.dataset.offset);
+                const logical = offsetFor(i);
+                let visual = logical;
+                if (!animate || prev === null) {
+                    el.classList.add('no-anim');
+                } else if (logical === -2 || logical === 2) {
+                    // Leaving view: exit toward the side it was on
+                    visual = prev > 0 ? 2 : -2;
+                } else if (Math.abs(logical - prev) > 1) {
+                    // Wrapping in: pre-place on the hidden side it enters from, then slide in
+                    el.classList.add('no-anim');
+                    el.dataset.offset = logical > 0 ? '2' : '-2';
+                }
+                return { el, i, visual };
+            });
+            void document.body.offsetWidth;
+            if (animate) items.forEach((el) => el.classList.remove('no-anim'));
+
+            targets.forEach(({ el, i, visual }) => {
+                el.dataset.offset = String(visual);
+                const isCenter = visual === 0;
+                // Exactly one enabled action: the centered one
+                if (isCenter) {
+                    el.dataset.route = ENTRY_ACTIONS[i].route;
+                    el.removeAttribute('aria-hidden');
+                    el.removeAttribute('tabindex');
+                    el.inert = false;
+                    el.setAttribute('aria-label', `${ENTRY_ACTIONS[i].label}, ${ENTRY_ACTIONS[i].hint}. Option ${i + 1} of ${ENTRY_ACTIONS.length}`);
+                    el.title = ENTRY_ACTIONS[i].label;
+                } else {
+                    delete el.dataset.route;
+                    el.setAttribute('aria-hidden', 'true');
+                    el.setAttribute('tabindex', '-1');
+                    el.inert = true;
+                    el.removeAttribute('aria-label');
+                    el.removeAttribute('title');
+                }
+            });
+            if (!animate) {
+                void document.body.offsetWidth;
+                items.forEach((el) => el.classList.remove('no-anim'));
+            }
+        }
+
+        function rotate(step) {
+            const track = $('entryTrack');
+            const hadFocus = track && track.contains(document.activeElement);
+            entryIndex = (entryIndex + step + ENTRY_ACTIONS.length) % ENTRY_ACTIONS.length;
+            store('snackshot-home-entry', String(entryIndex));
+            applyCarousel(true);
+            const a = ENTRY_ACTIONS[entryIndex];
+            announce(`${a.label}, ${entryIndex + 1} of ${ENTRY_ACTIONS.length}`);
+            if (hadFocus) {
+                const center = document.querySelector('.entry-item[data-offset="0"]');
+                if (center) center.focus({ preventScroll: true });
+            }
+        }
+
+        function bindCarousel() {
+            const track = $('entryTrack');
+            // Mouse wheel / trackpad also rotates (prototype convenience on desktop)
+            track.addEventListener('wheel', (e) => {
+                const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+                if (Math.abs(d) < 10) return;
+                e.preventDefault();
+                if (track.dataset.wheelLock) return;
+                track.dataset.wheelLock = '1';
+                rotate(d > 0 ? 1 : -1);
+                window.setTimeout(() => { delete track.dataset.wheelLock; }, 300);
+            }, { passive: false });
+
+            track.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); rotate(-1); }
+                if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); rotate(1); }
+            });
+
+            // Swipe left/right to rotate; a swipe never triggers the centered action.
+            let startX = null, dragged = false;
+            // startX holds the vertical start point (axis is vertical; name kept for the shared handlers)
+            track.addEventListener('pointerdown', (e) => { startX = e.clientY; dragged = false; });
+            track.addEventListener('pointermove', (e) => {
+                if (startX === null) return;
+                const dy = e.clientY - startX;
+                if (Math.abs(dy) > 8) dragged = true;
+                // Swipe up brings the next (lower) action to the center; swipe down the previous one
+                if (Math.abs(dy) > 24) { startX = null; rotate(dy < 0 ? 1 : -1); }
+            });
+            track.addEventListener('pointerup', () => { startX = null; });
+            track.addEventListener('pointerleave', () => { startX = null; });
+            track.addEventListener('pointercancel', () => { startX = null; });
+            track.addEventListener('click', (e) => {
+                if (dragged) { e.stopPropagation(); e.preventDefault(); dragged = false; }
+            }, true);
+        }
+
+        /* ---------------- Feed ---------------- */
+        function mealRow(m) {
+            return `<button type="button" class="meal-row${m.isNew ? ' is-new' : ''}" data-route="mealReviewSaved"
+                    aria-label="${m.name}, ${m.type} at ${m.time}, ${m.kcal} kilocalories, protein ${m.p} grams, carbs ${m.c} grams, fat ${m.f} grams">
+                <span class="meal-thumb" aria-hidden="true"><span class="material-symbols-rounded">${SRC_ICON[m.src]}</span></span>
+                <span class="meal-info" aria-hidden="true">
+                    <span class="meal-name">${m.name}</span>
+                    <span class="meal-meta">${m.type} · ${m.time}</span>
+                    <span class="meal-macros macro-dots"><span><i data-m="carbs"></i>Carbs ${m.c}</span><span><i data-m="fat"></i>Fat ${m.f}</span><span><i data-m="protein"></i>Protein ${m.p} g</span></span>
+                </span>
+                <span class="meal-kcal" aria-hidden="true">${m.kcal}<small>kcal</small></span>
+            </button>`;
+        }
+
+        function renderFeed(today, yesterday) {
+            let html = '';
+            if (today.length) {
+                html += `<div class="day-label">Today · ${fmt(totals(today).kcal)} kcal</div>`;
+                html += today.map(mealRow).join('');
+            }
+            if (yesterday.length) {
+                html += `<div class="day-label">Yesterday · ${fmt(totals(yesterday).kcal)} kcal</div>`;
+                html += yesterday.map(mealRow).join('');
+            }
+            $('feedSlot').innerHTML = html;
+            $('seeAllBtn').hidden = false;
+        }
+
+        function renderFeedSkeleton() {
+            $('feedSlot').innerHTML = `<div class="sk" style="width:110px;height:14px;margin-bottom:4px"></div>` +
+                [0,1,2].map(() => `<div class="meal-row" aria-hidden="true" style="pointer-events:none">
+                    <span class="sk" style="width:48px;height:48px;border-radius:10px"></span>
+                    <span style="display:flex;flex-direction:column;gap:6px">
+                        <span class="sk" style="width:75%;height:14px"></span>
+                        <span class="sk" style="width:45%;height:12px"></span>
+                    </span>
+                    <span class="sk" style="width:52px;height:20px"></span>
+                </div>`).join('');
+            $('seeAllBtn').hidden = true;
+        }
+
+        function renderEmptyFeed() {
+            $('feedSlot').innerHTML = `
+                <div class="empty-card">
+                    <span class="material-symbols-rounded" aria-hidden="true">restaurant</span>
+                    <span class="empty-title">No meals logged yet</span>
+                    <span class="empty-text">Take a photo of your plate and Snackshot estimates calories and macros. You can also search for a food or enter values yourself.</span>
+                    <button type="button" class="text-btn" data-route="camera" style="margin:4px 0 -8px">
+                        <span class="material-symbols-rounded" aria-hidden="true">photo_camera</span> Take a photo
+                    </button>
+                </div>`;
+            $('seeAllBtn').hidden = true;
+        }
+
+        /* ---------------- Snackbar ---------------- */
+        const frame = document.querySelector('.device-frame');
+        function hideSnackbar() {
+            $('snackbar').classList.remove('show');
+            frame.classList.remove('snackbar-open'); // entry dock moves back down
+        }
+        function showSnackbar(text, ms) {
+            $('snackbarText').textContent = text;
+            $('snackbar').classList.add('show');
+            frame.classList.add('snackbar-open');    // entry dock moves up to clear the snackbar
+            later(hideSnackbar, ms);
+        }
+
+        /* ---------------- States ---------------- */
+        function render(next) {
+            state = next;
+            clearTimers();
+            hideSnackbar();
+            document.querySelectorAll('[data-state-choice]').forEach((b) =>
+                b.setAttribute('aria-pressed', String(b.dataset.stateChoice === state)));
+
+            switch (state) {
+                case 'loading':
+                    // Local aggregates are loading: stable skeletons, entry disabled until ready.
+                    setSync('synced', 'Synced 11:15');
+                    renderSummarySkeleton();
+                    renderCarousel(true);
+                    renderFeedSkeleton();
+                    later(() => announce("Loading today's meals"), 0);
+                    break;
+
+                case 'empty':
+                    setSync('synced', 'Synced 11:15');
+                    renderSummary([], GOALS);
+                    renderCarousel(false);
+                    renderEmptyFeed();
+                    break;
+
+                case 'error':
+                    // Sync failed: only the red sync chip signals it; tapping it retries.
+                    // Cached meals stay visible — local data is never hidden by a sync failure.
+                    setSync('error', 'Sync failed');
+                    renderSummary(TODAY, GOALS);
+                    renderCarousel(false);
+                    renderFeed(TODAY, YESTERDAY);
+                    break;
+
+                case 'local':
+                    // Health Connect not connected: meals stay on device, no goals available.
+                    setSync('local', 'On device');
+                    renderSummary(TODAY, null);
+                    renderCarousel(false);
+                    renderFeed(TODAY, YESTERDAY);
+                    break;
+
+                case 'saved': {
+                    // Returning from S-10 after a save: local save is confirmed first, sync reported separately.
+                    const today = [JUST_SAVED, ...TODAY];
+                    setSync('syncing', 'Syncing…');
+                    renderSummary(today, GOALS);
+                    renderCarousel(false);
+                    renderFeed(today, YESTERDAY);
+                    showSnackbar('Meal saved on this device', 4000);
+                    later(() => {
+                        setSync('synced', 'Synced 11:17');
+                        announce('Meal synced to Health Connect');
+                    }, 2200);
+                    later(() => {
+                        const row = document.querySelector('.meal-row.is-new');
+                        if (row) row.classList.remove('is-new');
+                    }, 5000);
+                    break;
+                }
+
+                case 'saved-local': {
+                    // Returning from S-10 "Keep on device only": new meal saved locally, no sync, no goals.
+                    const today = [JUST_SAVED, ...TODAY];
+                    setSync('local', 'On device');
+                    renderSummary(today, null);
+                    renderCarousel(false);
+                    renderFeed(today, YESTERDAY);
+                    showSnackbar('Meal saved on this device', 4000);
+                    later(() => {
+                        const row = document.querySelector('.meal-row.is-new');
+                        if (row) row.classList.remove('is-new');
+                    }, 5000);
+                    break;
+                }
+
+                default:
+                    state = 'default';
+                    setSync('synced', 'Synced 11:15');
+                    renderSummary(TODAY, GOALS);
+                    renderCarousel(false);
+                    renderFeed(TODAY, YESTERDAY);
+            }
+
+            const url = new URL(window.location.href);
+            if (state === 'default') url.searchParams.delete('state');
+            else url.searchParams.set('state', state);
+            try { window.history.replaceState(null, '', url); } catch (e) { /* file:// in some browsers */ }
+        }
+
+        document.addEventListener('click', (e) => {
+            const b = e.target.closest('[data-state-choice]');
+            if (b) render(b.dataset.stateChoice);
+        });
+
+        render(new URLSearchParams(window.location.search).get('state') || 'default');
+    })();
+    </script>
+    <script src="prototype-navigation.js"></script>
+    <script src="prototype-theme.js"></script>
+</body>
+</html>
