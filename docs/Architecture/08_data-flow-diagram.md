@@ -9,7 +9,7 @@ This diagram describes how nutrition data moves between the main actors and syst
 - Local storage
 - Google Health Connect (GHC)
 - LogMeal API
-- LogMeal Access Broker (Firebase; AI access and usage only)
+- LogMeal Access Broker (Firebase; AI access, usage, and anonymous product metrics only)
 
 The design follows the project's local-first architecture: the application keeps its own local data as the primary source of truth, and Google Health can be used as an optional synchronization target.
 
@@ -21,7 +21,8 @@ flowchart LR
 
     APP --> BR[LogMeal Access Broker
     anonymous client ID, device hash,
-    picture counter, status]
+    picture counter, status,
+    anonymous daily product metrics]
     BR --> APP
 
     APP --> IMG[Meal image / food input]
@@ -45,7 +46,7 @@ flowchart LR
 
     APP --> UI[Dashboard / history / statistics]
     LOCAL --> UI
-    GHC --> UI
+    GHC --> LOCAL
 
     classDef user fill:#e8f1ff,stroke:#3b82f6,color:#111827;
     classDef app fill:#ecfdf5,stroke:#10b981,color:#111827;
@@ -63,18 +64,20 @@ flowchart LR
 ### 3.1 User to application
 The user enters data through the UI in one of the following ways:
 - photo capture or gallery image
-- text input / chat-like meal entry
+- Quick add (manual name, kcal, and macros)
 - manual correction of detected food items and values
-- Google Health consent and connection flow
+- optional nutrition goals (stored only locally)
+- the Google Health Connect consent and connection flow
 
 ### 3.1a Application to LogMeal Access Broker
 No registration is needed. On the first AI action:
 1. the app signs in anonymously to Firebase (silent, no personal data)
-2. the app sends a hashed device ID and app language to the broker
+2. the app sends a hashed device ID and the device language and country to the broker
 3. the broker returns the user's own LogMeal token and the free-picture counter, or a waitlist / trial-ended status
 4. after each successful recognition the app reports one used picture; the broker reconciles the counter hourly with LogMeal's usage log
+5. once a day the app sends one anonymous product-metrics aggregate (for example AI response time and usage statistics), which the broker stores without any client or device identifier
 
-The broker never receives photos, recognition results, or nutrition values. Details: [LogMeal access token management](./11_logmeal-access-token-management.md).
+The broker never receives photos, recognition results, food names, or nutrition values. Details: [LogMeal access token management](./11_logmeal-access-token-management.md).
 
 ### 3.2 Application to LogMeal
 The application sends the prepared image and context to LogMeal for image recognition and nutritional estimation.
@@ -98,11 +101,11 @@ Local storage keeps:
 - fat
 - carbs
 - photo reference or image metadata
-- user corrections / edit history
+- current user-corrected values (no edit history; only an "edited yes/no" flag for the Zero-Edit metric)
 - sync information
 
 ### 3.4 Local storage to Google Health Connect
-If the user is logged in and Health Connect is enabled, the app writes nutrition records to Google Health Connect using the Health Connect SDK.
+If the user has connected to Google Health Connect (signed in to the Google Health app and linked Snackshot), the app writes nutrition records to Health Connect using the Health Connect SDK.
 
 This follows the Health Connect sync model:
 - app keeps its own datastore as the source of truth
@@ -129,17 +132,19 @@ Google Health shows the user relevant health and nutrition data, including the d
 | Data | Source | Destination | Notes |
 | --- | --- | --- | --- |
 | Meal photo | User / camera / gallery | Snackshot app | Preprocessed before AI request |
-| AI access request | Snackshot app | LogMeal Access Broker | Anonymous ID token + hashed device ID + language; no personal data |
+| AI access request | Snackshot app | LogMeal Access Broker | Anonymous ID token + hashed device ID + language + country; no personal data |
 | Per-user LogMeal token, status, picture counter | LogMeal Access Broker | Snackshot app | Token stored encrypted on device |
 | Used-picture report | Snackshot app | LogMeal Access Broker | One count per successful recognition |
+| Product metrics | Snackshot app | LogMeal Access Broker | One anonymous daily aggregate; no identifiers, food names, images, or nutrition values; opt-out in Settings |
 | User management, usage | LogMeal Access Broker | LogMeal API | Company token; signUp, toggleEnabled, deleteAPIUser, info/usages |
 | Recognition request | Snackshot app | LogMeal API | Image + user context, authenticated with the user's own LogMeal token |
 | AI result | LogMeal API | Snackshot app | Food, ingredients, quantity, nutrients |
 | Meal log record | Snackshot app | Local storage | Primary app source of truth |
+| Nutrition goals | User | Local storage | Optional; never leave the device |
 | Nutrition entry | Snackshot app | Google Health Connect | Optional sync when enabled |
-| Health data / goals | Google Health Connect | Snackshot app | Read for dashboard and sync |
+| Nutrition records | Google Health Connect | Snackshot app | Bootstrap import and change sync; goals are not read in the MVP |
 | Health summary | Google Health service | User | UI displayed in Google Health |
-| Dashboard data | Local storage / GHC | Snackshot UI | Statistics and history |
+| Dashboard data | Local storage | Snackshot UI | Statistics, goals, and history |
 
 ## 5. Sequence interpretation
 

@@ -4,7 +4,7 @@
 
 **Decision:** How Snackshot is developed, tested, built, and distributed: environments, LogMeal usage in tests, repository layout, CI/CD, test devices, and secrets.
 **Date:** 18 November 2026
-**Status:** Accepted, decisions in §0. Refines WBS items 1.1, 1.3, 1.4, 3.1, 3.7, 11.3, and 11.4 of the [WBS and MVP Implementation Plan](../04_wbs_and_mvp_implementation_plan.md).
+**Status:** Accepted, decisions in §0. Refines WBS items 1.1, 1.3, 1.4, 3.1, 3.2, 3.7, 9.3, 10.3, 11.3, and 11.4 of the [WBS and MVP Implementation Plan](../04_wbs_and_mvp_implementation_plan.md).
 
 Sources:
 
@@ -24,7 +24,7 @@ Sources:
 | 3 | Which LogMeal credentials for manual testing? | **One dedicated test APIUser** with its own token. It is a real APIUser of the Snackshot company, so its usage appears in LogMeal statistics and in the admin console, marked as test. | The APICompany token stays in the prod project only. The dev broker never creates APIUsers. §3.3 |
 | 4 | Repository | **One private GitHub monorepo** (`sergeybelyuga-ops/snackshot`, already exists). | Android, broker, admin console, shared test fixtures, and docs (`docs/`, renamed from `Project documentation/`) live together. GitHub Actions with path filters. §4, §7 |
 | 5 | Test devices | **One physical Android phone + Android Studio emulators**, plus Firebase Test Lab and the Play pre-launch report for other devices and OS versions. | §6 |
-| 6 | Test APIUser and the LogMeal user limit | **The test APIUser counts against the LogMeal plan's user limit** (confirmed by the owner). | On the trial plan only 4 pilot users fit; the Analyse plan removes the limit. §3.4 |
+| 6 | Test APIUser and the LogMeal user limit | ~~The test APIUser counts against the LogMeal plan's user limit.~~ **Superseded (18 November 2026):** LogMeal has agreed to special conditions with no limit on the number of APIUsers. | All 5 pilot users fit; the test APIUser and the owner's devices (`isTest`) do not take pilot places. §3.4 |
 | 7 | Broker deploys to dev | **Automatic on every push to `main`** that changes `broker/**` or `admin/**`. Prod stays manual with approval. | §7.1 |
 | 8 | Test build distribution | **Firebase App Distribution** for dev builds, **Google Play internal testing** for prod builds. (TestFlight is iOS-only.) | §8 |
 
@@ -119,7 +119,6 @@ test-fixtures/
     segmentation-complete/  ok-single-dish.json, ok-mixed-plate.json, low-confidence.json
     nutritional-info/       ok.json
     quantity/               ok.json, missing-grams.json
-    dataset-dishes/         eng.json, spa.json, ger.json (trimmed catalogs)
     errors/                 401.json, 403-116.json, 429.json, 500.json
     README.md               recording date, LogMeal API version, scrubbing rules
   images/                   sample meal photos for gallery and camera tests
@@ -167,7 +166,7 @@ How `isTest` affects the rest of the system:
 - **Owner's phone:** when you install the prod build from the Play internal track, it provisions a normal prod client. You then mark it `isTest` in the admin console (Client detail → "Mark as test").
 - **Metrics:** the broker's `status` response includes `isTest`. The app adds `"test": true` to its daily metrics payload ([WBS](../04_wbs_and_mvp_implementation_plan.md) §6.3). The admin console Metrics page then shows pilot totals with or without test devices. The flag only marks the owner's own records, so pilot users' records stay anonymous.
 
-> ⚠ **LogMeal user limit:** the test APIUser counts against the LogMeal plan's user limit (decision 6). The free trial allows 5 APIUsers in total, so only 4 pilot users fit on the trial plan. The Analyse plan proposed in [WBS](../04_wbs_and_mvp_implementation_plan.md) §8 question 4 removes this limit.
+> ✅ **LogMeal user limit (resolved 18 November 2026):** under the LogMeal special conditions there is no limit on the number of APIUsers ([11](11_logmeal-access-token-management.md) §0 decision 15). The test APIUser and the owner's prod installs are extra APIUsers and do not reduce the 5 pilot places.
 
 ---
 
@@ -226,7 +225,7 @@ Branching: trunk-based. `main` is protected and needs green CI to merge. Short f
 | --- | --- | --- | --- | --- |
 | Android unit | Domain (Atwater, recalculation), repositories, ViewModels, LogMeal adapter mapping and error handling, broker client | JUnit 5, MockK, Turbine, kotlinx-coroutines-test, MockWebServer | JVM | Every push |
 | Android persistence | Room DAOs, migrations | Robolectric + in-memory Room, `MigrationTestHelper` | JVM | Every push |
-| Android UI | Key screens and flows (chat → result → review → save; waitlist; trial ended; HC denied) | Compose UI test, Hilt testing, MockWebServer | AVD API 34 in CI | PR to `main`, manual |
+| Android UI | Key screens and flows (Home → photo/gallery → review → save; Quick add; dashboard with and without goals; waitlist; trial ended; HC denied) | Compose UI test, Hilt testing, MockWebServer | AVD API 34 in CI | PR to `main`, manual |
 | Health Connect | Write/read/changes against a real HC | Instrumented tests + Health Connect Toolbox app for inspection | Your phone + AVDs | Manual, I-6 and 11.3 |
 | Broker | Endpoints, state machine, idempotency, cap/waitlist, `isTest`, metrics allow-list | Vitest, MSW, Firebase Emulator Suite (`firebase emulators:exec`) | Node 22 | Every push to `broker/**` |
 | Firestore rules | Deny-all client access | `@firebase/rules-unit-testing` | Emulator | Every push to `broker/**` |
@@ -358,7 +357,7 @@ Manual testing against real LogMeal: merge to `main` (the broker deploys to dev 
 | Document | Change |
 | --- | --- |
 | [04 WBS](../04_wbs_and_mvp_implementation_plan.md) | Decision 5; scope of items 1.1, 1.3, 1.4, 3.1, 3.2, 3.7, 9.3, 10.3, 11.3, 11.4; `test` field in §6.3; risk mitigation for device coverage. Extra effort of about 1.5 h is taken from contingency and re-checked at M1. |
-| [11 LogMeal access token management](11_logmeal-access-token-management.md) | `isTest` on `clients`, excluded from `maxClients`; `isTest` in the `status` response; `LOGMEAL_MODE`; APICompany token only in the prod project. |
+| [11 LogMeal access token management](11_logmeal-access-token-management.md) | `isTest` on `clients`, excluded from `maxClients`; `isTest` in the `status` response; `LOGMEAL_MODE`; APICompany token only in the prod project. Applied on 18 November 2026 (§0 decision 14, §8.2). |
 
 ## 12. Open questions
 

@@ -4,6 +4,8 @@
 **Analysis date:** 10 September 2026  
 **Recommendation:** Use LogMeal as the primary MVP provider, subject to a short technical spike and representative-meal validation. Keep Passio as the fallback provider candidate. Do not make Gemini or Bite the primary nutrition engine without additional validation and architecture work.
 
+> **Status note (18 November 2026):** this analysis was written for the original one-month, ~28-hour MVP window. That constraint was lifted on 15 November 2026; the current plan is ~75.5 h plus contingency, with the pilot release on 7 February 2027 ([04 WBS](../04_wbs_and_mvp_implementation_plan.md)). The provider recommendation is unchanged, because the larger budget does not change the ranking. The MVP scope is photo and gallery recognition (one item per photo) plus Quick add (F-11); AI chat (F-05), manual text search (F-10), multi-item (F-04), and packaged-product recognition (F-08) are post-MVP.
+
 ## 1. Decision question
 
 Which available AI provider best supports Snackshot's MVP within the one-month, approximately 28-hour delivery window while meeting the core requirements for photo-based food identification, portion estimation, calorie and macro output, quick correction, and local-first Health Connect logging?
@@ -12,7 +14,7 @@ Which available AI provider best supports Snackshot's MVP within the one-month, 
 
 Snackshot's differentiator is private, low-friction nutrition logging. The project charter defines a backend-less, local-first client: nutrition history remains on the device, Health Connect is an optional synchronization target, and an external AI service receives image payloads and returns data for local storage. The MVP target is friends and family, with free use until external API limits are reached and a one-month delivery window with approximately 28 hours available. Sources: [project charter](../01_project_charter.md), [architecture checklist](01_must-answer-architecture-checklist.md), [architecture answers](02_answers-architecture-checklist.md).
 
-The core AI flow must identify a meal, packaged product, or raw fruit/vegetable; estimate weight or portion; calculate calories and macros; present the result for fast correction; and save a timestamped log. The MVP also needs a manual text-search fallback, a macro dashboard, local data storage, and optional Health Connect synchronization. Sources: [F-01 AI food identification](../Features%20list/F-01-ai-food-identification.md), [F-02 portion estimation](../Features%20list/F-02-volume-portion-estimation.md), [F-03 fast correction](../Features%20list/F-03-fast-fix-of-recognized-values.md), [F-10 manual text search](../Features%20list/F-10-manual-text-search.md), [F-16 macro dashboard](../Features%20list/F-16-macronutrient-dashboard.md), [F-19 Health Connect](../Features%20list/F-19-connect-health-connect.md), [F-20 Health Connect sync](../Features%20list/F-20-google-health-connect-sync.md), and [F-23 log feed](../Features%20list/F-23-calories-macros-log-feed.md).
+The core AI flow must identify a meal, packaged product, or raw fruit/vegetable; estimate weight or portion; calculate calories and macros; present the result for fast correction; and save a timestamped log. The MVP also needs a manual fallback (Quick add since 18 November 2026; text search originally), a macro dashboard, local data storage, and optional Health Connect synchronization. Sources: [F-01 AI food identification](../Features%20list/F-01-ai-food-identification.md), [F-02 portion estimation](../Features%20list/F-02-volume-portion-estimation.md), [F-03 fast correction](../Features%20list/F-03-fast-fix-of-recognized-values.md), [F-10 manual text search](../Features%20list/F-10-manual-text-search.md), [F-16 macro dashboard](../Features%20list/F-16-macronutrient-dashboard.md), [F-19 Health Connect](../Features%20list/F-19-connect-health-connect.md), [F-20 Health Connect sync](../Features%20list/F-20-google-health-connect-sync.md), and [F-23 log feed](../Features%20list/F-23-calories-macros-log-feed.md).
 
 ## 3. Grounds for comparison
 
@@ -35,7 +37,7 @@ The comparison uses all provider-specific research currently stored in `Architec
 
 The repository does not yet contain provider latency benchmarks, verified mapping from the provider response to the application contract, image-retention policies, confidence-score behavior, exact nutrition-database provenance, or a representative test set. Scores below are therefore decision judgments based on documented capabilities, not measured model accuracy. The first implementation task must validate these unknowns.
 
-There is also a product-scope conflict: the project charter lists AI chat as out of scope for the MVP, while [F-05 AI Chat](../Features%20list/F-05-ai-chat.md) marks it as necessary. [F-06 voice logging](../Features%20list/F-06-ai-chat-voice-logging.md) is explicitly not MVP. This analysis treats photo logging and correction as the binding MVP scope; AI chat should remain a decision to resolve before implementation.
+The earlier scope conflict about [F-05 AI Chat](../Features%20list/F-05-ai-chat.md) is resolved: since 18 November 2026, AI chat and [F-06 voice logging](../Features%20list/F-06-ai-chat-voice-logging.md) are post-MVP. Photo logging and correction are the binding MVP scope, as this analysis assumed.
 
 ## 5. Provider evidence
 
@@ -155,7 +157,7 @@ Scores are from 1 (poor or unknown) to 5 (strong documented fit). They are inter
 - Image preprocessing, compression, and camera guidance.
 - The MVP uses one photo with user-editable grams; a separate depth quantity-capture flow is deferred.
 - Prompt/schema design and validation of returned fields.
-- An 80% confidence threshold and fallback to manual text search or quick add below the threshold.
+- An 80% confidence threshold; below it, an emphasized review with Quick add as the fallback (manual text search is post-MVP).
 - Whether a result is saved automatically or only after user correction/review.
 - Test-set composition, request throttling, caching of non-personal reference data, and usage caps.
 - Test-only local calculation of calories from returned macros using the project's Atwater rules: protein and carbohydrates at approximately 4 kcal/g, fat at approximately 9 kcal/g, with alcohol and other components handled explicitly when present. The test version displays this value alongside LogMeal's energy response for comparison; LogMeal's energy remains the application value. Source: [food-energy.md](common-data/food-energy.md).

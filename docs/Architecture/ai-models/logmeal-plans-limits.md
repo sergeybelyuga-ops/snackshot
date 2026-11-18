@@ -73,5 +73,5 @@ An endpoint may require both a minimum plan level and a specific user type. For 
 ## Next Steps
 
 - After the 30-day Free Trial ends, choose a subscription plan on the [LogMeal Pricing Page](https://logmeal.com/api/pricing/).
-- Learn about [User Types & Access Tokens](./guides-essential-concepts-users-and-access-tokens).
-- Explore [Food Recognition Capabilities](./guides-essential-concepts-recognition-capabilities).
+- Learn about [User Types & Access Tokens](../../services_documentation/logmeal/users-and-access-tokens.md).
+- Explore [Food Recognition Capabilities](../../services_documentation/logmeal/recognition-capabilities.md).

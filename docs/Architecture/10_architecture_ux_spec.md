@@ -1,8 +1,8 @@
 # Architecture & UX Specification: Snackshot
 
 **Status:** Draft
-**Version:** 1.1
-**Date:** 2026-09-14 (v1.1: 2026-11-14, account-free AI access, 90-picture trial, paywall, waitlist)
+**Version:** 1.2
+**Date:** 2026-09-14 (v1.1: 2026-11-14, account-free AI access, 90-picture trial, paywall, waitlist; v1.2: 2026-11-18, scope revision: Quick add in the MVP, AI chat and manual search post-MVP, dashboard ranges, local goals, product metrics)
 **Target Platform:** Android (Kotlin, Jetpack Compose, Material 3)
 
 ## 1. Executive Summary & Design Principles
@@ -13,13 +13,14 @@ The local application database is the source of truth. Health Connect is an opti
 
 ### 1.1 Product scope decisions
 
-- **MVP:** F-01, F-02, F-03, F-05 (AI chat: text, photo, gallery), F-16, F-19, F-20, F-23, F-30 (account-free access, no registration), F-32 (90-picture free AI trial, paywall as a screen only), and F-33 (minimal internal admin console, not part of the app UI).
-- **App access:** no registration or sign-in anywhere. AI access is obtained silently on the first AI action. The MVP pilot is capped at 5 users; further users are waitlisted for AI but can log manually.
-- **MVP flow:** one captured or gallery-selected image, LogMeal recognition, editable food and grams, local save, and optional Health Connect sync.
-- **Fallback:** manual text search first, then quick calorie/macro entry. A failed request is retried once, then the preserved draft is routed to fallback.
-- **Health Connect:** never blocks local logging. It is offered contextually at the first save and managed later from Settings.
-- **AI Chat (decision of 2026-11-15):** F-05 is in the MVP (text, photo, gallery; food logging only). F-06 voice remains post-MVP. F-10 manual search and F-11 quick add move to post-MVP. Screens and fallbacks below still need to be aligned; see [04 WBS and MVP Implementation Plan](../04_wbs_and_mvp_implementation_plan.md) §8–9.
-- **Deferred:** mixed plates, barcode, recipes, copy previous, adaptive targets, micronutrients, advanced statistics, body/water/fasting tracking, recap, Wear OS, and profile configuration beyond MVP access and integration settings.
+- **MVP:** F-01, F-02, F-03, F-09 (gallery), F-11 (Quick add, always free), F-16 (D / W / M / 3M / Y dashboard with optional local goals), F-19, F-20, F-23, F-30 (account-free access, no registration), F-32 (90-picture free AI trial, paywall as a screen only), and F-33 (minimal internal admin console, not part of the app UI).
+- **App access:** no registration or sign-in anywhere. AI access is obtained silently on the first AI action. The MVP pilot is capped at 5 users; further users are waitlisted for AI but can log meals with Quick add.
+- **MVP flow:** from S-02 Home, one captured or gallery-selected image (one dish, drink, or raw fruit/vegetable), LogMeal recognition, editable food and grams, local save, and optional Google Health Connect sync; or a Quick add entry.
+- **Fallback:** Quick add (F-11), always free. A failed request is retried once, then the preserved draft (image and time) is offered to Quick add. Quick add is also offered when the trial has ended, the user is waitlisted, the broker is unreachable, or LogMeal's daily limit is reached.
+- **Google Health Connect:** optional and never blocks local logging. It is offered contextually at the first save and managed later from Settings. The user connects by signing in to the Google Health app and linking Snackshot there; Snackshot has no sign-in of its own.
+- **Goals:** optional calorie and macro goals are set in Settings → Nutrition preferences and stored only locally; they are not synchronized with Google Health Connect. Every screen works without goals.
+- **Scope revision (2026-11-18):** F-05 AI chat, F-06 voice, and F-10 manual text search are post-MVP. Multi-item (F-04) and packaged-product (F-08) recognition are post-MVP. See [04 WBS and MVP Implementation Plan](../04_wbs_and_mvp_implementation_plan.md) §2.
+- **Deferred:** AI chat, voice, manual text search, mixed plates, product recognition, barcode, recipes, copy previous, adaptive targets, micronutrients, statistics beyond the D / W / M / 3M / Y dashboard, body/water/fasting tracking, recap, Wear OS, goal sync with Google Health Connect, and profile configuration beyond MVP access and integration settings.
 
 ### 1.2 Design principles
 
@@ -32,30 +33,32 @@ The local application database is the source of truth. Health Connect is an opti
 
 ## 2. Screen & Flow Inventory
 
+> **Prototype scope:** the HTML prototype ([docs/UX_UI/Prototype](../UX_UI/Prototype/)) and the draw.io schemas show the **final UX/UI solution**, including features that come after the MVP (for example "Quick search" in the Home carousel and S-08 Manual food search). In the MVP build these post-MVP features are shown **disabled** (not available); they are not removed from the design.
+
 ### 2.1 Screen catalog
 
 | ID | Screen / surface | Purpose | Primary actions | Secondary actions |
 |---|---|---|---|---|
 | S-01 | Welcome / app access | Establish app entry, AI recognition value, and local-first promise. | Continue. | Privacy details. |
-| S-01A | Privacy details | Explain local storage, LogMeal image processing, and optional Google Health Connect sharing. | Return to welcome. | Return via back. |
-| S-02 | Home | Provide the primary meal-entry carousel and recent meals. | Choose and open the centered meal-entry action; open dashboard/history. | Sync; choose carousel action. |
+| S-01A | Privacy details | Explain local storage, LogMeal image processing, anonymous product metrics, and optional Google Health Connect sharing. | Return to welcome. | Return via back. |
+| S-02 | Home (start screen) | Provide the primary meal-entry carousel (Take a photo, Gallery, Manual add), today's totals, and recent meals. | Choose and open the centered meal-entry action; open dashboard/history. | Sync; free-pictures counter; choose carousel action. |
 | S-03 | Camera capture | Capture a usable meal image. | Take photo; toggle flash. | Gallery; close; photo guidance; free-pictures counter. |
 | S-04 | Gallery picker | Select an existing image. | Choose image. | Cancel. |
 | S-05 | Recognition progress | Communicate image validation and AI processing while preprocessing runs in the background. | Cancel and preserve draft. | Retry after failure. |
 | S-07 | Edit nutrition bottom sheet | Correct food name, grams, calories, or macros. | Apply correction. | Cancel; reset estimate. |
-| S-08 | Manual food search | Find a food and nutrition values when recognition is wrong or unavailable. | Search; select result; save. | Quick add; cancel. |
-| S-09 | Quick add form | Record known calories/macros without recognition. | Save local entry. | Cancel. |
-| S-10 | Save / Health Connect prompt | Explain optional sync at first save. | Keep local-only; connect. | Read privacy details; later. |
-| S-11 | Health Connect authorization return | Reflect permission result and sync status. | Retry permission/sync. | Continue local-only; open system settings. |
-| S-12 | Daily dashboard detail | Compare today's and historical daily totals. | Select date; switch day/week. | Open meal feed. |
+| S-08 | Manual food search (**post-MVP**, F-10) | Find a food and nutrition values when recognition is wrong or unavailable. | Search; select result; save. | Quick add; cancel. |
+| S-09 | Quick add form | Record known calories/macros without recognition; always free; the fallback whenever AI is unavailable. | Save local entry. | Calculate kcal from macros; cancel. |
+| S-10 | Save / Google Health Connect prompt | Explain optional Google Health Connect sync at first save. | Keep local-only; connect. | Read privacy details; later. |
+| S-11 | Google Health Connect authorization return | Reflect permission result and sync status. | Retry permission/sync. | Continue local-only; open system settings. |
+| S-12 | Dashboard (D / W / M / 3M / Y) | Compare totals for a day, week, month, three months, or year, with optional local goals. | Select period; switch range. | Open meal feed. |
 | S-13 | Weekly summary | Show seven daily totals and daily averages. | Change week. | Select a day; return. |
 | S-14 | Meal history feed | Review, edit, or delete chronological entries. | Open entry; delete. | Filter by date; manual sync. |
-| S-15 | Meal review | Review a recognized or saved meal, including confidence, grams, calories, and macros. | Save; edit values. | Retake; manual search; quick add; discard. |
-| S-16 | Settings / integration | Manage local preferences, Health Connect state, and see AI recognition status. | Connect, disconnect, sync. | Privacy; AI recognition (free pictures left); delete all data. |
+| S-15 | Meal review | Review a recognized or saved meal, including confidence, grams, calories, and macros. | Save; edit values. | Retake; Quick add; discard. |
+| S-16 | Settings / integration | Manage local preferences, Google Health Connect state, goals, language and country, product metrics, and see AI recognition status. | Connect, disconnect, sync. | Privacy; AI recognition (free pictures left); Nutrition preferences (goals); language and country; product metrics on/off; theme; image retention; delete all data. |
 | S-17 | Confirmation dialogs | Confirm destructive or consequential actions. | Confirm delete/disconnect. | Cancel. |
 | S-18 | Snackbars / banners | Report save, sync, retry, and fallback results. | Retry; undo where supported. | Dismiss. |
-| S-19 | AI paywall | Shown on an AI action after the 90 free pictures are used. MVP: "Subscriptions are coming soon". | Search food; Quick add. | Close. Post-MVP: Subscribe, Restore purchase. |
-| S-20 | AI waitlist | Shown on an AI action when the 5-user pilot is full. | Search food; Quick add. | Close. |
+| S-19 | AI paywall | Shown on an AI action after the 90 free pictures are used. MVP: "Subscriptions are coming soon". | Quick add. | Close. Post-MVP: Subscribe, Restore purchase. |
+| S-20 | AI waitlist | Shown on an AI action when the 5-user pilot is full. | Quick add. | Close. |
 
 ### 2.2 Global navigation architecture
 
@@ -80,8 +83,7 @@ flowchart TD
     subgraph L3C[Level 3c]
         Camera[S-03 Take a photo]
         Gallery[S-04 Gallery]
-        QuickAdd[S-09 Manual add]
-        Search[S-08 Quick search]
+        QuickAdd[S-09 Quick add]
         SavePrompt[S-10 Save / Health Connect prompt]
         HealthConnect[S-11 Health Connect authorization]
     end
@@ -104,7 +106,7 @@ flowchart TD
 
     subgraph L5A[Level 5a: Sub-settings and connections]
         PrivacyDetails[S-01A Privacy details]
-        GoogleHealthConnection[Google Health connection]
+        GoogleHealthConnection[Google Health Connect connection]
         ImageRetentionPolicy[Image retention policy]
         NutritionPreferences[Nutrition preferences]
         Theme[Theme]
@@ -127,16 +129,14 @@ flowchart TD
     Home -->|Capture meal| Camera
     Home -->|Choose image| Gallery
     Home -->|Manual add| QuickAdd
-    Home -->|Quick search| Search
     Home -->|Settings tab| Settings
 
     Camera -->|Trial ended| Paywall
     Camera -->|Pilot full| Waitlist
     Gallery -->|Trial ended| Paywall
-    Paywall -->|Search food| Search
+    Gallery -->|Pilot full| Waitlist
     Paywall -->|Quick add| QuickAdd
     Paywall -->|Close| Home
-    Waitlist -->|Search food| Search
     Waitlist -->|Quick add| QuickAdd
     Waitlist -->|Close| Home
     Camera -->|Photo captured| Recognition
@@ -146,14 +146,11 @@ flowchart TD
     Gallery -->|Cancel| Camera
     Recognition -->|Result returned| MealReview
     Recognition -->|Cancel or retake| Camera
-    Recognition -->|Manual fallback| Search
     Recognition -->|Quick add fallback| QuickAdd
     MealReview -->|Edit result| EditSheet
     MealReview -->|Save| SavePrompt
     EditSheet -->|Apply or cancel| MealReview
-    Search -->|Select result| SavePrompt
     QuickAdd -->|Submit| SavePrompt
-    Search -->|Back or cancel| Home
     QuickAdd -->|Back or cancel| Home
 
     SavePrompt -->|Local-only save| Home
@@ -226,7 +223,7 @@ flowchart TD
     D -- trial, pictures left --> E[Camera with counter: N of 90 free pictures left]
     D -- trial_ended --> F[S-19 Paywall: subscriptions coming soon]
     D -- waitlisted --> G[S-20 Waitlist]
-    D -- broker unreachable --> H[Retryable error + manual logging]
+    D -- broker unreachable --> H[Retryable error + Quick add]
     E --> I[Recognition and review]
     I --> J[Report one used picture]
     J --> K{90 used?}
@@ -234,7 +231,7 @@ flowchart TD
     L -- Yes --> M[One-time heads-up snackbar]
     L -- No --> N[Continue]
     K -- Yes --> O[Next AI action shows S-19]
-    F --> P[Search food / Quick add / Close]
+    F --> P[Quick add / Close]
     G --> P
 ```
 
@@ -263,7 +260,7 @@ sequenceDiagram
         UI->>UI: Recalculate dependent values
         User->>UI: Tap Save
     else Result unusable
-        User->>UI: Choose search or quick add
+        User->>UI: Choose Quick add (draft image and time kept)
     end
     UI->>Local: Persist current meal values and processed image reference
 ```
@@ -321,7 +318,7 @@ Statistics should read as a guided health insight, not a dashboard of unrelated 
 4. **Primary chart:** one metric at a time, with large uncluttered plot area, labeled axes, rounded bars or a simple line, and a visible personal-goal band where applicable.
 5. **Chart legend and metric selector:** use a compact legend for Personal range, In range, Above range, and Below range; use an `ExposedDropdownMenuBox` or `FilterChip` for the metric choice rather than multiple simultaneous charts.
 6. **Chronological value rows:** full-width `ListItem` rows with date on the left and the measured value in a large right-aligned pill/value block. Use grouped surface rows with 12dp outer corners, not nested cards.
-7. **Macro goal section:** three labeled horizontal progress tracks for carbohydrates, fat, and protein, each showing consumed percentage and grams against the goal. Include a `View full nutrients` text action for future micronutrients.
+7. **Macro goal section (only when the user has set goals):** three labeled horizontal progress tracks for carbohydrates, fat, and protein, each showing consumed percentage and grams against the user's local goal. Include a `View full nutrients` text action for future micronutrients.
 
 Avoid four equal statistic cards, donut charts that hide exact values, decorative gradients, and a dense multi-series chart. The user should be able to answer “what was my value, for which period, and how does it compare with my goal?” at a glance.
 
@@ -385,7 +382,7 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 
 **Component hierarchy:** `Scaffold` -> theme surface -> top app bar with `IconButton` back -> abstract `Icon` brand mark -> scrollable `Card`/reading surface -> section headings and body text.
 
-**Content requirements:** State that Snackshot requires no registration and does not store customer profiles, nutrition logs, personal health data, or photos on its own servers. Explain that a small Snackshot service (the AI access service) keeps only an anonymous ID, a scrambled (hashed) device identifier, the number of AI pictures used, and the AI access status, so that free pictures can be counted and AI access can be managed; it never receives photos or nutrition data. Explain that photo recognition sends only the selected picture to LogMeal, without personal information linked to the user. Explain that Google Health Connect is optional, can be used with an existing or newly created Google account, and can share information with compatible applications for recommendations or other services.
+**Content requirements:** State that Snackshot requires no registration and does not store customer profiles, nutrition logs, personal health data, or photos on its own servers. Explain that a small Snackshot service (the AI access service) keeps only an anonymous ID, a scrambled (hashed) device identifier, the number of AI pictures used, and the AI access status, so that free pictures can be counted and AI access can be managed; it never receives photos or nutrition data. Explain that photo recognition sends only the selected picture, plus the user's language and country, to LogMeal, without personal information linked to the user. Explain that Snackshot collects only product metrics (for example AI response time and usage statistics) to make the product better, that they contain no personal data, and that they can be switched off in Settings. Explain that goals stay on the phone. Explain that Google Health Connect is optional: to use it, the user signs in to the Google Health app with an existing or newly created Google account and links Snackshot there, and it can share information with compatible applications for recommendations or other services.
 
 **States:** Loading is not applicable because the document is bundled with the prototype. Empty is not applicable. Error is limited to an unavailable local document and returns to S-01. Success/default presents the complete scrollable long read with a clear return action.
 
@@ -395,7 +392,7 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 
 **Purpose and role:** Provide the fastest entry to logging, recent meals, and navigation to dashboard and history.
 
-**Component hierarchy:** `Scaffold` -> `TopAppBar` with sync status -> compact meal-entry carousel -> recent meal value rows -> `NavigationBar` for Home, History, Settings. The carousel order loops Take a photo -> Quick search -> Gallery -> Manual add; only the centered, larger action is enabled. The immediately preceding and following actions remain visible at reduced scale as non-interactive previews.
+**Component hierarchy:** `Scaffold` -> `TopAppBar` with sync status -> free-pictures `AssistChip` (when AI access exists) -> today's totals -> compact meal-entry carousel -> recent meal value rows -> `NavigationBar` for Home, Dashboard, History, Settings. The carousel order loops Take a photo -> Gallery -> Manual add (Quick add); only the centered, larger action is enabled. The immediately preceding and following actions remain visible at reduced scale as non-interactive previews.
 
 **States:** Loading uses stable skeletons for the carousel and recent meal rows while local aggregates load. Empty uses a short explanation and the centered meal-entry action. Error shows cached meal rows plus an inline retry banner. Success updates recent meals immediately after local save and marks sync separately.
 
@@ -419,39 +416,41 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 
 **Component hierarchy:** `Scaffold` -> image preview -> validation status row -> `LinearProgressIndicator` -> provider progress `Text` -> cancel `OutlinedButton` -> retry/alternative actions in a compact action row.
 
-**States:** Loading shows image validation and provider progress, disables duplicate requests, and keeps the draft recoverable in the background. Empty means no usable image and routes back to capture. Error permits one immediate retry, then preserves the draft and offers Search or Quick Add. Success routes to S-15 Meal review.
+**States:** Loading shows image validation and provider progress, disables duplicate requests, and keeps the draft recoverable in the background. Empty means no usable image and routes back to capture. Error permits one immediate retry, then preserves the draft and offers Quick add. Success routes to S-15 Meal review.
 
-**Edge cases:** Poor lighting, blur, unsupported format, airplane mode, slow network, provider quota (LogMeal's 20 pictures per day: show "Daily AI limit reached — try again in N h" with Search and Quick Add), broker unreachable, access revoked (403) during the request, and p98 latency above 3 seconds must not discard the image or edits. Preprocessing is a background task, not a separate screen; if the app cannot finish within the expected window, show a recoverable pending state with fallback actions instead of a blocking preparation step.
+**Edge cases:** Poor lighting, blur, unsupported format, airplane mode, slow network, provider quota (LogMeal's 20 pictures per day: show "Daily AI limit reached — try again in N h" with Quick add), broker unreachable, access revoked (403) during the request, and p98 latency above 3 seconds must not discard the image or edits. Preprocessing is a background task, not a separate screen; if the app cannot finish within the expected window, show a recoverable pending state with fallback actions instead of a blocking preparation step.
 
 ### 4.7 S-07 Edit nutrition sheet and S-15 Meal review
 
 **Purpose and role:** Make the AI result useful without requiring a full manual re-entry.
 
-**Component hierarchy:** S-15 Review `Scaffold` -> `TopAppBar` -> processed image -> food name `ListItem` -> confidence `AssistChip` -> grams `OutlinedTextField`/stepper -> nutrition values `Card` -> `FilledButton` Save -> `TextButton` Search and Quick Add. S-07 Edit uses `ModalBottomSheet` with food name field, grams field, optional macro fields, Reset, and Apply.
+**Component hierarchy:** S-15 Review `Scaffold` -> `TopAppBar` -> processed image -> food name `ListItem` -> confidence `AssistChip` -> grams `OutlinedTextField`/stepper -> nutrition values `Card` -> `FilledButton` Save -> `TextButton` Quick add. S-07 Edit uses `ModalBottomSheet` with food name field, grams field, optional macro fields, Reset, and Apply.
 
 **States:** Loading displays the image and skeleton values. Empty means no usable recognition and presents fallback actions. Error identifies missing or invalid fields and blocks save until corrected. Success enables Save, updates totals immediately after edits, and provides haptic confirmation and snackbar.
 
-**Edge cases:** Below the 80% confidence threshold, emphasize review and fallback rather than silently accepting. Partial recognition can save only after the user supplies missing required values. Grams changes recalculate dependent nutrition values locally; manually supplied provider values remain the displayed source unless the correction contract says otherwise. Long food names wrap.
+**Edge cases:** Below the 80% confidence threshold, emphasize review and fallback rather than silently accepting. Partial recognition can save only after the user supplies missing required values. Grams changes recalculate dependent nutrition values locally by scaling them proportionally to the new weight; manually supplied provider values remain the displayed source unless the correction contract says otherwise. Long food names wrap.
 
-### 4.8 S-08 Manual food search and S-09 Quick add
+### 4.8 S-09 Quick add (S-08 Manual food search is post-MVP)
 
-**Purpose and role:** Preserve logging when recognition is uncertain, unavailable, or not worth correcting.
+**Purpose and role:** Preserve logging when AI is not wanted, uncertain, or unavailable (recognition failed, trial ended, waitlisted, broker unreachable, LogMeal daily limit). Quick add is always free and works offline without AI access.
 
-**Component hierarchy:** Search `Scaffold` -> `SearchBar` -> result `LazyColumn` of `ListItem`s with nutrition preview -> Quick Add `ModalBottomSheet` or destination form -> `OutlinedTextField`s for name, calories, protein, carbs, and fat -> `FilledButton` Save.
+**Component hierarchy:** Quick add `ModalBottomSheet` or destination form -> `OutlinedTextField`s for name, calories, protein, carbs, and fat -> "Calculate kcal from macros" `TextButton` -> `FilledButton` Save. When opened from a failed recognition, the preserved image and time are shown and kept.
 
-**States:** Loading shows result placeholders. Empty search shows the query and Quick Add CTA. Error offers retry and Quick Add. Success returns a complete local meal draft and preserves the selected timestamp/image reference where applicable.
+**States:** Loading is not applicable (local only). Empty shows blank fields with hints. Error marks invalid fields. Success returns a complete local meal draft to the save path and preserves the selected timestamp/image reference where applicable.
 
-**Edge cases:** Debounce search, handle offline database availability, validate non-negative numeric values, and prevent save with all nutrition fields blank. Text scaling must not hide the Save action.
+**Edge cases:** Validate non-negative numeric values and prevent save with all nutrition fields blank. Text scaling must not hide the Save action.
 
-### 4.9 S-10 Save / Health Connect prompt and S-11 authorization return
+**S-08 Manual food search (post-MVP, F-10):** the existing schema and prototype are kept for the post-MVP design and are not built in the MVP.
 
-**Purpose and role:** Explain optional synchronization at the first save without blocking local value.
+### 4.9 S-10 Save / Google Health Connect prompt and S-11 authorization return
+
+**Purpose and role:** Explain optional Google Health Connect sync at the first save without blocking local value.
 
 **Component hierarchy:** `AlertDialog` or `ModalBottomSheet` -> privacy explanation -> local-only `TextButton` -> connect `FilledButton`; return surface uses `LinearProgressIndicator`, sync status `AssistChip`, and retry action.
 
 **States:** Loading persists locally first, then checks SDK and permissions. Empty is local-only with no connection. Error explains unavailable SDK, revoked permission, failed write, or partial sync and keeps the local record. Success confirms local save and Health Connect write separately.
 
-**Edge cases:** Android 9+ and Health Connect availability vary. A user may decline, revoke, or reconnect later. Never require Google sign-in inside Snackshot as a Health Connect prerequisite; if Google Health requires its own account, direct the user to that system flow.
+**Edge cases:** Android 9+ and Health Connect availability vary. A user may decline, revoke, or reconnect later. Never require Google sign-in inside Snackshot. The only connection process is: the user signs in to the Google Health app and links Snackshot there, then grants Health Connect permissions; if the Google Health app needs its account, direct the user to that app's own flow.
 
 ### 4.10 S-12 Dashboard ranges and S-13 Weekly summary
 
@@ -459,11 +458,11 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 
 **Component hierarchy:** `Scaffold` -> `TopAppBar` -> `SegmentedButton` `D`/`W`/`M`/`3M`/`Y` -> period label and previous/next/current icon buttons -> metric insight header -> single-metric chart with personal range band -> metric selector -> legend -> `LazyColumn` chronological value rows -> macro goal progress rows -> meal feed CTA.
 
-**States:** Loading uses stable placeholders for the metric header and chart. Empty uses a large “No data” message with an explanation and Capture CTA. Error shows the last cached aggregate and retry. Success updates the headline, chart, selected range, and chronological rows after every local save and sync import.
+**States:** Loading uses stable placeholders for the metric header and chart. Empty uses a large “No data” message with an explanation and Take a photo and Quick add CTAs. Error shows the last cached aggregate and retry. Success updates the headline, chart, selected range, and chronological rows after every local save and sync import.
 
 **Range variants:** `D` presents a daily total and meal rows. `W` presents seven daily totals and a daily average. `M` presents a calendar-month aggregate. `3M` presents the last three complete or current calendar months as monthly bars with a daily average; the schema range is Jun 24-Sep 23, 2026. `Y` presents month-level aggregates for the current calendar year with a daily average; the schema range is Jan 1-Sep 23, 2026. The `3M` and `Y` variants reuse the same segmented control, aggregate header, macro averages, chart, and History CTA as weekly/monthly.
 
-**Edge cases:** Time zones and day boundaries use the device locale consistently. No target band is shown when none exists; the header says that the goal is unavailable. Large values, seven-day labels, and font scaling must not overlap. Long-range charts aggregate by month rather than rendering one mark per day. Every chart has an accessible tabular/text summary, and the selected metric and period are announced to screen readers.
+**Edge cases:** Time zones and day boundaries use the device locale consistently. Goals come only from the user's optional local goals (Settings → Nutrition preferences); they are not read from Google Health Connect. No target band is shown when no goal is set; the header says that no goal is set. Large values, seven-day labels, and font scaling must not overlap. Long-range charts aggregate by month rather than rendering one mark per day. Every chart has an accessible tabular/text summary, and the selected metric and period are announced to screen readers.
 
 ### 4.11 S-14 Meal history feed
 
@@ -471,17 +470,19 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 
 **Component hierarchy:** History `Scaffold` -> date/filter controls -> `LazyColumn` of meal `Card`s with image, time, name, calories, and macro labels -> manual sync `IconButton`. Selecting a meal opens S-15 Meal review.
 
-**States:** Loading uses list placeholders. Empty explains that no meals are logged and offers Capture/Search. Error retains cached entries and offers retry. Success supports edit, delete, undo snackbar where safe, and distinct sync status.
+**States:** Loading uses list placeholders. Empty explains that no meals are logged and offers Take a photo and Quick add. Error retains cached entries and offers retry. Success supports edit, delete, undo snackbar where safe, and distinct sync status.
 
 **Edge cases:** Deleted records require confirmation and propagate to Health Connect when linked. If external deletion arrives through changes, remove or mark the local record according to sync metadata. Missing images show a neutral placeholder, not a broken image layout.
 
 ### 4.12 S-16 Settings / integration and S-17 dialogs
 
-**Purpose and role:** Manage local privacy choices, Health Connect connection, sync, and destructive actions.
+**Purpose and role:** Manage local privacy choices, the Google Health Connect connection, sync, goals, language and country, product metrics, and destructive actions.
 
 **Component hierarchy:** `Scaffold` -> `TopAppBar` -> `ListItem` preference sections -> `Switch`/`AssistChip` connection state -> manual sync `FilledTonalButton` -> privacy and retention details. Destructive operations use `AlertDialog` with explicit consequences.
 
 **States:** Loading reads integration state. Empty means local-only configuration. Error identifies permission or sync failure and links to system settings. Success shows last sync time and connection state.
+
+**Sections:** Google Health Connect (connect, disconnect, sync, last sync), AI recognition, Language and country (used by LogMeal for recognized dishes; changes call the broker `profile` endpoint), Nutrition preferences (optional calorie and macro goals, stored only locally; can be cleared), Product metrics (`Switch`, on by default, with an explanation that no personal data is sent), Theme, Image retention policy, Privacy details, Delete all data.
 
 **AI recognition section:** a `ListItem` showing the AI status: "N of 90 free pictures left", "Free pictures used — subscriptions coming soon" (opens S-19), "On the waitlist" (opens S-20), or "AI paused". **Delete all data** (S-17 confirmation) explains that local meals and the AI access record are deleted, but the used free pictures are not reset.
 
@@ -489,17 +490,17 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 
 ### 4.13 S-19 AI paywall and S-20 AI waitlist
 
-**Purpose and role:** Explain honestly why AI recognition is not available and keep the user logging with free manual methods.
+**Purpose and role:** Explain honestly why AI recognition is not available and keep the user logging with Quick add, which is always free.
 
-**Component hierarchy:** `ModalBottomSheet` (or full-screen `Scaffold` on compact heights) -> abstract `Icon` -> `TitleLarge` -> `BodyLarge` explanation -> `FilledButton` Search food -> `OutlinedButton` Quick add -> `TextButton` Close.
+**Component hierarchy:** `ModalBottomSheet` (or full-screen `Scaffold` on compact heights) -> abstract `Icon` -> `TitleLarge` -> `BodyLarge` explanation -> `FilledButton` Quick add -> `TextButton` Close.
 
-**S-19 copy (MVP):** Title "You've used your 90 free AI pictures". Body "Thanks for trying Snackshot AI. Subscriptions are coming soon. You can keep logging meals with search and quick add — your history, dashboards, and Health Connect sync stay free." Post-MVP adds the price, `FilledButton` Subscribe (Google Play Billing), and `TextButton` Restore purchase.
+**S-19 copy (MVP):** Title "You've used your 90 free AI pictures". Body "Thanks for trying Snackshot AI. Subscriptions are coming soon. You can keep logging meals with Quick add — your history, dashboards, goals, and Google Health Connect sync stay free." Post-MVP adds the price, `FilledButton` Subscribe (Google Play Billing), and `TextButton` Restore purchase.
 
-**S-20 copy:** Title "AI recognition is in a closed pilot". Body "All pilot places are taken right now. You're on the waitlist and AI will turn on automatically when a place frees up. Meanwhile, log meals with search or quick add."
+**S-20 copy:** Title "AI recognition is in a closed pilot". Body "All pilot places are taken right now. You're on the waitlist and AI will turn on automatically when a place frees up. Meanwhile, log meals with Quick add."
 
-**States:** Loading checks the broker status (skeleton text, actions enabled). Error (broker unreachable) shows "Couldn't check AI access" with Retry plus the manual actions. Success/default shows the copy above. S-20 switches to the trial flow automatically on the next status check after approval.
+**States:** Loading checks the broker status (skeleton text, actions enabled). Error (broker unreachable) shows "Couldn't check AI access" with Retry plus Quick add. Success/default shows the copy above. S-20 switches to the trial flow automatically on the next status check after approval.
 
-**Edge cases:** Never show these sheets for manual logging, history, dashboards, or Health Connect. Do not show them mid-recognition; a recognition already started completes. Announce the title to screen readers when the sheet opens. No payment SDK or price is shown in the MVP.
+**Edge cases:** Never show these sheets for Quick add, history, dashboards, goals, or Google Health Connect. Do not show them mid-recognition; a recognition already started completes. Announce the title to screen readers when the sheet opens. No payment SDK or price is shown in the MVP.
 
 ## 5. Accessibility & Interaction Specs
 
@@ -513,7 +514,7 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 
 ### 5.2 Contrast, scaling, and content resilience
 
-- Target WCAG 2.1 AA contrast: at least 4.5:1 for normal text and 3:1 for large text and essential graphical elements.
+- Target WCAG 2.2 AA contrast: at least 4.5:1 for normal text and 3:1 for large text and essential graphical elements.
 - Support system font scaling without clipping, truncation of essential values, or horizontal scrolling for forms.
 - Do not rely on color alone for confidence, sync, error, or macro categories; combine color with labels, icons, and text.
 - Localize dates, decimal separators, units, and pluralization. Keep nutrition units explicit: kcal and g.
@@ -531,39 +532,40 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 - Recognition reliability target: at least 90% usable result or actionable fallback during validation.
 - Local save must complete independently of network and Health Connect state.
 - Store current meal values, processed image reference, timestamp, and sync metadata locally. Retain processed images according to the documented 365-day policy; delete captured originals after processing.
-- Instrument time-to-log, recognition latency, fallback use, edits, zero-edit rate, local save success, and sync outcomes without sending dietary history to an app-owned server.
+- Instrument time-to-log, recognition latency, Quick add use, edits, zero-edit rate, local save success, and sync outcomes as anonymous product metrics: one daily aggregate sent through the broker, with no personal data, food names, images, or nutrition values ([04 WBS](../04_wbs_and_mvp_implementation_plan.md) §6). The user can switch them off in Settings.
 
 ## 6. Feature Traceability and Scope
 
 | Feature IDs | UX ownership | Status |
 |---|---|---|
-| F-01, F-02, F-03 | S-03 to S-08 recognition and correction | MVP |
+| F-01, F-02, F-03 | S-02 entry, S-03 to S-07 and S-15 recognition and correction (one item per photo) | MVP |
 | F-04 | Future multi-item review variant of S-07 | Post-MVP |
-| F-05 | Chat as the start screen; text, photo, and gallery input | MVP |
+| F-05 | Future chat surface (text, photo, gallery) | Post-MVP |
 | F-06 | Voice input variant of chat | Post-MVP |
 | F-07 | Photo guidance from S-03 and the background validation path | Post-MVP, lightweight copy may ship in MVP |
 | F-08 | Product recognition variant of S-07 | Post-MVP |
-| F-09 | S-04 Gallery picker | Post-MVP in master list; supported as a low-cost MVP capture fallback |
-| F-10, F-11 | S-08 and S-09 manual fallbacks | Post-MVP |
+| F-09 | S-02 and S-03 gallery entry, S-04 Gallery picker | MVP |
+| F-10 | S-08 Manual food search | Post-MVP |
+| F-11 | S-09 Quick add from S-02, S-05, S-15, S-19, S-20 | MVP (always free) |
 | F-12, F-13, F-14 | Future input extensions from S-09/S-15 | Post-MVP or deferred |
-| F-15, F-16 | S-02, S-13, S-14 totals and macro views | F-16 MVP; F-15 post-MVP target comparison |
+| F-15, F-16 | S-02, S-12, S-13 totals, D / W / M / 3M / Y ranges, optional local goals (S-16 Nutrition preferences) | F-16 MVP including ranges and local goals; F-15 post-MVP for further target features |
 | F-17, F-18 | Future nutrition and target extensions | Deferred |
 | F-19, F-20, F-21 | S-11, S-12, S-17 integration surfaces | F-19/F-20 MVP; F-21 post-MVP |
 | F-22 | Separate Wear OS surface | Deferred |
 | F-23 | S-14 history feed and S-15 meal review | MVP |
-| F-24, F-25 | Future timeline/statistics variants of S-13/S-14 | Post-MVP |
+| F-24, F-25 | Future timeline/statistics variants beyond the S-12/S-13 ranges | Post-MVP |
 | F-26, F-27, F-28, F-29 | Future tracking and recap surfaces | Deferred |
 | F-30 | No registration; silent anonymous AI access on first AI action (S-03/S-04) | MVP |
 | F-32 | S-03 counter, S-16 AI section, S-19 paywall, S-20 waitlist | MVP (paywall as a screen only) |
 | F-33 | Internal admin console (separate web app, not in the Android UI) | MVP (minimal) |
-| F-31 | S-17 settings/profile extension | Deferred |
+| F-31 | S-16 settings/profile extension | Deferred |
 
 ## 7. Open Decisions Before Implementation
 
 1. Validate LogMeal's single-photo grams response, latency, quota, image retention, and training-use terms. Mobile credential protection is resolved by [11_logmeal-access-token-management.md](./11_logmeal-access-token-management.md).
 2. ✅ Resolved (2026-11-14): no Google sign-in or registration in Snackshot, including for AI. AI access uses a silent anonymous identity (F-30), a 90-picture free trial with a paywall screen (F-32), and a 5-user pilot cap.
-3. Confirm whether F-09 gallery selection ships in the MVP vertical slice; the feature file marks it post-MVP, while F-01 requires a gallery fallback.
-4. Define the exact local persistence technology and schema migration strategy behind the repository boundary.
+3. ✅ Resolved (2026-11-18): F-09 gallery selection is in the MVP.
+4. Define the exact local persistence technology and schema migration strategy behind the repository boundary (Room proposed; confirmed in WBS 1.2).
 5. Validate Health Connect permission scopes, bootstrap import behavior, client record version handling, and deletion semantics on physical Android devices.
 
 ## 8. Quality Checklist
@@ -574,4 +576,4 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 - [x] Each primary screen and modal defines loading, empty, error, success, and relevant edge behavior.
 - [x] Camera, gallery, AI failure, local-only, Health Connect denial, revocation, retry, and deletion paths are mapped.
 - [x] Accessibility, touch targets, contrast, font scaling, motion, and haptics are specified.
-- [x] The document is saved under `docs/Architecture/UX_UI/`.
+- [x] The document is saved as `docs/Architecture/10_architecture_ux_spec.md`; the visual materials (design brief, prototype, schemas, `theme.kt`) are under `docs/UX_UI/`.

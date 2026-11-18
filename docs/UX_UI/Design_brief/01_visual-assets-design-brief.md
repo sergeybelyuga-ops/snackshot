@@ -1,14 +1,17 @@
 # Snackshot: Visual Assets Design Brief
 
 **Status:** DRAFT for designer review
-**Document Version:** 0.3
-**Date:** November 14, 2026
+**Document Version:** 0.4
+**Date:** November 14, 2026 (v0.4: November 18, 2026, MVP scope revision: Quick add in the MVP, manual food search post-MVP)
 **Owner:** Snackshot product team
 **Related documents:** [Project charter](../../01_project_charter.md), [Architecture UX spec](../../Architecture/10_architecture_ux_spec.md) (§3 visual system, §4 screens, §5 accessibility), [prototype theme tokens](../Prototype/prototype-theme.css), [Compose typography](../theme.kt), [HTML prototype](../Prototype/)
 
 ---
 
 ## 1. Summary
+
+> **Prototype scope:** the HTML prototype ([docs/UX_UI/Prototype](../Prototype/)) and the draw.io schemas show the **final UX/UI solution**, including features that come after the MVP (for example "Quick search" in the Home carousel and S-08 Manual food search). In the MVP build these post-MVP features are shown **disabled** (not available); they are not removed from the design.
+
 
 Snackshot needs a first complete visual identity. This brief asks for four groups of deliverables:
 
@@ -27,7 +30,7 @@ All deliverables must work in **both light and dark themes**, follow **Material 
 
 ### 2.1 What Snackshot is
 
-Snackshot is a mobile nutrition and calorie tracker. The user **takes a photo of a meal**, AI recognizes the food and estimates the portion, and the app logs calories and macros (carbs, fat, protein). Meals can also be logged by text search or quick manual entry.
+Snackshot is a mobile nutrition and calorie tracker. The user **takes a photo of a meal**, AI recognizes the food and estimates the portion, and the app logs calories and macros (carbs, fat, protein). Meals can also be logged by quick manual entry (Quick add), which is always free. Text food search (S-08) comes after the MVP.
 
 Key product promises that the visuals should express:
 
@@ -45,7 +48,7 @@ Key product promises that the visuals should express:
 |---|---|
 | MVP platform | Android (Kotlin, Jetpack Compose, Material 3), reference device Pixel 9 (412 x 892dp) |
 | Post-MVP platform | iOS (native UI, HealthKit). The iOS assets are requested now so the identity is ready |
-| MVP audience | Closed pilot, friends and family, adults 20 to 55, everyday smartphone users, not athletes or dieticians |
+| MVP audience | Closed pilot of 5 friends and family: adults of all genders, around 40 years old (as in the [project charter](../../01_project_charter.md)), everyday smartphone users, not athletes or dieticians |
 | Language | English UI; the identity must not depend on text other than the wordmark |
 
 ### 2.4 Brand personality
@@ -288,18 +291,18 @@ Each row shows how the icon looks in the app today (Material Symbols Rounded, ou
 |---|---|---|---|---|
 | <img src="icons_current/photo_camera.png" width="28" alt="photo_camera"> | `photo_camera` | Take a photo / AI recognition, the main brand action | S-01A, S-02 (carousel "Take a photo"), S-03 (shutter, permission states), S-12, S-14, S-15 (retake), S-16 (AI recognition), S-19 (sheet icon) | **Redesign** |
 | <img src="icons_current/photo_library.png" width="28" alt="photo_library"> | `photo_library` | Pick from gallery | S-02 (carousel "Gallery"), S-03, S-05, S-16, S-19 | **Redesign** |
-| <img src="icons_current/search.png" width="28" alt="search"> | `search` | Food database search | S-02 (carousel "Quick search"), S-05, S-08, S-09, S-14, S-15, S-19 | **Redesign** |
+| <img src="icons_current/search.png" width="28" alt="search"> | `search` | Food database search | S-08, S-14 (post-MVP search); the "Quick search" carousel action and the Search buttons on S-05, S-15, S-19 are removed from the MVP | **Redesign**, lower priority (post-MVP) |
 | <img src="icons_current/edit_note.png" width="28" alt="edit_note"> | `edit_note` | Manual add (kcal and macros); manual meal source | S-02 (carousel "Manual add", meal thumbnail), S-05, S-12, S-14, S-16 ("Write nutrition"), S-19 | **Redesign** |
 | <img src="icons_current/image.png" width="28" alt="image"> | `image` | **Meal placeholder**: the single thumbnail for a meal logged without a photo (meals with a photo always show the real photo); also the generic "image" sign | S-02, S-04, S-09, S-12, S-14 | **Redesign** |
 | <img src="icons_current/auto_awesome.png" width="28" alt="auto_awesome"> | `auto_awesome` | AI estimate / high recognition confidence | S-07, S-15 | **Redesign**: Snackshot's "AI" sign |
 | <img src="icons_current/restaurant.png" width="28" alt="restaurant"> | `restaurant` | Meal (generic) | S-02, S-07, S-10, S-14 | **Redesign** |
 | <img src="icons_current/nutrition.png" width="28" alt="nutrition"> | `nutrition` | Nutrition / nutrition preferences | S-16 | **Redesign** |
 | <img src="icons_current/local_fire_department.png" width="28" alt="local_fire_department"> | `local_fire_department` | Calories (kcal) | S-16 (calorie goal) | **Redesign** |
-| <img src="icons_current/bolt.png" width="28" alt="bolt"> | `bolt` | Quick add (shortcut to S-09) | S-08, S-15 | **Redesign**. Today the same action uses `edit_note` on S-02 and `bolt` on S-08/S-15; the new set should define **one** Quick add icon used everywhere |
+| <img src="icons_current/bolt.png" width="28" alt="bolt"> | `bolt` | Quick add (shortcut to S-09) | S-05, S-15, S-19, S-20 | **Redesign**. Today the same action uses `edit_note` on S-02 and `bolt` on S-15; the new set should define **one** Quick add icon used everywhere |
 
 #### Group 2: Macronutrients (New, priority 1)
 
-Today, macros are shown as colored dots (carbs `#2D9CDB`, fat `#E5675C`, protein `#C77700`). Shape-coded icons improve accessibility because color is no longer the only signal. The style references in [UX_UI/art](../art/) (`carbs.png` wheat, `fat.png`, `protein.png`, `meal.png`) are **direction only**; the Depositphotos sheet is a watermarked stock preview and must not be used or traced.
+Today, macros are shown as colored dots (carbs `#2D9CDB`, fat `#E5675C`, protein `#C77700`). Shape-coded icons improve accessibility because color is no longer the only signal. The style references in [icons_current](icons_current/) (`carbs.png` wheat, `fat.png`, `protein.png`, `meal.png`) are **direction only**; the Depositphotos sheet is a watermarked stock preview and must not be used or traced.
 
 | Proposed icon | Meaning | Would be used on | Action |
 |---|---|---|---|
@@ -449,7 +452,7 @@ Explains what stays on the phone, what is sent for AI recognition, and what chan
 
 ### S-02 Home
 
-Daily calorie ring with macros, meal-entry carousel (Take a photo, Quick search, Gallery, Manual add), recent meals, bottom navigation.
+Start screen: daily calorie ring with macros, free-pictures counter, meal-entry carousel (Take a photo, Gallery, Manual add), recent meals, bottom navigation. The screenshots show the final design, including the "Quick search" carousel action, which is disabled in the MVP.
 
 **Brand assets:** none · **Icons:** Core actions (G1), macros (G2), navigation (G3), sync state (G4)
 
@@ -522,9 +525,9 @@ Correct the food name, grams, calories and macros.
 
 <div class="screen">
 
-### S-08 Manual food search
+### S-08 Manual food search (post-MVP)
 
-Search the food database, pick a result, set the portion.
+Search the food database, pick a result, set the portion. Not part of the MVP; assets for this screen have the lowest priority.
 
 **Brand assets:** none · **Icons:** Search, Quick add (G1)
 
@@ -539,7 +542,7 @@ Search the food database, pick a result, set the portion.
 
 ### S-09 Quick add
 
-Enter calories and macros by hand.
+Enter calories and macros by hand. Always free; also opened from S-05, S-15, S-19, and S-20 when AI is unavailable.
 
 **Brand assets:** none · **Icons:** Calculate, info (G6), image (G1)
 
@@ -552,9 +555,9 @@ Enter calories and macros by hand.
 
 <div class="screen">
 
-### S-10 Save / Health Connect prompt
+### S-10 Save / Google Health Connect prompt
 
-On first save, explains optional sync: keep local or connect.
+On first save, explains optional Google Health Connect sync: keep local or connect.
 
 **Brand assets:** none · **Icons:** Privacy and sync (G4)
 
@@ -674,7 +677,7 @@ AI recognition status, Health Connect, image retention, nutrition goals, theme, 
 
 ### S-19 AI paywall (bottom sheet)
 
-Shown after the 90 free AI pictures are used; offers Search food and Quick add.
+Shown after the 90 free AI pictures are used; offers Quick add and Close.
 
 **Brand assets:** none · **Icons:** Camera (G1), check (G6)
 
@@ -691,7 +694,7 @@ Shown after the 90 free AI pictures are used; offers Search food and Quick add.
 
 Shown when the 5-user pilot is full.
 
-**Brand assets:** none · **Icons:** Hourglass (G6), search, quick add (G1)
+**Brand assets:** none · **Icons:** Hourglass (G6), quick add (G1)
 
 <table class="shots">
 <tr><th>Light</th><th>Dark</th></tr>
@@ -741,4 +744,4 @@ docs/UX_UI/Design_brief/deliverables/
 - Android: [Adaptive icons](https://developer.android.com/develop/ui/views/launch/icon_design_adaptive), [Splash screens](https://developer.android.com/develop/ui/views/launch/splash-screen), [Google Play icon specification](https://developer.android.com/distribute/google-play/resources/icon-design-specifications)
 - Apple Human Interface Guidelines: [App icons](https://developer.apple.com/design/human-interface-guidelines/app-icons), [Launching](https://developer.apple.com/design/human-interface-guidelines/launching), [SF Symbols](https://developer.apple.com/design/human-interface-guidelines/sf-symbols)
 - Accessibility: [WCAG 2.2](https://www.w3.org/TR/WCAG22/)
-- Internal: [UX spec §3 Visual system, §4.2 Welcome, §5 Accessibility](../../Architecture/10_architecture_ux_spec.md), [HTML prototype](../Prototype/s01_welcome.html), [style references](../art/)
+- Internal: [UX spec §3 Visual system, §4.2 Welcome, §5 Accessibility](../../Architecture/10_architecture_ux_spec.md), [HTML prototype](../Prototype/s01_welcome.html), [style references](icons_current/)

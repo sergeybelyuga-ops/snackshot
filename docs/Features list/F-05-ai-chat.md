@@ -1,5 +1,7 @@
 # F-05 | AI Chat
 
+> **MVP status (18 November 2026):** post-MVP. The whole chat, including audio messages (F-06), is delivered after the MVP. In the MVP, meals are logged from S-02 Home by photo, gallery image, or Quick add.
+
 ## Overview
 The initial screen of the application is an AI chat interface. The user sees the previous communication history, including taken pictures, sent text, and sent audio messages (transcribed into text), as well as the calculated calories and macros for saved entries.
 
@@ -54,4 +56,4 @@ Every user input is parsed and analyzed in the following order:
 - All modifications are saved automatically to the user's nutrition history.
 
 ## MVP status
-Necessary for MVP: Yes
+Necessary for MVP: No (post-MVP)

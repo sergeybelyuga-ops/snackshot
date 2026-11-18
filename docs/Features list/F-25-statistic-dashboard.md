@@ -13,3 +13,5 @@ As a user, I want to see my trends over weeks and months so I can understand whe
 
 ## MVP status
 Necessary for MVP: No
+
+The D / W / M / 3M / Y range views are delivered in the MVP as part of F-16. F-25 covers trend analysis beyond them.

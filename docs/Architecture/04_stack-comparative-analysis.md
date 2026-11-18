@@ -4,6 +4,8 @@
 **Analysis date:** 10 September 2026  
 **Recommendation:** Build the MVP as a native Android application with Kotlin, Jetpack Compose, Android Health Connect SDK, CameraX, and a provider adapter for LogMeal. Keep business logic, nutrition calculations, API contracts, and persistence boundaries modular so selected parts can be extracted into Kotlin Multiplatform shared modules when iOS work begins. Do not introduce a cross-platform UI framework, web target, or desktop target in the MVP.
 
+> **Status note (18 November 2026):** this analysis was written for the original one-month, ~28-hour MVP window. That constraint was lifted on 15 November 2026; the current plan is ~75.5 h plus contingency, with the pilot release on 7 February 2027 ([04 WBS](../04_wbs_and_mvp_implementation_plan.md)). The stack recommendation is unchanged; the decision gate in §10 now refers to the WBS budget.
+
 ## 1. Decision question
 
 Which technology stack gives Snackshot the fastest and lowest-risk path to an Android MVP while preserving a practical route to an iOS application after the MVP?
@@ -221,7 +223,7 @@ Proceed with the recommended native Android stack if:
 - Health Connect permissions and `NutritionRecord` writes work reliably.
 - LogMeal tokens can be handled without exposing an unacceptable long-lived secret. ✅ Resolved by [11_logmeal-access-token-management.md](./11_logmeal-access-token-management.md).
 - The regular-recognition fallback works on devices without depth support.
-- The stack remains compatible with the approximately 28-hour MVP budget.
+- The stack remains compatible with the MVP budget in the [WBS](../04_wbs_and_mvp_implementation_plan.md) (~75.5 h plus contingency).
 
 Reconsider the stack if the project receives a firm requirement for iOS before MVP, if the team already has strong Flutter/React Native/.NET expertise, or if a required integration is unavailable in native Kotlin. Those conditions are not established in the current project evidence.
 

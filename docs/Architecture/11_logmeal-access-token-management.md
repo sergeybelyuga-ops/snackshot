@@ -1,7 +1,7 @@
 # LogMeal Access Token Management
 
 **Decision:** How Snackshot stores, issues, updates, and revokes LogMeal credentials for the Android client, with per-client billing and the ability to pause or cancel LogMeal usage for an individual client.
-**Date:** 12 November 2026 (updated 14 November 2026)
+**Date:** 12 November 2026 (updated 14 November 2026 and 18 November 2026)
 **Status:** Accepted, decisions in §0. Resolves the open risk "API credential exposure" and the decision gate "LogMeal tokens can be handled without exposing an unacceptable long-lived secret" in [04_stack-comparative-analysis.md](./04_stack-comparative-analysis.md) §8, §10.
 
 **Recommendation:** Introduce a thin, stateless-for-health-data **LogMeal Access Broker** (serverless). It holds the APICompany token, provisions one LogMeal **APIUser per Snackshot client**, hands that client only its own APIUser token, and controls the client's lifecycle (trial / trial ended / active / paused / cancelled) through LogMeal's `toggleEnabled` and `deleteAPIUser` endpoints. The user never registers: identity is a silent anonymous Firebase user plus a hashed device ID. The Android app keeps calling LogMeal directly with its APIUser token. No meal, photo, or nutrition data passes through or is stored on the broker, so the local-first principle is preserved.
@@ -20,10 +20,15 @@
 | 6 | Broker platform | **Firebase.** | Firebase Auth, Cloud Functions, Firestore, Secret Manager, App Check, Hosting (admin console). Requires the **Blaze** (pay-as-you-go) plan. |
 | 7 | Registration before AI? | **No registration.** The user starts using the app and AI immediately. | Silent **Firebase Anonymous Authentication** plus a hashed device ID (§5.3). No Google sign-in anywhere in Snackshot, consistent with [02_answers](./02_answers-architecture-checklist.md) §2.1–2.3. |
 | 8 | Free AI allowance | **90 AI recognitions in total per client** (one-time trial, not monthly), then a subscription paywall. | New status `trial_ended` (§5.1). The counter survives reinstall on the same device (§5.3). |
-| 9 | Payment in MVP | **Paywall screen only.** | S-19 paywall explains that subscriptions are coming soon; manual logging keeps working. Play Billing stays post-MVP (§6.4). |
-| 10 | MVP pilot size | **Maximum 5 clients.** | The 6th client is waitlisted. Matches the LogMeal trial cap of 5 APIUsers. |
+| 9 | Payment in MVP | **Paywall screen only.** | S-19 paywall explains that subscriptions are coming soon; Quick add keeps working. Play Billing stays post-MVP (§6.4). |
+| 10 | MVP pilot size | **Maximum 5 clients.** | The 6th client is waitlisted. This is Snackshot's own limit (decision 15); clients marked `isTest` are not counted. |
+| 11 | Logging without AI (18 Nov 2026) | **Quick add (F-11) is always available and free.** | Every state that blocks AI (TrialEnded, Waitlisted, Paused, Suspended, Cancelled, broker unreachable, LogMeal daily limit) offers Quick add. AI chat and text lookup are post-MVP, so only photo and gallery recognition use LogMeal. |
+| 12 | Language and country (18 Nov 2026) | **Set on every APIUser.** | `provision` sends the device language and country; the broker sets them with `modifyUserProfileInfo`. `POST /v1/logmeal/profile` updates them when the user changes them in Settings (§8). |
+| 13 | Product metrics (18 Nov 2026) | **Anonymous daily aggregates through the broker.** | `POST /v1/metrics` and the `metrics_daily` collection, stored without any client or device identifier. Snackshot collects only product metrics (for example AI response time and usage statistics); they contain no personal data ([WBS](../04_wbs_and_mvp_implementation_plan.md) §6). |
+| 14 | Environments (18 Nov 2026) | **Per [12](./12_dev-and-test-environment.md).** | `LOGMEAL_MODE` = `fake` / `test-user` / `company`; the APICompany token exists only in `snackshot-prod` Secret Manager; one test APIUser and the owner's devices are clients with `isTest: true` (§8.2). |
+| 15 | LogMeal plan (18 Nov 2026) | **LogMeal special conditions: no limit on the number of APIUsers.** | The pilot cap of 5 is Snackshot's own limit only. Company credits are still watched with the alarm (§6.3). |
 
-> ⚠ **LogMeal plan check:** the LogMeal free trial is limited to **30 days, 5 users, and 200 queries**. 5 clients × 90 pictures = 450 pictures, and one picture uses at least one credit (more if nutrition or quantity endpoints are called separately). The trial therefore cannot cover the full pilot. Plan for the **Analyse plan (from 144 EUR/month)**, or accept that the trial runs out after about 200 requests.
+> ✅ **LogMeal plan check (resolved 18 November 2026):** the standard free trial (30 days, 5 users, 200 queries) could not cover the pilot. LogMeal has agreed to special conditions with no limit on the number of APIUsers (decision 15). Credit consumption (one picture uses at least one credit, more if nutrition or quantity endpoints are called separately) is still monitored (§6.3).
 
 ---
 
@@ -43,7 +48,7 @@ Sources: [users-and-access-tokens.md](../services_documentation/logmeal/users-an
 | `GET /v2/info/usages?date_start&date_end&api_user_id` returns each request (`service_id`, `timestamp`, `userId`). | Authoritative **per-client usage metering** for billing. |
 | Response headers: `RateLimit-Limit/Remaining/Reset` (per APIUser, rolling 24 h) and `X-Account-Credits-Used/Remaining` (company). `GET /v2/info/limitations` is free. | Client-side quota display; broker-side company credit alarm. |
 | Standard plans: **20 images/day and 1 image/s per APIUser**; monthly credits shared across all users; overage charged extra; HTTP 429 when exceeded. | Per-client cap is enforced by LogMeal for free; the company-wide budget must be watched by us. |
-| `signUp` returns **403** when the plan's user limit is reached; **409** if username exists. Trial: max **5 users, 200 queries**. | Provisioning must handle "capacity full" gracefully; usernames must be globally unique. |
+| `signUp` returns **403** when the plan's user limit is reached; **409** if username exists. Trial: max **5 users, 200 queries**. | Provisioning must still handle "capacity full" gracefully (not expected under the special conditions, decision 15); usernames must be globally unique. |
 
 > Note on "billing separately for each client": LogMeal bills **only the APICompany** (Snackshot). It cannot invoice end users. Per-client billing therefore means: *Snackshot meters each client's LogMeal usage via its APIUser and charges the client itself* (e.g. Google Play subscription / in-app credits). The design below supports both a flat subscription and usage-based pricing.
 
@@ -72,8 +77,10 @@ flowchart LR
     end
 
     subgraph Broker[LogMeal Access Broker - serverless]
-        API[Broker API\n/provision /status /token]
-        DB[(Client registry\nstatus, logmealUserId,\nencrypted token, plan)]
+        API[Broker API\n/provision /status /profile\n/picture /account /metrics]
+        DB[(Client registry\nstatus, logmealUserId,\nencrypted token, plan,\nlanguage, country, isTest)]
+        MD[(metrics_daily\nno identifiers)]
+        API --> MD
         Jobs[Scheduled jobs\nusage metering, reconciliation,\ncredit alarm]
         SM[(Secret Manager\nAPICompany token)]
         API --> DB
@@ -88,7 +95,8 @@ flowchart LR
     LM[LogMeal API]
 
     App -- signInAnonymously --> Auth
-    App -- ID token + deviceId + integrity token --> API
+    App -- ID token + deviceId + language/country + integrity token --> API
+    App -- daily anonymous metrics --> API
     API -- verify --> Auth
     API -- verify --> Integrity
     API -- APICompany token: signUp / toggleEnabled / deleteAPIUser --> LM
@@ -105,7 +113,7 @@ flowchart LR
 
 | Secret | Stored where | Who can read it | Never |
 | --- | --- | --- | --- |
-| **APICompany token** | Secret Manager (server). Loaded at function cold start. | Broker service account only. | In the APK, repo, CI logs, Firestore, client responses. |
+| **APICompany token** | Secret Manager of `snackshot-prod` only ([12](./12_dev-and-test-environment.md) §9). Loaded at function cold start. | Broker service account only. | In the APK, repo, CI logs, Firestore, client responses. |
 | **APIUser token (server copy)** | Client registry, encrypted with a KMS key (envelope encryption). | Broker only. | Plaintext in DB, logs, analytics. |
 | **APIUser token (device copy)** | Encrypted DataStore; AES-GCM key held in **Android Keystore** (hardware-backed where available, e.g. via Tink `AndroidKeysetManager`). | The app process only. | `SharedPreferences` plaintext, logs, crash reports, Health Connect, cloud backup (exclude via `dataExtractionRules` / `fullBackupContent`). |
 | **Snackshot session** | Firebase Auth SDK, anonymous user (short-lived ID token, auto-refreshed). Lost on uninstall; recovered through the device ID (§5.3). | App + broker. | — |
@@ -126,7 +134,7 @@ Notes:
 stateDiagram-v2
     [*] --> Pending: first AI use (silent anonymous identity)
     Pending --> Trial: provision OK (signUp), 90 free pictures
-    Pending --> Waitlisted: pilot cap (5) or LogMeal user limit reached
+    Pending --> Waitlisted: pilot cap (5) reached
     Waitlisted --> Trial: admin approves / capacity available
     Trial --> TrialEnded: 90 pictures used
     TrialEnded --> Active: subscription purchased (post-MVP)
@@ -146,23 +154,23 @@ stateDiagram-v2
 | Snackshot state | LogMeal action | LogMeal effect | App behaviour |
 | --- | --- | --- | --- |
 | **Trial** (MVP default) | `signUp` (once), `enabled = true` | Calls allowed; uses credits; counts as MAU. | AI recognition available; counter "N of 90 free pictures left". |
-| **TrialEnded** | `toggleEnabled` → `false` | 403/116; **no credits, no MAU**. | **S-19 paywall** when the user opens AI capture. MVP: "Subscriptions are coming soon". Manual search, quick add, history, dashboards, and Health Connect keep working. |
+| **TrialEnded** | `toggleEnabled` → `false` | 403/116; **no credits, no MAU**. | **S-19 paywall** when the user opens AI capture. MVP: "Subscriptions are coming soon". Quick add, history, dashboards, goals, and Google Health Connect sync keep working. |
 | **Active** (paid, post-MVP) | `enabled = true` | Calls allowed. | Unlimited AI within LogMeal's 20 pictures/day cap. |
-| **Paused** (payment on hold, user, admin) | `toggleEnabled` → `false` | 403/116; no credits, no MAU. | "AI paused" message with reason; manual logging works. |
-| **Suspended** (abuse) | `toggleEnabled` → `false` | Same as paused. | "AI recognition unavailable, contact support". |
-| **Cancelled** | `deleteAPIUser` (soft delete), token wiped from registry | Token permanently invalid. | Local data untouched (local-first); AI disabled. |
-| **Waitlisted** | none (no APIUser created) | — | "AI recognition is in a closed pilot — you're on the waitlist"; manual logging works. |
+| **Paused** (payment on hold, user, admin) | `toggleEnabled` → `false` | 403/116; no credits, no MAU. | "AI paused" message with reason; Quick add works. |
+| **Suspended** (abuse) | `toggleEnabled` → `false` | Same as paused. | "AI recognition unavailable, contact support"; Quick add works. |
+| **Cancelled** | `deleteAPIUser` (soft delete), token wiped from registry | Token permanently invalid. | Local data untouched (local-first); AI disabled; Quick add works. |
+| **Waitlisted** | none (no APIUser created) | — | "AI recognition is in a closed pilot — you're on the waitlist"; Quick add works. |
 
 Important: `toggleEnabled` is a **toggle**, not a setter. The broker must read the current `enabled` value (`GET /v2/users/APIUsers`) before calling it, and run state changes as idempotent, serialized jobs per client to avoid double toggles.
 
-**When to provision:** on the **first AI action** (camera or gallery recognition), not at app start. Users who only log manually never use up a pilot slot or a LogMeal APIUser.
+**When to provision:** on the **first AI action** (camera or gallery recognition), not at app start. Users who only log with Quick add never use up a pilot slot or a LogMeal APIUser.
 
 ### 5.2 Who triggers state changes
 
 | Trigger | Source | Resulting transition |
 | --- | --- | --- |
 | First AI action, capacity available | `POST /provision` | Pending → Trial |
-| First AI action, pilot cap (5) reached | `POST /provision` | Pending → Waitlisted |
+| First AI action, pilot cap (5, `isTest` clients not counted) reached | `POST /provision` | Pending → Waitlisted |
 | 90th picture used | Picture counter (§6.1) | Trial → TrialEnded |
 | Subscription purchased (post-MVP) | `billing/verify`, RTDN `SUBSCRIPTION_PURCHASED` | Trial / TrialEnded → Active |
 | Subscription renewed | RTDN `RENEWED` | stays Active |
@@ -200,11 +208,11 @@ Registry additions: `clients/{clientId}` holds `deviceId`, `authUids[]`, `pictur
 | **Paid user switches back and forth** | `deviceSwitchCount30d` above 3 | Refuse and show "contact support"; an admin can reset it. |
 | **"Delete all data" in Settings** | `DELETE /v1/account` | Delete the APIUser and the registry record. Keep only `devices/{deviceId}` → `picturesUsed`, so deleting data does not grant a new trial (state this in the privacy policy). |
 
-Uninstalling also removes the local meal history (local-first). It can be restored only if Health Connect sync was enabled; see the bootstrap flow in [09_process-flow-diagrams.md](./09_process-flow-diagrams.md). The broker does not and cannot restore meals.
+Uninstalling also removes the local meal history (local-first). It can be restored only if Google Health Connect sync was enabled; see the bootstrap flow in [09_process-flow-diagrams.md](./09_process-flow-diagrams.md). The broker does not and cannot restore meals.
 
 **Why no Google sign-in?** The architecture decision ([02_answers](./02_answers-architecture-checklist.md) §2.1–2.3, [10_architecture_ux_spec](./10_architecture_ux_spec.md) §1.2) is that Snackshot never requires a Google account. Anonymous auth + `deviceId` gives the broker everything it needs for the trial, pause, cancel, and metering. For paying users, the Play purchase handles moving to a new phone. An **optional** "Link Google account" can be added post-MVP if users ask to move a *free* trial between phones; Firebase `linkWithCredential` keeps the same UID, so nothing in this design changes.
 
-To confirm with LogMeal: do soft-deleted APIUsers still count toward the plan's user limit? If they do, `TrialEnded` clients should be deleted (not just disabled) to free LogMeal capacity, with the picture counter kept in `devices/{deviceId}`.
+Under the LogMeal special conditions (decision 15) there is no APIUser limit, so `TrialEnded` clients stay disabled and do not need to be deleted to free capacity.
 
 ---
 
@@ -245,13 +253,13 @@ LogMeal's usage log is the **authoritative** meter (the device cannot be trusted
 
 - Every broker call and every metering run reads `X-Account-Credits-Remaining`. Alert at 70 % / 90 % of monthly credits; at 100 % optionally pause the free tier first, paid tier last.
 - Global **kill switch** flag (Firebase Remote Config, read by the app) disables AI recognition for everybody without touching LogMeal users — for incidents or unexpected overage.
-- Plan user-cap monitoring: count Active + Paused users vs. plan limit; Cancelled users are deleted so they free capacity.
-- **MVP pilot cap:** at most **5 clients** in Trial/TrialEnded/Active/Paused (admin setting `maxClients`, default 5). Further clients are Waitlisted and approved from the admin console when a slot is freed.
-- **Worst-case MVP cost:** 5 clients × 90 pictures = 450 recognitions plus follow-up calls. This is more than the LogMeal trial's 200 queries, so a paid LogMeal plan is needed for the full pilot (see §0).
+- Plan user-cap monitoring is not needed under the LogMeal special conditions (no APIUser limit, decision 15); Cancelled users are still deleted.
+- **MVP pilot cap:** at most **5 clients** in Trial/TrialEnded/Active/Paused (admin setting `maxClients`, default 5). Clients with `isTest: true` (the test APIUser and the owner's devices) are not counted. Further clients are Waitlisted and approved from the admin console when a slot is freed.
+- **Worst-case MVP cost:** 5 clients × 90 pictures = 450 recognitions plus follow-up calls, covered by the LogMeal special conditions (see §0); the credit alarm still applies.
 
 ### 6.4 How payments reach Snackshot (post-MVP)
 
-In the MVP, the paywall is a screen only (decision 9): clients who used their 90 pictures see "Subscriptions are coming soon" and keep manual logging. This section is the target design for when real payments launch.
+In the MVP, the paywall is a screen only (decision 9): clients who used their 90 pictures see "Subscriptions are coming soon" and keep logging with Quick add. This section is the target design for when real payments launch.
 
 **Money flow**
 
@@ -316,10 +324,12 @@ All endpoints require a valid Firebase ID token (from the **anonymous** user) **
 
 | Endpoint | Purpose | Response |
 | --- | --- | --- |
-| `POST /v1/logmeal/provision` | Called on the **first AI action**. Idempotent. Body: `{ deviceId, locale }`. Re-attaches an existing client by `deviceId` (§5.3), otherwise creates client + APIUser if a pilot slot is free, otherwise waitlists. | `{ status, token?, tokenVersion, pictures: { used, limit } }` |
-| `GET /v1/logmeal/status` | Called on app start (cached about 1 h) and after any 401/403 from LogMeal. | `{ status: trial\|trial_ended\|active\|paused\|suspended\|cancelled\|waitlisted, token? (only if tokenVersion changed), reason, pictures: { used, limit } }` |
+| `POST /v1/logmeal/provision` | Called on the **first AI action** (photo or gallery recognition). Idempotent. Body: `{ deviceId, language, country }` from the device locale (language mapped to a LogMeal-supported language, fallback English; ISO 3166-1 country). Sets them on the APIUser with `modifyUserProfileInfo`. Re-attaches an existing client by `deviceId` (§5.3), otherwise creates client + APIUser if a pilot slot is free, otherwise waitlists. | `{ status, token?, tokenVersion, pictures: { used, limit } }` |
+| `GET /v1/logmeal/status` | Called on app start (cached about 1 h) and after any 401/403 from LogMeal. | `{ status: trial\|trial_ended\|active\|paused\|suspended\|cancelled\|waitlisted, token? (only if tokenVersion changed), reason, pictures: { used, limit }, isTest }` |
+| `POST /v1/logmeal/profile` | The user changed language or country in Settings. Body: `{ language, country }`. The broker updates the registry and calls `modifyUserProfileInfo`. | `{ language, country }` |
 | `POST /v1/logmeal/picture` | Reports one successful recognition (fast path of §6.1a). Idempotent by `requestId`. | `{ status, pictures: { used, limit } }` |
 | `DELETE /v1/account` | "Delete all data" in Settings: delete APIUser, erase registry record; keep only the device's picture counter (§5.3). | `204` |
+| `POST /v1/metrics` | Once a day: one anonymous product-metrics aggregate ([WBS](../04_wbs_and_mvp_implementation_plan.md) §6.3). Validated against an allow-list; unknown fields are dropped; stored in `metrics_daily/{autoId}` **without** the caller's UID, client ID, or device ID. Request logs must not include the UID. | `204` |
 | `POST /v1/billing/verify`, `/restore` *(post-MVP)* | Verify a Play purchase; restore and move the client to this device. | `{ status, token? }` |
 | `POST /v1/billing/rtdn` *(post-MVP)* | Pub/Sub push from Google Play; verifies the purchase via the Play Developer API and drives the state machine. | `204` |
 
@@ -340,19 +350,21 @@ Registry record (Firestore `clients/{clientId}`):
   "entitlementSource": null,              // post-MVP: "google_play"
   "purchaseToken": null,
   "language": "eng",
+  "country": "GB",
+  "isTest": false,                       // true for the test APIUser and the owner's devices; not counted in maxClients
   "createdAt": "2026-11-12T10:00:00Z",
   "statusChangedAt": "…",
   "statusReason": "provisioned"
 }
 ```
 
-Plus `devices/{deviceId}` → `{ clientId, picturesUsed }` and an append-only `audit/{id}` collection for every state change and admin action.
+Plus `devices/{deviceId}` → `{ clientId, picturesUsed }`, an append-only `audit/{id}` collection for every state change and admin action, and `metrics_daily/{autoId}` with anonymous daily aggregates that carry no identifier (only a `test` flag).
 
 ### 8.1 Broker admin console
 
 A small web UI for operating the broker. It never talks to LogMeal or Firestore directly; every action goes through admin Cloud Functions, so the same validation, state machine, and audit log apply to admins and automation alike.
 
-**Stack:** single-page app (React + Vite) on **Firebase Hosting**. Admin sign-in uses Firebase Auth (Google), restricted to accounts with the custom claim `admin: true`, which is set once with an Admin SDK script. App Check is enforced. Firestore security rules **deny all client SDK access** to `clients`, `usage`, `audit`, `devices`, and `settings`; only Cloud Functions (Admin SDK) read or write them.
+**Stack:** single-page app (React + Vite) on **Firebase Hosting**. Admin sign-in uses Firebase Auth (Google), restricted to accounts with the custom claim `admin: true`, which is set once with an Admin SDK script. App Check is enforced. Firestore security rules **deny all client SDK access** to `clients`, `usage`, `audit`, `devices`, `settings`, and `metrics_daily`; only Cloud Functions (Admin SDK) read or write them.
 
 **Screens**
 
@@ -360,8 +372,9 @@ A small web UI for operating the broker. It never talks to LogMeal or Firestore 
 | --- | --- | --- |
 | **Dashboard** | LogMeal credits used/remaining this period (from `X-Account-Credits-*`), clients vs pilot cap (x of 5), clients by status (Trial / TrialEnded / Waitlisted / …), pictures used across all trials, recognitions per day (30 days), top consumers, alarms | **Global kill switch** (Remote Config), "Sync with LogMeal" |
 | **Clients** | Searchable table: client ID, LogMeal user id, status + reason, pictures used / 90, device (hashed, last seen), app version, created. No e-mail or name exists, because clients are anonymous. | Filter by status; bulk pause/resume |
-| **Client detail** | Profile, status history (from audit), usage chart by endpoint, device binding history, token shown **masked** (`••••a3ed`, `tokenVersion`) | Pause · Resume · Suspend · **Rotate token** · **Grant extra pictures / reset trial** · Delete (APIUser + registry) to free a pilot slot. Each action requires a reason and a confirmation dialog. |
+| **Client detail** | Profile, status history (from audit), usage chart by endpoint, device binding history, token shown **masked** (`••••a3ed`, `tokenVersion`), `isTest` flag | Pause · Resume · Suspend · **Rotate token** · **Grant extra pictures / reset trial** · **Mark as test** · Delete (APIUser + registry) to free a pilot slot. Each action requires a reason and a confirmation dialog. |
 | **Waitlist** | Devices waiting for a pilot slot, in order of first AI attempt | Approve (provision when a slot is free) / reject |
+| **Metrics** | Pilot-level product metrics per day and week (recognition success rate, latency, Zero-Edit rate, habit days, time-to-log, Quick add share); pilot totals only, never per record | Show / hide test devices |
 | **Audit log** | Who, what, when, reason, before/after state | Export CSV |
 | **Settings** | Trial picture allowance (default 90), pilot cap `maxClients` (default 5), paywall text variant, credit alarm thresholds, device switch limit, alert e-mail | Save (audited) |
 
@@ -371,7 +384,21 @@ A small web UI for operating the broker. It never talks to LogMeal or Firestore 
 - The APICompany token is not visible or editable in the UI. It is changed only in Secret Manager.
 - "Sync with LogMeal" compares the registry with `GET /v2/users/APIUsers` and flags drift: users created or toggled manually in LogMeal's own Users dashboard, `enabled` mismatches, and orphan APIUsers. The admin resolves each item explicitly. Use LogMeal's dashboard only in emergencies.
 
-**Admin functions:** `adminListClients`, `adminGetClient`, `adminSetStatus`, `adminRotateToken`, `adminGrantPictures`, `adminDeleteClient`, `adminApproveWaitlist`, `adminGetDashboard`, `adminSyncLogMeal`, `adminUpdateSettings`. Each one checks the `admin` claim and writes an `audit` record.
+**Admin functions:** `adminListClients`, `adminGetClient`, `adminSetStatus`, `adminSetTest`, `adminRotateToken`, `adminGrantPictures`, `adminDeleteClient`, `adminApproveWaitlist`, `adminGetMetrics`, `adminGetDashboard`, `adminSyncLogMeal`, `adminUpdateSettings`. Each one checks the `admin` claim; every action writes an `audit` record.
+
+**MVP scope** (same in [F-33](../Features%20list/F-33-broker-admin-console.md) and [WBS](../04_wbs_and_mvp_implementation_plan.md) 9.2–9.3): Clients, Client detail actions (including Mark as test), Waitlist, and Metrics. Dashboard, Audit log UI, Settings UI, and Sync with LogMeal follow after the MVP.
+
+### 8.2 Environments and LogMeal modes
+
+The broker runs in three environments ([12](./12_dev-and-test-environment.md) §1, §3.3). Its LogMeal client reads `LOGMEAL_MODE`:
+
+| Mode | Environment | `provision` behaviour |
+| --- | --- | --- |
+| `fake` | Local emulator (`demo-snackshot`), broker tests | Creates the client record and returns a fixed fake token; LogMeal calls go to the fake server or MSW. |
+| `test-user` | `snackshot-dev` | Returns the single test APIUser token; never calls `signUp`, `toggleEnabled`, `deleteAPIUser`, or `modifyUserProfileInfo`. |
+| `company` | `snackshot-prod` | Full design of this document. |
+
+The APICompany token exists only in `snackshot-prod` Secret Manager (decision 4). The test APIUser is registered in prod Firestore with `isTest: true`; the owner's own prod installs are marked `isTest` from the admin console. `isTest` clients are not counted in `maxClients`, and the app adds `"test": true` to their metrics.
 
 ---
 
@@ -384,18 +411,18 @@ sequenceDiagram
     participant Broker
     participant LM as LogMeal
 
-    Note over App: user taps Take a photo (first AI action)
+    Note over App: user taps Take a photo or Gallery (first AI action)
     App->>App: signInAnonymously() if no Firebase user (silent)
     App->>Store: read token + tokenVersion
     alt no token
-        App->>Broker: POST /provision (anon ID token, deviceId, integrity token)
+        App->>Broker: POST /provision (anon ID token, deviceId, language, country, integrity token)
         Broker-->>App: trial + token + pictures 0/90, or waitlisted, or trial_ended
         App->>Store: save encrypted
     end
     alt status trial_ended
-        App->>App: show S-19 paywall, offer manual logging
+        App->>App: show S-19 paywall, offer Quick add
     else status waitlisted
-        App->>App: show S-20 waitlist, offer manual logging
+        App->>App: show S-20 waitlist, offer Quick add
     end
     App->>LM: POST /v2/image/segmentation/complete (Bearer APIUser token)
     alt 200
@@ -405,7 +432,7 @@ sequenceDiagram
         App->>App: show 32 free pictures left
     else 429
         LM-->>App: RateLimit-Reset
-        App->>App: "Daily AI limit reached — try in N h", offer manual entry
+        App->>App: "Daily AI limit reached — try in N h", offer Quick add
     else 401 or 403/116
         App->>Broker: GET /status
         Broker-->>App: trial_ended | paused | cancelled | new token
@@ -417,9 +444,9 @@ Rules:
 
 - The LogMeal adapter reads the token through a `LogMealCredentialProvider` interface — this is the seam for a future switch to Option C.
 - Never retry automatically on 403/116 or 429 beyond one status check (avoid burning requests).
-- Manual food search, quick-add, history, and Health Connect sync must keep working in all states — only AI recognition is gated.
+- Quick add, history, dashboards, goals, and Google Health Connect sync must keep working in all states — only AI recognition is gated.
 - There is no sign-in or sign-out UI. "Delete all data" in Settings calls `DELETE /v1/account` and wipes the device token copy.
-- Show the remaining free pictures quietly (camera screen and Settings); show a one-time heads-up at 10 pictures left.
+- Show the remaining free pictures quietly (Home, camera screen, and Settings); show a one-time heads-up at 10 pictures left.
 
 ---
 
@@ -439,6 +466,8 @@ Applied on 14 November 2026:
 | [10_architecture_ux_spec.md](./10_architecture_ux_spec.md) | New S-19 Paywall and S-20 Waitlist states; picture counter on S-03 and S-16; S-01 / S-01A copy updated. |
 | UX prototypes ([s01_welcome](../UX_UI/Prototype/s01_welcome.html), [s01a_privacy](../UX_UI/Prototype/s01a_privacy.html), [s19_paywall](../UX_UI/Prototype/s19_paywall.html)) | Copy updated; paywall prototype added. The draw.io schemas are not updated yet. |
 
+Applied on 18 November 2026 (decisions 11–15): `profile` and `metrics` endpoints, `metrics_daily`, language/country at provisioning, `isTest`, `LOGMEAL_MODE`, Quick add in every blocked state, LogMeal special conditions, and the MVP admin console scope. The same changes are reflected in [01](../01_project_charter.md), [04 WBS](../04_wbs_and_mvp_implementation_plan.md), [02](./02_answers-architecture-checklist.md), [05](./05_c4-context-diagram.md)–[10](./10_architecture_ux_spec.md), [12](./12_dev-and-test-environment.md), and the feature files.
+
 ---
 
 ## 11. Rollout plan
@@ -452,12 +481,12 @@ Applied on 14 November 2026:
 | 5 | **Hardening:** App Check / Play Integrity enforcement, abuse heuristics, drift sync with LogMeal. | 2–4 h |
 | 6 | **Payments (post-MVP):** Play Billing subscription, `billing/verify` + `restore` (device move), RTDN via Pub/Sub, merchant account setup. | 5–7 h |
 
-Steps 1–5 total about **18–26 h**, which is most or all of the 28-hour MVP budget on top of the Android app itself. To fit, ship steps 1–3 with the MVP and use a minimal console (Clients list + Client detail actions only, about 3 h) until the full console is built.
+Steps 1–5 total about **18–26 h**. The MVP ships steps 1–3, the hardening that the pilot needs, and the minimal console (Clients, Client detail including Mark as test, Waitlist, Metrics); the scheduled effort is in the [WBS](../04_wbs_and_mvp_implementation_plan.md) (items 3.x, 4.x, 9.x, 10.3). The rest of steps 4–5 follows after the MVP.
 
 ---
 
 ## 12. Remaining questions
 
-1. LogMeal: do soft-deleted APIUsers count toward the plan's user limit? (Affects whether TrialEnded clients must be deleted to free capacity, §5.3.)
+1. ✅ Resolved (18 November 2026): under the LogMeal special conditions there is no APIUser limit, so soft-deleted users do not matter for capacity.
 2. LogMeal: price per extra credit, and how many credits one picture uses in the chosen flow (recognition + nutrition + optional quantity). (Needed for cost per trial and later pricing, §6.4.)
-3. LogMeal plan for the pilot: the free trial (30 days, 200 queries) cannot cover 5 × 90 pictures. Analyse plan from day one, or accept the trial running out early? (§0)
+3. ✅ Resolved (18 November 2026): LogMeal special conditions (decision 15).

@@ -13,4 +13,4 @@ As a user, I want a quick text search fallback so I can still log my meal when r
 - The flow is faster than full manual entry.
 
 ## MVP status
-Necessary for MVP: No (post-MVP; will reuse the LogMeal food search built for F-05)
+Necessary for MVP: No (post-MVP)

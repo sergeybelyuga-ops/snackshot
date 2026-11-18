@@ -14,6 +14,8 @@ As the app owner, I want to see each user's AI usage and status and be able to p
 - **Clients:** list with client ID, LogMeal user ID, status and reason, pictures used / 90, device (hashed), last seen, created.
 - **Client detail:** status history, usage by endpoint, masked token (last 4 characters + version) and actions: **Pause**, **Resume**, **Suspend**, **Rotate token**, **Grant extra pictures / reset trial**, **Delete** (frees a pilot slot). Every action asks for a reason and a confirmation.
 - **Waitlist:** devices waiting for a pilot slot; **Approve** / **Reject**.
+- **Test clients:** **Mark as test** on Client detail for the test APIUser and the owner's devices. Test clients do not take a pilot place and can be shown or hidden in the metrics.
+- **Metrics:** pilot-level product metrics (recognition success rate, latency, Zero-Edit rate, habit days, time-to-log, Quick add share) per day and per week, with test devices shown or hidden. Values are pilot totals only, never per record.
 - **Audit log:** who, what, when, reason, before/after; CSV export.
 - **Settings:** trial picture allowance (90), pilot cap (5), credit alarm thresholds, device-switch limit, alert e-mail.
 - **Sync with LogMeal:** compares the broker registry with LogMeal's user list and flags differences (for example, a user changed manually in LogMeal's dashboard).
@@ -25,7 +27,7 @@ As the app owner, I want to see each user's AI usage and status and be able to p
 - The kill switch disables AI in all app installs within the Remote Config refresh interval, without changing LogMeal users.
 
 ## MVP status
-Necessary for MVP: Yes, in a minimal form (Clients list + Client detail actions + Waitlist approve). Dashboard, Audit log UI, Settings UI, and Sync can follow after the MVP.
+Necessary for MVP: Yes, in a minimal form (Clients list, Client detail actions including Mark as test, Waitlist approve/reject, Metrics page). Dashboard, Audit log UI, Settings UI, and Sync can follow after the MVP.
 
 ## Related feature IDs
 - F-30 Account-free App Access

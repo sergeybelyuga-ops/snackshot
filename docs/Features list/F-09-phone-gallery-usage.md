@@ -12,4 +12,4 @@ As a user, I want to log a meal from a previously taken photo when I do not want
 - The result can be reviewed and saved.
 
 ## MVP status
-Necessary for MVP: No
+Necessary for MVP: Yes (gallery on S-02 Home and on the camera screen)

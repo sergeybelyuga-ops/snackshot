@@ -5,7 +5,7 @@
 This is a C4 Level 3 component diagram. It shows the internal building blocks of the Snackshot application and how they collaborate to support the product flows:
 
 - AI-powered meal logging
-- user interaction through a chat-like interface
+- meal entry from the Home screen: photo, gallery, and Quick add
 - image capture / preprocessing
 - Google Health Connect synchronization
 - local persistence of meal logs
@@ -18,16 +18,17 @@ The application contains the following major components:
 ### 2.1 UI layer
 Responsible for all user-facing application flows:
 - AI access states: free-picture counter, paywall, waitlist (no registration or sign-in)
-- AI chat / meal input
+- Home and meal entry (photo, gallery, Quick add)
 - camera and photo capture
 - manual correction of recognized data
-- statistics dashboard
+- dashboard (D / W / M / 3M / Y) with optional local goals
 - history of logs
-- Google Health connection and consent experience
+- Google Health Connect connection and consent experience
 
 ### 2.2 Local data storage
 Responsible for persisting nutrition records locally:
 - food logs
+- nutrition goals (local only)
 - user settings
 - sync state
 - meal metadata
@@ -44,7 +45,7 @@ Responsible for communication with the LogMeal API:
 Responsible for obtaining and protecting AI access without registration:
 - silent Firebase anonymous sign-in on the first AI action
 - hashed device ID (`ANDROID_ID` + salt) so a reinstall on the same phone is recognized
-- `provision`, `status`, and `picture` calls to the LogMeal Access Broker
+- `provision`, `status`, `profile` (language and country), `picture`, and `DELETE /account` calls to the LogMeal Access Broker
 - encrypted storage of the per-user LogMeal token (Android Keystore + DataStore, excluded from backup)
 - exposing trial / trial ended / waitlisted / paused state to the UI
 - `LogMealCredentialProvider` interface used by the LogMeal integration layer
@@ -60,20 +61,27 @@ Responsible for preparing the images before sending them to the AI service:
 - validation of the image payload
 
 ### 2.5 Google Health Connect integration layer
-Responsible for integration with Google Health when the user is signed in:
+Responsible for the optional Google Health Connect sync when the user has connected to Google Health Connect (signed in to the Google Health app and linked Snackshot):
 - permission check and request flow
-- save nutrition records to Google Health
-- read goals / health data
-- synchronize local changes to Google Health
+- save nutrition records to Health Connect
+- read nutrition records for the bootstrap import and change sync (goals are not read in the MVP)
+- synchronize local changes to Health Connect
 - handle permission revocation and fallback cases
+
+### 2.6 Metrics component
+Responsible for anonymous product metrics:
+- record metric events locally (recognition latency, edits, Quick add use, time-to-log)
+- compute one daily aggregate with no identifiers, food names, images, or nutrition values
+- upload it through the broker (`POST /v1/metrics`) with WorkManager, respecting the Settings opt-out
 
 ## 3. C4 Component Diagram
 
 ```mermaid
 flowchart LR
     U[User] --> UI[UI Layer
-    Chat / meal input
+    Home / meal entry
     Photo capture
+    Quick add
     Manual correction
     Trial counter / paywall
     Statistics
@@ -106,6 +114,9 @@ flowchart LR
     LM --> ACC
     ACC --> BRK[LogMeal Access Broker
     Firebase]
+    UI --> MET[Metrics Component
+    Daily anonymous aggregates]
+    MET --> BRK
 
     IMG --> LM
     LM --> API[LogMeal API
@@ -128,7 +139,7 @@ flowchart LR
     classDef ext fill:#fff7ed,stroke:#f59e0b,color:#111827;
 
     class U user;
-    class UI,LSI,LM,GHC,IMG,R,ACC ui;
+    class UI,LSI,LM,GHC,IMG,R,ACC,MET ui;
     class API,GH,BRK ext;
 ```
 
@@ -137,8 +148,7 @@ flowchart LR
 ### UI Layer
 The UI is the primary interaction layer for the user. It handles:
 - AI access states (free-picture counter, paywall, waitlist); no registration
-- meal logging through text and image input
-- AI assistant or chat-like conversation
+- meal logging through photo, gallery, and Quick add
 - confirmation and manual edits
 - health integration configuration
 - statistics and history display
@@ -176,7 +186,6 @@ This layer manages the optional synchronization of nutrition data with Google He
 
 Responsibilities:
 - request or check Health Connect permissions
-- read user health goals
 - write completed meal data
 - propagate local data changes to Google Health
 - handle permission loss or unavailable service scenarios

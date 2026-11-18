@@ -7,9 +7,10 @@ Snackshot is an Android-first, local-first nutrition tracking application that h
 - capture a food photo or choose an image from the gallery,
 - identify the food item and estimate nutrition values,
 - review and correct the AI result,
+- log a meal manually with Quick add when AI is not used or not available,
 - save the meal to local device storage,
 - optionally synchronize nutrition data with Google Health Connect,
-- view a daily summary of calories and macronutrients.
+- view calories and macronutrients for a day, week, month, three months, or year, compared with optional goals stored on the device.
 
 This is a Level 1 C4 context diagram: it shows the system boundary, the primary user, and the external systems that the application depends on.
 
@@ -34,7 +35,8 @@ flowchart LR
     G --> B[LogMeal Access Broker
     Firebase
     Anonymous AI access
-    Free-picture counter]
+    Free-picture counter
+    Anonymous product metrics]
     B --> A
     O[Snackshot owner] --> B
 
@@ -56,13 +58,13 @@ flowchart LR
 ## 4. Key interpretation of the diagram
 
 ### Primary actor
-- User: registers in the app, logs meals, and uses Google Health to review health information.
+- User: uses the app without registration and logs meals. If they choose to connect to Google Health Connect, they sign in to the Google Health app and link Snackshot there; that is the only connection process.
 
 ### Key external systems
 - Snackshot App: stores user data locally, provides the interface for meal logging, and communicates with external services.
 - LogMeal Service: receives meal data or images from the app, recognizes the food, and returns the result.
 - Google Health Service: stores health data and presents the information to the user in a health dashboard.
-- LogMeal Access Broker (Snackshot-owned, Firebase): gives each anonymous app install its own LogMeal access, counts free AI pictures (90 per user), and lets the owner pause, cancel, or waitlist users through an admin console. It stores no health data. See [11_logmeal-access-token-management.md](./11_logmeal-access-token-management.md).
+- LogMeal Access Broker (Snackshot-owned, Firebase): gives each anonymous app install its own LogMeal access, counts free AI pictures (90 per user), receives anonymous daily product metrics (for example AI response time and usage statistics, no personal data), and lets the owner pause, cancel, or waitlist users through an admin console. It stores no health data. See [11_logmeal-access-token-management.md](./11_logmeal-access-token-management.md).
 - Snackshot owner: operates the broker through the admin console (F-33).
 
 ### Important design constraint
@@ -77,10 +79,10 @@ flowchart LR
 | --- | --- |
 | User -> Snackshot App | Logs meals in the application without registration |
 | Snackshot App -> LogMeal Service | Sends meal data or images and receives recognition results, using the user's own LogMeal token |
-| Snackshot App -> LogMeal Access Broker | Obtains AI access silently, reports used pictures, receives trial/paywall/waitlist status |
+| Snackshot App -> LogMeal Access Broker | Obtains AI access silently, sets language and country, reports used pictures, receives trial/paywall/waitlist status, sends anonymous daily product metrics |
 | LogMeal Access Broker -> LogMeal Service | Creates, enables, disables, and deletes per-user LogMeal accounts; reads usage |
 | Snackshot owner -> LogMeal Access Broker | Manages users and costs in the admin console |
-| Snackshot App -> Google Health Service | Saves health-related data and provides user health information |
+| Snackshot App -> Google Health Service | Optional Google Health Connect sync of meal nutrition records, after the user has signed in to the Google Health app and linked Snackshot |
 | User -> Google Health Service | Reviews health-related information in Google Health |
 
 ## 6. Business and technical implications
@@ -88,7 +90,7 @@ flowchart LR
 1. The application boundary is intentionally narrow: it is a client application, not a full backend-driven product. The only server component is the LogMeal Access Broker, which handles AI credentials and usage, never health data.
 2. Health Connect is an optional integration and not a mandatory onboarding blocker for the core app flow.
 3. The AI provider is a stateless processing dependency; the app remains the source of truth for user nutrition history.
-4. The user experience is designed around low-friction logging: capture photo, confirm result, save, and review totals.
+4. The user experience is designed around low-friction logging: capture photo, confirm result, save, and review totals. Quick add is always available as the manual path.
 
 ## 7. Decision status
 
@@ -111,7 +113,7 @@ This C4 context diagram is based on the following project evidence:
 - [Architecture answers](02_answers-architecture-checklist.md)
 - [Technology stack analysis](04_stack-comparative-analysis.md)
 - [AI provider analysis](03_ai-model-comparative-analysis.md)
-- [Feature F-19: Connect to Health Connect](../Features%20list/F-19-connect-health-connect.md)
+- [Feature F-19: Connect to Google Health Connect](../Features%20list/F-19-connect-health-connect.md)
 - [Feature F-20: Google Health Connect Sync](../Features%20list/F-20-google-health-connect-sync.md)
 - [Feature F-30: Account-free App Access](../Features%20list/F-30-google-account-registration-login.md)
 - [LogMeal access token management](./11_logmeal-access-token-management.md)
