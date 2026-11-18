@@ -437,7 +437,7 @@ Applied on 14 November 2026:
 | [05](./05_c4-context-diagram.md), [06](./06_c4-container-diagram.md), [07](./07_c4-component-diagram.md) C4 diagrams | LogMeal Access Broker, Firebase, and admin console added; "Registration / Login" removed. |
 | [08_data-flow-diagram.md](./08_data-flow-diagram.md), [09_process-flow-diagrams.md](./09_process-flow-diagrams.md) | Provisioning, picture counting, and trial-ended flows added. |
 | [10_architecture_ux_spec.md](./10_architecture_ux_spec.md) | New S-19 Paywall and S-20 Waitlist states; picture counter on S-03 and S-16; S-01 / S-01A copy updated. |
-| UX prototypes ([s01_welcome](../../UX_UI/Prototype/s01_welcome.html), [s01a_privacy](../../UX_UI/Prototype/s01a_privacy.html), [s19_paywall](../../UX_UI/Prototype/s19_paywall.html)) | Copy updated; paywall prototype added. The draw.io schemas are not updated yet. |
+| UX prototypes ([s01_welcome](../UX_UI/Prototype/s01_welcome.html), [s01a_privacy](../UX_UI/Prototype/s01a_privacy.html), [s19_paywall](../UX_UI/Prototype/s19_paywall.html)) | Copy updated; paywall prototype added. The draw.io schemas are not updated yet. |
 
 ---
 

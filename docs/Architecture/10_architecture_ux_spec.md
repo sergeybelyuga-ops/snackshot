@@ -329,7 +329,7 @@ Avoid four equal statistic cards, donut charts that hide exact values, decorativ
 
 The Android implementation uses Google Fonts through the Google Play services font provider. `GoogleSansFontFamily` is reserved for screen headings and large health metrics, while `GoogleSansTextFontFamily` is used for interface controls, body copy, metadata, and labels. The provider requires the Google Fonts provider authority, package, and certificate resource configured in `theme.kt`; screens must retain a readable fallback if the downloadable font is unavailable.
 
-Use the following `HealthTypography` Material 3 mapping from `UX_UI/theme.kt`. Do not use display typography inside dense data surfaces. The negative tracking on `DisplayLarge` is an implementation-defined exception for large metric values; all other tracking values are explicit and must not be replaced with platform defaults.
+Use the following `HealthTypography` Material 3 mapping from `docs/UX_UI/theme.kt`. Do not use display typography inside dense data surfaces. The negative tracking on `DisplayLarge` is an implementation-defined exception for large metric values; all other tracking values are explicit and must not be replaced with platform defaults.
 
 | Token | Font family | Size / line height | Weight | Letter spacing | Usage |
 |---|---|---:|---|---:|---|

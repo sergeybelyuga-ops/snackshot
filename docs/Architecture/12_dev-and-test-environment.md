@@ -187,7 +187,7 @@ snackshot/
   test-fixtures/          shared LogMeal fixtures and sample images (§3.1)
   tools/                  fake-logmeal, adb-reverse.ps1, logmeal-contract-check
   docs/                   project documentation (renamed from "Project documentation/")
-  UX_UI/                  design brief, prototype, theme sources
+    UX_UI/                design brief, prototype, theme sources
   .github/workflows/      CI/CD (§7)
   .gitattributes          * text=auto eol=lf; *.bat, *.cmd, *.ps1 eol=crlf
   .gitignore

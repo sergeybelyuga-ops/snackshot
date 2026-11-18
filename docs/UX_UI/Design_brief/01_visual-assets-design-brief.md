@@ -4,7 +4,7 @@
 **Document Version:** 0.3
 **Date:** November 14, 2026
 **Owner:** Snackshot product team
-**Related documents:** [Project charter](../../docs/01_project_charter.md), [Architecture UX spec](../../docs/Architecture/10_architecture_ux_spec.md) (§3 visual system, §4 screens, §5 accessibility), [prototype theme tokens](../Prototype/prototype-theme.css), [Compose typography](../theme.kt), [HTML prototype](../Prototype/)
+**Related documents:** [Project charter](../../01_project_charter.md), [Architecture UX spec](../../Architecture/10_architecture_ux_spec.md) (§3 visual system, §4 screens, §5 accessibility), [prototype theme tokens](../Prototype/prototype-theme.css), [Compose typography](../theme.kt), [HTML prototype](../Prototype/)
 
 ---
 
@@ -707,7 +707,7 @@ Shown when the 5-user pilot is full.
 ### 9.1 Folder structure
 
 ```
-UX_UI/Design_brief/deliverables/
+docs/UX_UI/Design_brief/deliverables/
   app-icon/
     android/   ic_launcher_foreground.xml, ic_launcher_background.xml,
                ic_launcher_monochrome.xml, mipmap-*/ic_launcher.png,
@@ -741,4 +741,4 @@ UX_UI/Design_brief/deliverables/
 - Android: [Adaptive icons](https://developer.android.com/develop/ui/views/launch/icon_design_adaptive), [Splash screens](https://developer.android.com/develop/ui/views/launch/splash-screen), [Google Play icon specification](https://developer.android.com/distribute/google-play/resources/icon-design-specifications)
 - Apple Human Interface Guidelines: [App icons](https://developer.apple.com/design/human-interface-guidelines/app-icons), [Launching](https://developer.apple.com/design/human-interface-guidelines/launching), [SF Symbols](https://developer.apple.com/design/human-interface-guidelines/sf-symbols)
 - Accessibility: [WCAG 2.2](https://www.w3.org/TR/WCAG22/)
-- Internal: [UX spec §3 Visual system, §4.2 Welcome, §5 Accessibility](../../docs/Architecture/10_architecture_ux_spec.md), [HTML prototype](../Prototype/s01_welcome.html), [style references](../art/)
+- Internal: [UX spec §3 Visual system, §4.2 Welcome, §5 Accessibility](../../Architecture/10_architecture_ux_spec.md), [HTML prototype](../Prototype/s01_welcome.html), [style references](../art/)
