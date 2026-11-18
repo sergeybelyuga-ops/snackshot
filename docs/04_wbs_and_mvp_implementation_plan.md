@@ -3,8 +3,8 @@
 **Snackshot: AI-Powered Nutrition & Calorie Tracker**
 
 **Status:** DRAFT
-**Document Version:** 1.2
-**Date:** November 15, 2026
+**Document Version:** 1.3
+**Date:** November 18, 2026
 
 ## 1. Purpose
 
@@ -20,6 +20,7 @@ Sources:
 - [C4 container](Architecture/06_c4-container-diagram.md) and [component](Architecture/07_c4-component-diagram.md) diagrams, [process flows](Architecture/09_process-flow-diagrams.md)
 - [Architecture & UX specification](Architecture/10_architecture_ux_spec.md) (screens S-01 … S-20)
 - [LogMeal access token management](Architecture/11_logmeal-access-token-management.md) (broker, trial, admin console)
+- [Development and test environment](Architecture/12_dev-and-test-environment.md) (environments, LogMeal fakes, CI/CD, devices, distribution)
 - [LogMeal OpenAPI](services_documentation/logmeal/LogMeal_openapi_docs.yaml), [LogMeal multi-language support](services_documentation/logmeal/multi-language-support.md)
 
 ## 2. Decisions recorded (15 November 2026)
@@ -30,6 +31,7 @@ Sources:
 | 2 | **F-05 AI Chat is in the MVP; F-10 Manual Text Search and F-11 Quick Add Calories are not.** | The chat is the main logging entry point (text, photo, gallery). The feature list already shows this; the charter and feature files are updated to match. |
 | 3 | **Food lookup by text uses LogMeal, localized by country and language.** | Chat text input is matched against LogMeal's dish catalog in the user's language; the APIUser profile carries the user's country and language. No separate food database is bundled. The same component is reused when F-10 is built after the MVP. |
 | 4 | **North-star metrics are sent through the LogMeal Access Broker, fully anonymized.** | New broker endpoint and storage for anonymous daily metric aggregates (§6). No personal data, food names, images, or nutrition values leave the device for metrics. |
+| 5 | **Development and test environment per [12](Architecture/12_dev-and-test-environment.md) (18 November 2026).** Local emulators + `snackshot-dev` + `snackshot-prod`; automated tests never call real LogMeal; manual testing uses one test APIUser marked `isTest`; App Distribution for dev builds, Play internal testing for prod. | Scope of 1.1, 1.3, 1.4, 3.1, 3.2, 3.7, 9.3, 10.3, 11.3, 11.4 extended (about +1.5 h, taken from contingency and re-checked at M1). |
 
 ## 3. MVP scope baseline
 
@@ -90,10 +92,10 @@ flowchart TB
 | WBS | Work package | Features | Deliverable / scope | Est. (h) |
 | --- | --- | --- | --- | --- |
 | **1** | **Foundation** | | | **6.5** |
-| 1.1 | LogMeal + Health Connect technical spike | F-01, F-02, F-05, F-20 | Throwaway build on a physical device with a dev-only APIUser token (never shipped). Photo → `segmentation/complete` → nutrition → quantity (grams). Text → dish catalog match → nutrition for a chosen dish and grams. One `NutritionRecord` write. Record latency, grams quality, credits per call, catalog size per language, ARCore availability. Decision-gate evidence for [04](Architecture/04_stack-comparative-analysis.md) §10. | 3 |
+| 1.1 | LogMeal + Health Connect technical spike | F-01, F-02, F-05, F-20 | Throwaway build on a physical device with the test APIUser token ([12](Architecture/12_dev-and-test-environment.md) §3.4, never shipped). Photo → `segmentation/complete` → nutrition → quantity (grams). Text → dish catalog match → nutrition for a chosen dish and grams. One `NutritionRecord` write. Record latency, grams quality, credits per call, catalog size per language, ARCore availability. Decision-gate evidence for [04](Architecture/04_stack-comparative-analysis.md) §10. Capture and scrub LogMeal responses as shared fixtures in `test-fixtures/logmeal` ([12](Architecture/12_dev-and-test-environment.md) §3.1). | 3 |
 | 1.2 | Close open decisions | — | Confirm persistence technology, the LogMeal plan for the pilot, and the open product questions in §8; update affected documents. | 0.5 |
-| 1.3 | Android project skeleton | — | Kotlin + Compose project, Gradle version catalog, packages/modules (`domain`, `data-local`, `logmeal`, `healthconnect`, `access`, `metrics`, `ui`), Hilt, ktlint/lint, GitHub Actions (build + unit tests). | 2 |
-| 1.4 | Firebase project | F-30, F-33 | Firebase project on Blaze, budget alert, Emulator Suite for development, APICompany token in Secret Manager readable only by the broker service account. | 1 |
+| 1.3 | Android project skeleton | — | Kotlin + Compose project, Gradle version catalog, packages/modules (`domain`, `data-local`, `logmeal`, `healthconnect`, `access`, `metrics`, `ui`), Hilt, ktlint/lint; flavors `local` / `dev` / `prod` with `BuildConfig` URLs; monorepo layout, `.gitignore` / `.gitattributes`; GitHub Actions `android-ci` and `distribute-android` (App Distribution for dev) ([12](Architecture/12_dev-and-test-environment.md) §2, §4, §7). | 2 |
+| 1.4 | Firebase projects | F-30, F-33 | `snackshot-dev` and `snackshot-prod` on Blaze with budget alerts; Emulator Suite (`demo-snackshot`) for development; APICompany token only in prod Secret Manager, readable only by the broker service account; test APIUser token in dev Secret Manager; Workload Identity Federation for GitHub Actions deploys ([12](Architecture/12_dev-and-test-environment.md) §1, §7.2, §9). | 1 |
 | **2** | **App core** | | | **7.5** |
 | 2.1 | Design system | all | Material 3 theme and tokens ([10](Architecture/10_architecture_ux_spec.md) §3), shared state contract components (loading, empty, error + retry, snackbar). | 1.5 |
 | 2.2 | Navigation shell and entry screens | F-05, F-30 | Global navigation with the chat as the start screen, S-01 Welcome, S-01A Privacy details (including the anonymous metrics notice). No sign-in screens. | 1.5 |
@@ -101,13 +103,13 @@ flowchart TB
 | 2.4 | Local persistence | F-05, F-16, F-20, F-23 | Room schema (meals, chat messages, goals, settings, sync metadata, dish catalog cache, metric counters), DAOs, repositories, migration strategy, app-private storage. | 2 |
 | 2.5 | Meal draft and image store | F-01, F-05 | Draft survives backgrounding and process death; processed image stored locally (raw photo deleted, 365-day retention) per [02](Architecture/02_answers-architecture-checklist.md) §1.5, §8.4. | 1 |
 | **3** | **LogMeal Access Broker** | | | **10** |
-| 3.1 | Broker project setup | F-30 | Cloud Functions (TypeScript), Firestore collections (`clients`, `devices`, `usage`, `audit`, `settings`, `metrics_daily`) with deny-all client rules, LogMeal company client, token encryption, emulator config. | 1.5 |
-| 3.2 | `provision` and `status` endpoints | F-30, F-32 | Anonymous ID token + App Check verification; device re-attach by hashed device ID; `signUp` APIUser; set APIUser `language` and `country`; pilot cap of 5 → waitlist; status with picture counter. | 3 |
+| 3.1 | Broker project setup | F-30 | Cloud Functions (TypeScript), Firestore collections (`clients`, `devices`, `usage`, `audit`, `settings`, `metrics_daily`) with deny-all client rules, LogMeal company client with `LOGMEAL_MODE` (`fake` / `test-user` / `company`), token encryption, emulator config, fake LogMeal server, seed data, `broker-ci` workflow ([12](Architecture/12_dev-and-test-environment.md) §3.3, §10). | 1.5 |
+| 3.2 | `provision` and `status` endpoints | F-30, F-32 | Anonymous ID token + App Check verification; device re-attach by hashed device ID; `signUp` APIUser; set APIUser `language` and `country`; pilot cap of 5 → waitlist (clients with `isTest` not counted); status with picture counter and `isTest`. | 3 |
 | 3.3 | `profile` endpoint | F-05, F-30 | Update APIUser `language` / `country` when the user changes them in Settings. | 0.5 |
 | 3.4 | `picture` and `DELETE /account` endpoints | F-32, F-30 | Idempotent picture count by `requestId`; trial ends at 90; account deletion keeps the device picture counter. | 1.5 |
 | 3.5 | Client state machine | F-32, F-33 | Trial → TrialEnded / Waitlisted / Paused / Suspended / Cancelled; read-before-`toggleEnabled`; `deleteAPIUser`; serialized per-client jobs; audit records. | 1.5 |
 | 3.6 | Cost controls | F-33 | Remote Config global kill switch; scheduled credit check with alert e-mail. | 1 |
-| 3.7 | Broker tests | — | Emulator tests for provision, waitlist, profile, picture idempotency, trial end, delete, metrics. | 1 |
+| 3.7 | Broker tests | — | Emulator tests (Vitest, MSW with shared fixtures, no real LogMeal calls) for provision, waitlist, profile, picture idempotency, trial end, delete, metrics; Firestore rules tests. | 1 |
 | **4** | **AI access in app** | | | **4** |
 | 4.1 | AI Access module | F-30 | Silent anonymous sign-in on the first AI action; hashed device ID; Play Integrity App Check; broker client; token in DataStore encrypted with Tink + Android Keystore; backup exclusion; `LogMealCredentialProvider`; status cache (~1 h). | 3.5 |
 | 4.2 | Language and country | F-05 | Detect device locale on provisioning; map to a LogMeal-supported language (fallback English) and ISO 3166-1 country. | 0.5 |
@@ -134,17 +136,17 @@ flowchart TB
 | **9** | **Trial, paywall, admin console** | | | **6** |
 | 9.1 | Trial and paywall UI | F-32 | "N of 90 free pictures left" in the chat/camera and S-16; one-time heads-up at 10 left; S-19 paywall (screen only); S-20 waitlist; LogMeal daily-limit message; async picture report. | 2 |
 | 9.2 | Admin functions | F-33 | Admin custom-claim script; `adminListClients`, `adminGetClient`, `adminSetStatus`, `adminGrantPictures`, `adminDeleteClient`, `adminApproveWaitlist`, `adminGetMetrics` — each checks the claim; actions write audit. | 1.5 |
-| 9.3 | Admin SPA | F-33 | React + Vite on Firebase Hosting: Google admin sign-in, Clients list, Client detail actions (reason + confirmation), Waitlist approve/reject, Metrics page (§6.4). | 2.5 |
+| 9.3 | Admin SPA | F-33 | React + Vite on Firebase Hosting: Google admin sign-in, Clients list, Client detail actions (reason + confirmation), Waitlist approve/reject, Metrics page (§6.4) with test devices shown or hidden; "Mark as test" action; `admin-ci` workflow. | 2.5 |
 | **10** | **North-star metrics** | | | **4.5** |
 | 10.1 | On-device metric collector | — | Record metric events locally (§6.2) and compute daily aggregates. | 1.5 |
 | 10.2 | Upload job | — | WorkManager job sends the previous day's aggregates once per day through the broker; retries with backoff; deletes sent aggregates. Respects the Settings opt-out. | 1 |
-| 10.3 | Broker `metrics` endpoint and storage | — | `POST /v1/metrics` validates the payload against an allow-list schema, drops unknown fields, and stores it in `metrics_daily` without any client or device identifier (§6.3). | 1 |
+| 10.3 | Broker `metrics` endpoint and storage | — | `POST /v1/metrics` validates the payload against an allow-list schema, drops unknown fields, and stores it in `metrics_daily` without any client or device identifier (§6.3); accepts the `test` flag. | 1 |
 | 10.4 | Metrics aggregation | — | Scheduled function computes pilot-level north-star values (§6.4) for the admin console. | 1 |
 | **11** | **Settings, quality, release** | | | **8** |
 | 11.1 | Settings (S-16) | F-05, F-19, F-30, F-32 | Health Connect connect/disconnect/sync; AI section (pictures left, status); food language and country; anonymous metrics on/off; privacy; "Delete all data" (local + `DELETE /account`); S-17 dialogs. | 2 |
 | 11.2 | Accessibility pass | all | TalkBack labels, font scaling, contrast, touch targets per [10](Architecture/10_architecture_ux_spec.md) §5. | 1 |
-| 11.3 | End-to-end device testing and fixes | all | Full test pass on physical devices: chat text and photo, lists, offline, HC denied/revoked, reinstall, waitlist, trial end, metrics upload. | 2.5 |
-| 11.4 | Google Play release | — | Signing, internal testing track, privacy policy page (including anonymous metrics), Data safety form, Health Connect permission declaration, store listing. | 2.5 |
+| 11.3 | End-to-end device testing and fixes | all | Full test pass on the physical phone, the AVD set (API 28, 34, latest), and Firebase Test Lab devices ([12](Architecture/12_dev-and-test-environment.md) §6): chat text and photo, lists, offline, HC denied/revoked, reinstall, waitlist, trial end, metrics upload. | 2.5 |
+| 11.4 | Google Play release | — | Play App Signing with an upload key in the GitHub `prod` environment, internal testing track, pre-launch report review, privacy policy page (including anonymous metrics), Data safety form, Health Connect permission declaration, store listing. | 2.5 |
 | | **Total** | | | **78.5** |
 | | Contingency (~10 %) | | | 8 |
 | | **Total with contingency** | | | **86.5** |
@@ -177,6 +179,7 @@ flowchart TB
   "day": "2026-11-15",
   "appVersion": "1.0.0",
   "locale": "eng-GB",
+  "test": false,
   "photoRecognitions": 4,
   "textLookups": 2,
   "highConfidence": 3,
@@ -190,7 +193,7 @@ flowchart TB
 }
 ```
 
-The broker stores it in `metrics_daily/{autoId}` exactly as validated. Latency values are rounded to 100 ms and time-to-log to whole seconds.
+The broker stores it in `metrics_daily/{autoId}` exactly as validated. Latency values are rounded to 100 ms and time-to-log to whole seconds. `test` is `true` only on devices whose client is marked `isTest` (the owner's devices), so the console can exclude them from pilot totals ([12](Architecture/12_dev-and-test-environment.md) §3.4).
 
 ### 6.4 Reporting
 
@@ -285,7 +288,8 @@ I-3, I-5, and I-6 depend only on I-2 and can be reordered. I-8 can start once ph
   - Spike results (photo latency, grams, text-match quality per language, credits per call, HC write) are recorded in the architecture docs, and the [04](Architecture/04_stack-comparative-analysis.md) §10 decision gates pass or the plan is revised.
   - The open questions in §8 have an owner decision.
   - The app builds in CI and opens S-01 → chat; navigation to History, Dashboard, and Settings works (placeholder screens allowed).
-  - The Firebase project exists with the APICompany token in Secret Manager.
+  - `snackshot-dev` and `snackshot-prod` exist; the APICompany token is in prod Secret Manager and the test APIUser token in dev Secret Manager.
+  - LogMeal fixtures from the spike are committed; the local flavor runs against the emulators and the fake LogMeal server.
   - Room schema and nutrition calculation have unit tests.
 
 #### I-1 AI access — F-30
@@ -353,6 +357,7 @@ The following documents describe F-10 / F-11 as MVP fallbacks or treat F-05 as p
 - [11_logmeal-access-token-management.md](Architecture/11_logmeal-access-token-management.md) — `profile` and `metrics` endpoints, `metrics_daily` collection, language/country at provisioning, behaviour for TrialEnded / Waitlisted users.
 - [F-32](Features%20list/F-32-free-ai-trial-paywall.md) — paywall and waitlist buttons.
 - [09_process-flow-diagrams.md](Architecture/09_process-flow-diagrams.md) — text logging flow through the chat; metrics upload flow.
+- [11_logmeal-access-token-management.md](Architecture/11_logmeal-access-token-management.md) — `isTest` clients excluded from `maxClients`, `LOGMEAL_MODE`, APICompany token only in the prod project ([12](Architecture/12_dev-and-test-environment.md) §11).
 
 ## 10. Risks
 
@@ -364,7 +369,7 @@ The following documents describe F-10 / F-11 as MVP fallbacks or treat F-05 as p
 | LogMeal dish catalog does not cover the user's language | Poor text matching | English fallback; country set on the APIUser; check catalog coverage in the spike |
 | LogMeal credits run out | AI stops during the pilot | Buy the Analyse plan before M3; credit alarm; kill switch |
 | Metrics could identify a pilot user (5 users) | Privacy breach | Aggregates only, no identifiers, coarse values, pilot totals only in the console, opt-out |
-| Health Connect behaves differently across devices | Sync bugs | Test on at least two physical devices in I-6 and 11.3 |
+| Health Connect behaves differently across devices | Sync bugs | Test on the physical phone, AVDs (API 28, 34, latest), and Firebase Test Lab devices from other vendors in I-6 and 11.3 ([12](Architecture/12_dev-and-test-environment.md) §6) |
 | Google Play review of Health Connect permissions takes long | Release delay | Prepare the declaration and privacy policy early in I-6; use the internal testing track |
 
 ## 11. Out of scope of this plan

@@ -574,4 +574,4 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 - [x] Each primary screen and modal defines loading, empty, error, success, and relevant edge behavior.
 - [x] Camera, gallery, AI failure, local-only, Health Connect denial, revocation, retry, and deletion paths are mapped.
 - [x] Accessibility, touch targets, contrast, font scaling, motion, and haptics are specified.
-- [x] The document is saved under `Project documentation/Architecture/UX_UI/`.
+- [x] The document is saved under `docs/Architecture/UX_UI/`.

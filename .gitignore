@@ -1,3 +1,32 @@
-.github/
+# GitHub: keep local Copilot agents/skills private, commit workflows
+/.github/*
+!/.github/workflows/
+# third-party samples under docs keep their own .github folders out of the repo
+docs/**/.github/
+
+# Python
 .venv/
-Project documentation/competitors_UI/video/
+
+# Large local media
+docs/competitors_UI/video/
+
+# Android
+.gradle/
+build/
+local.properties
+*.jks
+*.keystore
+captures/
+
+# Node / Firebase
+node_modules/
+.secret.local
+*.local
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+broker/seed/emulator-export/
+
+# IDE
+.idea/
+*.iml
