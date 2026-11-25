@@ -26,9 +26,9 @@
 | 12 | Language and country (18 Nov 2026) | **Set on every APIUser.** | `provision` sends the device language and country; the broker sets them with `modifyUserProfileInfo`. `POST /v1/logmeal/profile` updates them when the user changes them in Settings (§8). |
 | 13 | Product metrics (18 Nov 2026) | **Anonymous daily aggregates through the broker.** | `POST /v1/metrics` and the `metrics_daily` collection, stored without any client or device identifier. Snackshot collects only product metrics (for example AI response time and usage statistics); they contain no personal data ([WBS](../04_wbs_and_mvp_implementation_plan.md) §6). |
 | 14 | Environments (18 Nov 2026) | **Per [12](./12_dev-and-test-environment.md).** | `LOGMEAL_MODE` = `fake` / `test-user` / `company`; the APICompany token exists only in `snackshot-prod` Secret Manager; one test APIUser and the owner's devices are clients with `isTest: true` (§8.2). |
-| 15 | LogMeal plan (18 Nov 2026) | **LogMeal special conditions: no limit on the number of APIUsers.** | The pilot cap of 5 is Snackshot's own limit only. Company credits are still watched with the alarm (§6.3). |
+| 15 | LogMeal plan (18 Nov 2026, quota measured 25 Nov 2026) | **LogMeal special conditions: no limit on the number of APIUsers.** The query quota is the standard one: **200 queries per month shared by all APIUsers, 20 calls per day and 1 call per second per APIUser** (`GET /v2/info/limitations`, [13](13_spike-1.1-results.md) §4). | The pilot cap of 5 is Snackshot's own limit only. Company credits are watched with the alarm against 200 per month (§6.3). |
 
-> ✅ **LogMeal plan check (resolved 18 November 2026):** the standard free trial (30 days, 5 users, 200 queries) could not cover the pilot. LogMeal has agreed to special conditions with no limit on the number of APIUsers (decision 15). Credit consumption (one picture uses at least one credit, more if nutrition or quantity endpoints are called separately) is still monitored (§6.3).
+> ⚠️ **LogMeal plan check (updated 25 November 2026):** LogMeal has agreed to special conditions with no limit on the number of APIUsers (decision 15). The account's query quota is unchanged: **200 queries per month shared by all APIUsers, 20 calls per day and 1 call per second per APIUser**. Measured in the spike ([13](13_spike-1.1-results.md) §4): one picture costs **1 credit** (`segmentation/complete`); `nutritionalInfo`, `confirm/quantity` and `info/limitations` cost none. The pilot can therefore recognise **at most 200 pictures per calendar month in total**, less than the worst case of 5 × 90 = 450 (§6.3).
 
 ---
 
@@ -251,11 +251,11 @@ LogMeal's usage log is the **authoritative** meter (the device cannot be trusted
 
 ### 6.3 Company-level cost protection
 
-- Every broker call and every metering run reads `X-Account-Credits-Remaining`. Alert at 70 % / 90 % of monthly credits; at 100 % optionally pause the free tier first, paid tier last.
+- Every broker call and every metering run reads `X-Account-Credits-Remaining`. Alert at 70 % / 90 % of monthly credits (200 under the current quota, i.e. 140 / 180); at 100 % optionally pause the free tier first, paid tier last.
 - Global **kill switch** flag (Firebase Remote Config, read by the app) disables AI recognition for everybody without touching LogMeal users — for incidents or unexpected overage.
 - Plan user-cap monitoring is not needed under the LogMeal special conditions (no APIUser limit, decision 15); Cancelled users are still deleted.
 - **MVP pilot cap:** at most **5 clients** in Trial/TrialEnded/Active/Paused (admin setting `maxClients`, default 5). Clients with `isTest: true` (the test APIUser and the owner's devices) are not counted. Further clients are Waitlisted and approved from the admin console when a slot is freed.
-- **Worst-case MVP cost:** 5 clients × 90 pictures = 450 recognitions plus follow-up calls, covered by the LogMeal special conditions (see §0); the credit alarm still applies.
+- **Worst-case MVP usage:** 5 clients × 90 pictures = 450 recognitions (1 credit each; follow-up calls are free). The monthly quota is 200, so the pilot fits only if usage is spread over at least three months. When the quota is used up, LogMeal returns HTTP 429 until the next month: the app shows the LogMeal limit state and offers Quick add (decision 11); the credit alarm warns before that.
 
 ### 6.4 How payments reach Snackshot (post-MVP)
 
@@ -395,7 +395,7 @@ The broker runs in three environments ([12](./12_dev-and-test-environment.md) §
 | Mode | Environment | `provision` behaviour |
 | --- | --- | --- |
 | `fake` | Local emulator (`demo-snackshot`), broker tests | Creates the client record and returns a fixed fake token; LogMeal calls go to the fake server or MSW. |
-| `test-user` | `snackshot-dev` | Returns the single test APIUser token; never calls `signUp`, `toggleEnabled`, `deleteAPIUser`, or `modifyUserProfileInfo`. |
+| `test-user` | `snackshot-dev-app` | Returns the single test APIUser token; never calls `signUp`, `toggleEnabled`, `deleteAPIUser`, or `modifyUserProfileInfo`. |
 | `company` | `snackshot-prod` | Full design of this document. |
 
 The APICompany token exists only in `snackshot-prod` Secret Manager (decision 4). The test APIUser is registered in prod Firestore with `isTest: true`; the owner's own prod installs are marked `isTest` from the admin console. `isTest` clients are not counted in `maxClients`, and the app adds `"test": true` to their metrics.

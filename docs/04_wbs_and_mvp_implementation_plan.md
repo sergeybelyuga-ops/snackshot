@@ -31,9 +31,9 @@ Sources:
 | 2 | 15 Nov 2026 | ~~F-05 AI Chat is in the MVP; F-10 and F-11 are not.~~ **Superseded by decision 6.** | — |
 | 3 | 15 Nov 2026 | ~~Food lookup by text uses LogMeal's dish catalog.~~ **Superseded by decision 6** (no text lookup in the MVP). The APIUser still carries the user's `language` and `country`, which LogMeal uses to localize and refine recognized dishes. | Language and country are set at provisioning and can be changed in Settings (3.2, 3.3, 4.2). |
 | 4 | 15 Nov 2026 | **Product metrics are sent through the LogMeal Access Broker.** Snackshot collects only product metrics (for example AI response time and usage statistics) to improve the product; they contain no personal data. | Broker endpoint and storage for anonymous daily metric aggregates (§6). No personal data, food names, images, or nutrition values leave the device for metrics. |
-| 5 | 18 Nov 2026 | **Development and test environment per [12](Architecture/12_dev-and-test-environment.md).** Local emulators + `snackshot-dev` + `snackshot-prod`; automated tests never call real LogMeal; manual testing uses one test APIUser marked `isTest`; App Distribution for dev builds, Play internal testing for prod. | Scope of 1.1, 1.3, 1.4, 3.1, 3.2, 3.7, 9.3, 10.3, 11.3, 11.4 extended. The extra 1.5 h is taken from contingency (8 h → 6.5 h) and re-checked at M1. |
+| 5 | 18 Nov 2026 | **Development and test environment per [12](Architecture/12_dev-and-test-environment.md).** Local emulators + `snackshot-dev-app` + `snackshot-prod`; automated tests never call real LogMeal; manual testing uses one test APIUser marked `isTest`; App Distribution for dev builds, Play internal testing for prod. | Scope of 1.1, 1.3, 1.4, 3.1, 3.2, 3.7, 9.3, 10.3, 11.3, 11.4 extended. The extra 1.5 h is taken from contingency (8 h → 6.5 h) and re-checked at M1. |
 | 6 | 18 Nov 2026 | **Scope revision.** F-05 AI Chat and F-10 Manual Text Search are **out** of the MVP. F-11 Quick Add is **in** the MVP and is always free. F-09 Gallery is in the MVP. Multi-item (F-04) and product recognition (F-08) are post-MVP. The dashboard has D / W / M / 3M / Y ranges. The user can set optional calorie and macro goals in the app; goals are stored only locally and are not synchronized with Google Health Connect. | The start screen is S-02 Home. Quick Add is the fallback for every case where AI is unavailable (failure, trial ended, waitlisted, broker down, LogMeal daily limit). WBS 5 "AI chat and text logging" is replaced by "Home, quick add, and goals". |
-| 7 | 18 Nov 2026 | **LogMeal special conditions.** LogMeal has agreed to special conditions with no limit on the number of APIUsers. | The pilot cap of 5 is Snackshot's own limit only; the test APIUser and the owner's devices do not take pilot places. |
+| 7 | 18 Nov 2026 (quota measured 25 Nov 2026) | **LogMeal special conditions.** LogMeal has agreed to special conditions with no limit on the number of APIUsers. The query quota is the standard 200 per month shared by all APIUsers (20 per day per APIUser); one picture costs 1 credit ([13](Architecture/13_spike-1.1-results.md) §4). | The pilot cap of 5 is Snackshot's own limit only; the test APIUser and the owner's devices do not take pilot places. The pilot can recognise at most 200 pictures per month. |
 
 ## 3. MVP scope baseline
 
@@ -97,7 +97,7 @@ flowchart TB
 | 1.1 | LogMeal + Health Connect technical spike | F-01, F-02, F-20 | Throwaway build on a physical device with the test APIUser token ([12](Architecture/12_dev-and-test-environment.md) §3.4, never shipped). Photo → `segmentation/complete` → nutrition → quantity (grams). One `NutritionRecord` write. Record latency, grams quality, credits per call, ARCore availability. Decision-gate evidence for [04](Architecture/04_stack-comparative-analysis.md) §10. Capture and scrub LogMeal responses as shared fixtures in `test-fixtures/logmeal` ([12](Architecture/12_dev-and-test-environment.md) §3.1). | 3 |
 | 1.2 | Close open decisions | — | Confirm persistence technology and the open questions in §8; update affected documents. | 0.5 |
 | 1.3 | Android project skeleton | — | Kotlin + Compose project, Gradle version catalog, packages/modules (`domain`, `data-local`, `logmeal`, `healthconnect`, `access`, `metrics`, `ui`), Hilt, ktlint/lint; flavors `local` / `dev` / `prod` with `BuildConfig` URLs; monorepo layout, `.gitignore` / `.gitattributes`; GitHub Actions `android-ci` and `distribute-android` (App Distribution for dev) ([12](Architecture/12_dev-and-test-environment.md) §2, §4, §7). | 2 |
-| 1.4 | Firebase projects | F-30, F-33 | `snackshot-dev` and `snackshot-prod` on Blaze with budget alerts; Emulator Suite (`demo-snackshot`) for development; APICompany token only in prod Secret Manager, readable only by the broker service account; test APIUser token in dev Secret Manager; Workload Identity Federation for GitHub Actions deploys ([12](Architecture/12_dev-and-test-environment.md) §1, §7.2, §9). | 1 |
+| 1.4 | Firebase projects | F-30, F-33 | `snackshot-dev-app` and `snackshot-prod` on Blaze with budget alerts; Emulator Suite (`demo-snackshot`) for development; APICompany token only in prod Secret Manager, readable only by the broker service account; test APIUser token in dev Secret Manager; Workload Identity Federation for GitHub Actions deploys ([12](Architecture/12_dev-and-test-environment.md) §1, §7.2, §9). | 1 |
 | **2** | **App core** | | | **7.5** |
 | 2.1 | Design system | all | Material 3 theme and tokens ([10](Architecture/10_architecture_ux_spec.md) §3), shared state contract components (loading, empty, error + retry, snackbar). | 1.5 |
 | 2.2 | Navigation shell and entry screens | F-30 | Global navigation with S-02 Home as the start screen, S-01 Welcome, S-01A Privacy details (including the product metrics notice). No sign-in screens. | 1.5 |
@@ -291,7 +291,7 @@ I-2, I-5, and I-6 depend only on I-1 and can be reordered. I-3 depends only on I
   - Spike results (photo latency, grams, credits per call, HC write) are recorded in the architecture docs, and the [04](Architecture/04_stack-comparative-analysis.md) §10 decision gates pass or the plan is revised.
   - The open questions in §8 have an owner decision.
   - The app builds in CI and opens S-01 → S-02 Home; navigation to History, Dashboard, and Settings works (placeholder screens allowed).
-  - `snackshot-dev` and `snackshot-prod` exist; the APICompany token is in prod Secret Manager and the test APIUser token in dev Secret Manager.
+  - `snackshot-dev-app` and `snackshot-prod` exist; the APICompany token is in prod Secret Manager and the test APIUser token in dev Secret Manager.
   - LogMeal fixtures from the spike are committed; the local flavor runs against the emulators and the fake LogMeal server.
   - Room schema and nutrition calculation have unit tests.
 
@@ -349,7 +349,7 @@ I-2, I-5, and I-6 depend only on I-1 and can be reordered. I-3 depends only on I
 | 1 | How does a user log a meal after the 90-picture trial ends, or while waitlisted? | **Resolved (decision 6):** Quick add is always available and free. S-19 and S-20 offer Quick add. |
 | 2 | Do text lookups count toward the 90 free pictures? | **No longer applies:** there is no text lookup in the MVP. |
 | 3 | What happens when photo recognition fails? | **Resolved (decision 6):** retry once, then Quick add with the draft kept. |
-| 4 | Which LogMeal plan covers the pilot? | **Resolved (decision 7):** LogMeal special conditions, no APIUser limit. Credit consumption is still watched with the alarm (3.6). |
+| 4 | Which LogMeal plan covers the pilot? | **Resolved (decision 7):** LogMeal special conditions, no APIUser limit; quota 200 pictures per month in total. Credit consumption is watched with the alarm against 200 (3.6). |
 | 5 | Can LogMeal's dish catalog handle free-text quantities? | **No longer applies:** text logging is post-MVP (F-05, F-10). |
 
 ## 9. Documents aligned
@@ -360,10 +360,10 @@ All documents were aligned with decisions 6 and 7 on 18 November 2026. The HTML 
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| LogMeal grams or latency are not good enough | Core value not proven | Spike in I-0 before production code; SMALL/MEDIUM/BIG portion confirmation as fallback; Quick add always available; decision gate in [04](Architecture/04_stack-comparative-analysis.md) §10 |
+| LogMeal grams or latency are not good enough | Core value not proven | **Spike done ([13](Architecture/13_spike-1.1-results.md)):** recognition correct 5/5, but grams are standard portions (about 80 % mean error) and photo → result took 3.7–6.8 s (median 4.3 s), almost all LogMeal server time, so the p98 < 3 s target is not met yet. Mitigation: optional grams correction on S-15 (per-item `confirm/quantity`); pending state while waiting; raise latency with LogMeal; re-measure with CameraX and mobile data in I-4; Quick add always available |
 | Estimates are optimistic | Schedule slip | Re-plan at each milestone using actual hours; contingency week |
 | AI is unavailable (LogMeal or broker down, trial ended, waitlisted) | No AI logging | Clear retryable errors; keep the draft; Quick add as the fallback |
-| LogMeal credits run out | AI stops during the pilot | Credit alarm; kill switch; special conditions agreed with LogMeal |
+| LogMeal credits run out | AI stops during the pilot | The quota is 200 pictures per month for the whole pilot (worst case needs 450). Credit alarm at 140 / 180; kill switch; HTTP 429 handled as the LogMeal limit state with Quick add; ask LogMeal for a larger quota if the pilot needs it |
 | Metrics could identify a pilot user (5 users) | Privacy breach | Aggregates only, no identifiers, coarse values, pilot totals only in the console, opt-out |
 | Health Connect behaves differently across devices | Sync bugs | Test on the physical phone, AVDs (API 28, 34, latest), and Firebase Test Lab devices from other vendors in I-6 and 11.3 ([12](Architecture/12_dev-and-test-environment.md) §6) |
 | Google Play review of Health Connect permissions takes long | Release delay | Prepare the declaration and privacy policy early in I-6; use the internal testing track |
