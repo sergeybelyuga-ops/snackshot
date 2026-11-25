@@ -1,0 +1,5 @@
+{
+  "M": "200 queries per month among all your users. (On M limited endpoints)",
+  "D": "20 calls per day per user. (On D limited endpoints)",
+  "S": "1.0 allowed calls per second per user. (On S limited endpoints)"
+}
