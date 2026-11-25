@@ -19,7 +19,7 @@ Sources:
 
 | # | Question | Decision | Effect |
 | --- | --- | --- | --- |
-| 1 | How many environments? | **Local (Firebase Emulator Suite), Dev (`snackshot-dev`), Prod (`snackshot-prod`).** | Two Firebase projects on Blaze, each with a budget alert. Pilot data never mixes with test data. §1 |
+| 1 | How many environments? | **Local (Firebase Emulator Suite), Dev (`snackshot-dev-app`), Prod (`snackshot-prod`).** | Two Firebase projects on Blaze, each with a budget alert. Pilot data never mixes with test data. §1 |
 | 2 | Real LogMeal in automated tests? | **No.** Automated tests (unit, UI, broker, CI) use recorded LogMeal responses served by fakes. | Zero credits and no LogMeal secret in CI. Real LogMeal is used only in manual testing. §3 |
 | 3 | Which LogMeal credentials for manual testing? | **One dedicated test APIUser** with its own token. It is a real APIUser of the Snackshot company, so its usage appears in LogMeal statistics and in the admin console, marked as test. | The APICompany token stays in the prod project only. The dev broker never creates APIUsers. §3.3 |
 | 4 | Repository | **One private GitHub monorepo** (`sergeybelyuga-ops/snackshot`, already exists). | Android, broker, admin console, shared test fixtures, and docs (`docs/`, renamed from `Project documentation/`) live together. GitHub Actions with path filters. §4, §7 |
@@ -27,6 +27,7 @@ Sources:
 | 6 | Test APIUser and the LogMeal user limit | ~~The test APIUser counts against the LogMeal plan's user limit.~~ **Superseded (18 November 2026):** LogMeal has agreed to special conditions with no limit on the number of APIUsers. | All 5 pilot users fit; the test APIUser and the owner's devices (`isTest`) do not take pilot places. §3.4 |
 | 7 | Broker deploys to dev | **Automatic on every push to `main`** that changes `broker/**` or `admin/**`. Prod stays manual with approval. | §7.1 |
 | 8 | Test build distribution | **Firebase App Distribution** for dev builds, **Google Play internal testing** for prod builds. (TestFlight is iOS-only.) | §8 |
+| 9 | Dev project ID (25 November 2026) | **`snackshot-dev-app`** (display name `snackshot-dev`). The ID `snackshot-dev` was already taken globally. Budgets are in USD, the billing account currency: 5 USD dev, 10 USD prod, alerts at 50 / 90 / 100 % and forecast 100 %. | All references updated. §1 |
 
 ---
 
@@ -42,7 +43,7 @@ flowchart LR
         AppL -->|adb reverse| Fake
         Emu -->|LOGMEAL_MODE=fake| Fake
     end
-    subgraph Dev["Dev — snackshot-dev"]
+    subgraph Dev["Dev — snackshot-dev-app"]
         AppD["App: dev flavor<br/>(App Distribution)"]
         BrokerD["Broker<br/>LOGMEAL_MODE=test-user"]
         AppD --> BrokerD
@@ -62,7 +63,7 @@ flowchart LR
 | | **Local** | **Dev** | **Prod** |
 | --- | --- | --- | --- |
 | Purpose | Daily development, automated tests | Manual testing against real LogMeal on your phone | Pilot (5 users) |
-| Firebase | Emulator Suite, project ID `demo-snackshot` (the `demo-` prefix means no real cloud resource can be touched) | Project `snackshot-dev`, Blaze, budget alert (5 EUR) | Project `snackshot-prod`, Blaze, budget alert |
+| Firebase | Emulator Suite, project ID `demo-snackshot` (the `demo-` prefix means no real cloud resource can be touched) | Project `snackshot-dev-app`, Blaze, budget alert (5 USD) | Project `snackshot-prod`, Blaze, budget alert (10 USD) |
 | Android flavor | `local` | `dev` | `prod` |
 | Application ID | `…snackshot.local` | `…snackshot.dev` | `…snackshot` |
 | App Check | Not enforced in the emulator | Debug provider (debug tokens registered in the console) | Play Integrity (works only for Play-distributed builds) |
@@ -83,7 +84,7 @@ One flavor dimension, `env`, with `local`, `dev`, and `prod`. Each flavor sets `
 
 | `BuildConfig` field | `local` | `dev` | `prod` |
 | --- | --- | --- | --- |
-| `BROKER_BASE_URL` | `http://localhost:5001/demo-snackshot/<region>/api` | `https://<region>-snackshot-dev.cloudfunctions.net/api` | `https://<region>-snackshot-prod.cloudfunctions.net/api` |
+| `BROKER_BASE_URL` | `http://localhost:5001/demo-snackshot/<region>/api` | `https://<region>-snackshot-dev-app.cloudfunctions.net/api` | `https://<region>-snackshot-prod.cloudfunctions.net/api` |
 | `LOGMEAL_BASE_URL` | `http://localhost:8090` | `https://api.logmeal.com` | `https://api.logmeal.com` |
 | `USE_FIREBASE_EMULATORS` | `true` | `false` | `false` |
 | `APP_CHECK_PROVIDER` | `none` | `debug` | `playIntegrity` |
@@ -146,7 +147,7 @@ The broker's LogMeal client reads `LOGMEAL_MODE`:
 | Mode | Used in | `provision` behaviour | Secrets needed |
 | --- | --- | --- | --- |
 | `fake` | Local emulator, broker tests | Creates the client record and returns a fixed fake token. LogMeal calls go to the fake server (or MSW in tests). | none |
-| `test-user` | `snackshot-dev` | Creates the client record and returns the **test APIUser token**. Never calls `signUp`, `toggleEnabled`, `deleteAPIUser`, or `modifyUserProfileInfo`; those calls are logged and skipped. | `LOGMEAL_TEST_USER_TOKEN` |
+| `test-user` | `snackshot-dev-app` | Creates the client record and returns the **test APIUser token**. Never calls `signUp`, `toggleEnabled`, `deleteAPIUser`, or `modifyUserProfileInfo`; those calls are logged and skipped. | `LOGMEAL_TEST_USER_TOKEN` |
 | `company` | `snackshot-prod` | Full design from [11](11_logmeal-access-token-management.md). | `LOGMEAL_COMPANY_TOKEN` |
 
 Reasons for this split:
@@ -157,7 +158,7 @@ Reasons for this split:
 ### 3.4 The test APIUser
 
 - **Created once** by the owner with a one-off script, `broker/scripts/create-test-user.ts`. The script runs in a short-lived shell that reads the APICompany token from prod Secret Manager (`gcloud secrets versions access`), so the token is never written to disk. It calls `signUp`, sets `language`/`country`, and prints the new APIUser token once.
-- **Stored** in `snackshot-dev` Secret Manager as `LOGMEAL_TEST_USER_TOKEN`. On the developer PC it goes in `broker/functions/.secret.local` (gitignored) only when you want the local emulator in `test-user` mode.
+- **Stored** in `snackshot-dev-app` Secret Manager as `LOGMEAL_TEST_USER_TOKEN`. On the developer PC it goes in `broker/functions/.secret.local` (gitignored) only when you want the local emulator in `test-user` mode.
 - **Registered in prod Firestore** as `clients/{id}` with `isTest: true`, so the admin console shows its usage with a "test" label.
 
 How `isTest` affects the rest of the system:
@@ -177,7 +178,7 @@ snackshot/
   android/                Kotlin + Compose (Gradle version catalog, modules from WBS 1.3)
   broker/
     firebase.json         emulators, functions, firestore, hosting
-    .firebaserc           aliases: dev → snackshot-dev, prod → snackshot-prod
+    .firebaserc           aliases: dev → snackshot-dev-app, prod → snackshot-prod
     firestore.rules       deny-all client access
     functions/            Cloud Functions (TypeScript), Vitest tests
     seed/                 emulator seed data and scripts
@@ -305,9 +306,9 @@ For different **Android OS versions** and devices, use the AVD set, Firebase Tes
 | Secret | Where it lives | Who can read it |
 | --- | --- | --- |
 | LogMeal APICompany token | `snackshot-prod` Secret Manager **only** | Prod broker service account; the owner through a short-lived `gcloud` session when running `create-test-user` |
-| LogMeal test APIUser token | `snackshot-dev` Secret Manager; optionally `broker/functions/.secret.local` on your PC | Dev broker service account; the local emulator |
+| LogMeal test APIUser token | `snackshot-dev-app` Secret Manager; optionally `broker/functions/.secret.local` on your PC | Dev broker service account; the local emulator |
 | Upload keystore + passwords | GitHub `prod` environment secrets; offline backup | `distribute-android.yml` (prod) |
-| App Check debug tokens | Registered in the `snackshot-dev` console; on the device / in `local.properties` | Dev builds only |
+| App Check debug tokens | Registered in the `snackshot-dev-app` console; on the device / in `local.properties` | Dev builds only |
 | Firebase config (`google-services.json`, web config) | Committed | Public by design; API keys restricted per app |
 | WIF provider, deploy service account names | GitHub variables | Workflows |
 
@@ -334,7 +335,7 @@ Rules:
 
 1. Install the tools above, clone the repo, and run `npm ci` in `broker/functions`, `admin`, and `tools/fake-logmeal`.
 2. Create AVDs: API 28 (Google Play), API 34 (Google APIs), and the latest stable API (Google Play).
-3. Create `snackshot-dev` and `snackshot-prod` (Blaze, budget alerts). Register the Android apps (`.dev`, prod) and the admin web app, and add the dev App Check debug provider.
+3. Create `snackshot-dev-app` and `snackshot-prod` (Blaze, budget alerts). Register the Android apps (`.dev`, prod) and the admin web app, and add the dev App Check debug provider.
 4. Set up WIF and the deploy service accounts for both projects; add the GitHub variables and the `prod` environment.
 5. Put the APICompany token in prod Secret Manager. Run `create-test-user` and put the test token in dev Secret Manager.
 6. Seed the local emulator: `npm run seed` (settings with `maxClients = 5`, an admin user with the `admin` claim, sample clients in `trial`, `trial_ended`, and `waitlisted`).

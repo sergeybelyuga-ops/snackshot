@@ -395,7 +395,7 @@ The broker runs in three environments ([12](./12_dev-and-test-environment.md) §
 | Mode | Environment | `provision` behaviour |
 | --- | --- | --- |
 | `fake` | Local emulator (`demo-snackshot`), broker tests | Creates the client record and returns a fixed fake token; LogMeal calls go to the fake server or MSW. |
-| `test-user` | `snackshot-dev` | Returns the single test APIUser token; never calls `signUp`, `toggleEnabled`, `deleteAPIUser`, or `modifyUserProfileInfo`. |
+| `test-user` | `snackshot-dev-app` | Returns the single test APIUser token; never calls `signUp`, `toggleEnabled`, `deleteAPIUser`, or `modifyUserProfileInfo`. |
 | `company` | `snackshot-prod` | Full design of this document. |
 
 The APICompany token exists only in `snackshot-prod` Secret Manager (decision 4). The test APIUser is registered in prod Firestore with `isTest: true`; the owner's own prod installs are marked `isTest` from the admin console. `isTest` clients are not counted in `maxClients`, and the app adds `"test": true` to their metrics.
