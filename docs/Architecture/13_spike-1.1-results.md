@@ -4,7 +4,7 @@
 
 **Purpose:** Evidence for the decision gates in [04 Stack comparative analysis](04_stack-comparative-analysis.md) §10 and the I-0 Definition of Done in the [WBS](../04_wbs_and_mvp_implementation_plan.md) §7.5.
 **Date:** 25 November 2026
-**Status:** Measured. Decisions on the open findings (§6) are pending.
+**Status:** Accepted. Decisions on the findings are recorded in §6 (25 November 2026).
 
 Spike code: branch `spike/1.1`, folder `spike/logmeal-hc/` (throwaway, never merged). Fixtures: [test-fixtures/logmeal](../../test-fixtures/logmeal/README.md).
 
@@ -60,7 +60,7 @@ Measured in the app, from "photo chosen" to "nutrition shown". Upload size was 1
 
 One picture with any number of corrections costs **1 credit**. Total spike cost: 6 credits.
 
-`GET /v2/info/limitations` for the test APIUser reports: **"200 queries per month among all your users"**, **20 calls per day per user**, 1 call per second. `x-account-credits-remaining` was 194 after the spike. **This is the standard trial quota**, not the special conditions assumed in [11](11_logmeal-access-token-management.md) §0 decision 15 and §6 ("5 clients × 90 pictures = 450 recognitions … covered by the LogMeal special conditions").
+`GET /v2/info/limitations` for the test APIUser reports: **"200 queries per month among all your users"**, **20 calls per day per user**, 1 call per second. `x-account-credits-remaining` was 194 after the spike. This is the standard quota: the special conditions remove only the APIUser limit. The documents previously assumed that 450 pictures were covered; they now state the real quota (§6, F3).
 
 ## 5. Health Connect and ARCore
 
@@ -73,13 +73,13 @@ One picture with any number of corrections costs **1 credit**. Total spike cost:
 
 Creating an ARCore `Session` needs the `CAMERA` runtime permission. When the app declares `CAMERA`, `ACTION_IMAGE_CAPTURE` also needs it granted.
 
-## 6. Findings that need a decision
+## 6. Findings and decisions
 
-| # | Finding | Proposal |
+| # | Finding | Decision (25 November 2026) |
 | --- | --- | --- |
-| F1 | Latency is about 4.3 s median and 6.8 s max, against a target of p98 < 3 s. | Change the target to what the app controls: **app overhead < 0.5 s and photo → result p90 < 6 s on Wi-Fi**, with the recoverable pending state from [10](10_architecture_ux_spec.md) ("show a recoverable pending state beyond that threshold") shown from the first second. Re-measure with CameraX and mobile data in I-4, and ask LogMeal whether a faster model or region is available. |
-| F2 | Grams without depth are standard portions (mean error about 80 %). | Make the quantity step on S-15 part of **every** recognition: show the grams pre-selected and editable, with SMALL / MEDIUM / BIG presets, and send the per-item object form. Keep depth quantity (ARCore is supported on the pilot phone) as a post-MVP experiment. |
-| F3 | The account reports the **trial quota** (200 queries/month across all users) while the pilot needs about 450. | **Ask LogMeal to apply the special conditions** to the account, including the monthly query quota, before I-4. Until then, the credit alarm ([11](11_logmeal-access-token-management.md) §6.3) must be set against 200. |
+| F1 | Latency is about 4.3 s median and 6.8 s max, against a target of p98 < 3 s. | **Keep the target p98 < 3 s.** The gap is an open risk with LogMeal ([WBS](../04_wbs_and_mvp_implementation_plan.md) §10): raise it with LogMeal, re-measure with CameraX and mobile data in I-4, and show the recoverable pending state from [10](10_architecture_ux_spec.md) while waiting. |
+| F2 | Grams without depth are standard portions (mean error about 80 %). | **Correction stays optional**, as planned: S-15 shows LogMeal's grams and the user may edit them (F-03). Corrections use the per-item object form. Depth quantity stays post-MVP. |
+| F3 | The account reports **200 queries per month** across all users, while the worst case of the pilot is about 450. | **Documents changed to the real quota:** [11](11_logmeal-access-token-management.md) §0 decision 15 and §6.3, [WBS](../04_wbs_and_mvp_implementation_plan.md) decision 7, open question 4 and risks. Credit alarm at 140 / 180 of 200; HTTP 429 leads to the LogMeal limit state with Quick add. |
 
 ## 7. Notes for production code
 
@@ -98,4 +98,4 @@ Creating an ARCore `Session` needs the `CAMERA` runtime permission. When the app
 | Regular-recognition fallback without depth | ✅ Passed: regular recognition + per-item `confirm/quantity` |
 | Stack compatible with the MVP budget | ✅ No change to the native Android stack |
 
-The stack decision stands. The open findings F1–F3 change targets, UX and the LogMeal account, not the stack.
+The stack decision stands. Findings F1–F3 do not change the stack; F1 and F3 are tracked as risks in the [WBS](../04_wbs_and_mvp_implementation_plan.md) §10.
