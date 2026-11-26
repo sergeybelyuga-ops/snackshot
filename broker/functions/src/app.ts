@@ -3,9 +3,11 @@ import type { AppCheck } from "firebase-admin/app-check";
 import type { Auth } from "firebase-admin/auth";
 import type { Firestore } from "firebase-admin/firestore";
 import type { BrokerConfig } from "./config.ts";
+import type { KillSwitch } from "./cost/kill-switch.ts";
 import type { TokenCipher } from "./crypto/token-cipher.ts";
 import { errorHandler, notFound } from "./http/errors.ts";
 import type { LogMealCompany } from "./logmeal/client.ts";
+import { accountRoutes, logmealRoutes } from "./routes/logmeal.ts";
 
 /** Everything a request handler needs; tests build it against the emulators and the fake LogMeal. */
 export type Deps = {
@@ -15,18 +17,20 @@ export type Deps = {
   appCheck: AppCheck;
   logmeal: LogMealCompany;
   cipher: TokenCipher;
+  killSwitch: KillSwitch;
   now: () => Date;
 };
 
 /** The broker HTTP API under `/v1` (doc 11 §8), served by the `api` function. */
-export function createApp(_deps: Deps): Express {
+export function createApp(deps: Deps): Express {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", true);
   app.use(express.json({ limit: "16kb" }));
 
   const v1 = express.Router();
-  // Endpoints are added by WBS 3.2–3.4.
+  v1.use("/logmeal", logmealRoutes(deps));
+  v1.use("/account", accountRoutes(deps));
   app.use("/v1", v1);
 
   app.use((_req, _res, next) => next(notFound()));

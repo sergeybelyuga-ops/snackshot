@@ -2,11 +2,17 @@ import { getApps, initializeApp } from "firebase-admin/app";
 import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getRemoteConfig } from "firebase-admin/remote-config";
 import { defineSecret } from "firebase-functions/params";
+import { logger } from "firebase-functions";
 import { onRequest } from "firebase-functions/v2/https";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import type { Express } from "express";
-import { createApp } from "./app.ts";
+import { createApp, type Deps } from "./app.ts";
+import { reconcilePending } from "./clients/logmeal-sync.ts";
 import { loadConfig, REGION } from "./config.ts";
+import { checkCredits } from "./cost/credit-check.ts";
+import { FirestoreKillSwitch, RemoteConfigKillSwitch } from "./cost/kill-switch.ts";
 import { EmulatorTokenCipher, KmsTokenCipher } from "./crypto/token-cipher.ts";
 import { createLogMeal } from "./logmeal/client.ts";
 
@@ -16,35 +22,60 @@ const testUserToken = defineSecret("LOGMEAL_TEST_USER_TOKEN");
 const mode = process.env.LOGMEAL_MODE;
 const secrets = mode === "company" ? [companyToken] : mode === "test-user" ? [testUserToken] : [];
 
+let deps: Deps | undefined;
 let app: Express | undefined;
 
-function getApp(): Express {
-  if (app) return app;
+function getDeps(): Deps {
+  if (deps) return deps;
   const config = loadConfig();
   if (getApps().length === 0) initializeApp();
-  app = createApp({
+  deps = {
     config,
     db: getFirestore(),
     auth: getAuth(),
     appCheck: getAppCheck(),
     logmeal: createLogMeal(config, { companyToken: () => companyToken.value(), testUserToken: () => testUserToken.value() }),
     cipher: config.kmsKeyName ? new KmsTokenCipher(config.kmsKeyName) : new EmulatorTokenCipher(),
+    // Remote Config has no emulator; locally the switch is a field in settings/broker.
+    killSwitch: config.emulator ? new FirestoreKillSwitch(getFirestore()) : new RemoteConfigKillSwitch(getRemoteConfig(), () => new Date()),
     now: () => new Date(),
-  });
+  };
+  return deps;
+}
+
+function getApp(): Express {
+  app ??= createApp(getDeps());
   return app;
 }
+
+/** Shared by every function: the broker account, its LogMeal secret, Frankfurt. */
+const runtime = { region: REGION, serviceAccount: "broker@", secrets, memory: "256MiB" } as const;
 
 /** `https://europe-west3-<project>.cloudfunctions.net/api/v1/...` (Android BuildConfig.BROKER_BASE_URL). */
 export const api = onRequest(
   {
-    region: REGION,
     // Runs as the broker account: Firestore, its own LogMeal secret, and the token KMS key only.
-    serviceAccount: "broker@",
-    secrets,
-    memory: "256MiB",
+    ...runtime,
     maxInstances: 5,
     timeoutSeconds: 30,
     invoker: "public", // every endpoint checks the Firebase ID token and App Check itself
   },
   (req, res) => getApp()(req, res),
 );
+
+/**
+ * Hourly: finishes LogMeal changes that failed when the status changed (doc 11 §5.1), so an
+ * ended trial is disabled and a cancelled APIUser deleted even if LogMeal was down at the time.
+ */
+export const reconcileClients = onSchedule({ ...runtime, schedule: "every 60 minutes", timeZone: "Europe/Berlin", maxInstances: 1 }, async () => {
+  const result = await reconcilePending(getDeps());
+  if (result.checked > 0) logger.info("reconcileClients", result);
+});
+
+/**
+ * Every 6 hours: company credits against the monthly plan; one alarm per threshold per month,
+ * which the Cloud Monitoring alert policy turns into an e-mail (doc 11 §6.3).
+ */
+export const checkLogMealCredits = onSchedule({ ...runtime, schedule: "every 6 hours", timeZone: "Europe/Berlin", maxInstances: 1 }, async () => {
+  await checkCredits(getDeps());
+});

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, before, describe, it } from "node:test";
 import { startFakeLogMeal, FAKE_COMPANY_TOKEN, type FakeLogMeal } from "../../../tools/fake-logmeal/server.ts";
 import { loadConfig } from "../src/config.ts";
-import { EmulatorTokenCipher } from "../src/crypto/token-cipher.ts";
+import { EmulatorTokenCipher, KmsTokenCipher } from "../src/crypto/token-cipher.ts";
 import { HttpLogMealCompany, LogMealError, TestUserLogMeal } from "../src/logmeal/client.ts";
 import { call, startBroker, type TestBroker } from "./harness.ts";
 
@@ -94,6 +94,31 @@ describe("LogMeal company client against the fake", () => {
 });
 
 describe("token cipher", () => {
+  it("KMS: uses the configured key and binds the client id as associated data", async () => {
+    const key = "projects/p/locations/europe-west3/keyRings/broker/cryptoKeys/apiuser-token";
+    const calls: { op: string; name: string; aad: string }[] = [];
+    // A stand-in for the KMS client: reverses the bytes and remembers the associated data.
+    const fakeKms = {
+      encrypt: async (r: { name: string; plaintext: Buffer; additionalAuthenticatedData: Buffer }) => {
+        calls.push({ op: "encrypt", name: r.name, aad: r.additionalAuthenticatedData.toString() });
+        return [{ ciphertext: Buffer.from(r.plaintext).reverse() }];
+      },
+      decrypt: async (r: { name: string; ciphertext: Buffer; additionalAuthenticatedData: Buffer }) => {
+        calls.push({ op: "decrypt", name: r.name, aad: r.additionalAuthenticatedData.toString() });
+        if (r.additionalAuthenticatedData.toString() !== "snackshot:apiuser-token:client-a") throw new Error("aad mismatch");
+        return [{ plaintext: Buffer.from(r.ciphertext).reverse() }];
+      },
+    };
+    const cipher = new KmsTokenCipher(key, fakeKms as never);
+    const ciphertext = await cipher.encrypt("apiuser-token", "client-a");
+    assert.match(ciphertext, /^kms1:/);
+    assert.equal(await cipher.decrypt(ciphertext, "client-a"), "apiuser-token");
+    await assert.rejects(cipher.decrypt(ciphertext, "client-b"));
+    await assert.rejects(cipher.decrypt("emu1:abc", "client-a"), /Not a KMS/);
+    assert.ok(calls.every((c) => c.name === key));
+    assert.equal(calls[0]?.aad, "snackshot:apiuser-token:client-a");
+  });
+
   it("round-trips and binds the ciphertext to its client", async () => {
     const cipher = new EmulatorTokenCipher();
     const ciphertext = await cipher.encrypt("apiuser-token", "client-a");
@@ -106,7 +131,7 @@ describe("token cipher", () => {
 describe("HTTP shell", () => {
   let broker: TestBroker;
   before(async () => {
-    broker = await startBroker();
+    broker = await startBroker({ mode: "fake" });
   });
   after(() => broker.close());
 
