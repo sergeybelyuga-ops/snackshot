@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="state_loading">Loading</string>
+    <string name="state_retry">Retry</string>
+    <string name="state_error">Error</string>
+</resources>
