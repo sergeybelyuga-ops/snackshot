@@ -136,7 +136,7 @@ test-fixtures/
 | --- | --- | --- |
 | Android unit tests (`logmeal` module) | OkHttp `MockWebServer` | `test-fixtures/logmeal` (added as a test resource folder in Gradle) |
 | Android instrumented / Compose UI tests | `MockWebServer` + Hilt test modules that replace the broker client | same |
-| Broker tests (Vitest + emulator) | MSW (`msw/node`) intercepts `fetch` to `api.logmeal.com` | same |
+| Broker tests (`node:test` + emulator) | `tools/fake-logmeal`, started in-process for each suite (WBS 3.1: one fake for every consumer instead of a separate MSW layer) | same |
 | Local manual development | **Fake LogMeal server** `tools/fake-logmeal` (Node, `node:http`, port 8090), used by both the app and the broker emulator | same |
 
 The fake LogMeal server picks a scenario from a request header or a startup flag (`--scenario low-confidence`, `--scenario 429`, `--delay 2500`). This lets you test failures, retries, and the waiting state by hand without spending credits.
@@ -181,8 +181,8 @@ snackshot/
     firebase.json         emulators, functions, firestore, hosting
     .firebaserc           default → demo-snackshot (so a deploy without --project fails), dev → snackshot-dev-app, prod → snackshot-prod
     firestore.rules       deny-all client access
-    functions/            Cloud Functions (TypeScript), Vitest tests
-    seed/                 emulator seed data and scripts
+    functions/            Cloud Functions (TypeScript), node:test tests
+    functions/scripts/    emulator seed script (`npm run seed`)
     scripts/              admin-claim, create-test-user (owner-only, never in CI)
   admin/                  React + Vite admin console (deployed by broker/firebase.json hosting)
   test-fixtures/          shared LogMeal fixtures and sample images (§3.1)
@@ -229,7 +229,7 @@ Branching: trunk-based. `main` is protected and needs green CI to merge. Short f
 | Android persistence | Room DAOs, migrations | Robolectric + in-memory Room, `MigrationTestHelper` | JVM | Every push |
 | Android UI | Key screens and flows (Home → photo/gallery → review → save; Quick add; dashboard with and without goals; waitlist; trial ended; HC denied) | Compose UI test, Hilt testing, MockWebServer | AVD API 34 in CI | PR to `main`, manual |
 | Health Connect | Write/read/changes against a real HC | Instrumented tests + Health Connect Toolbox app for inspection | Your phone + AVDs | Manual, I-6 and 11.3 |
-| Broker | Endpoints, state machine, idempotency, cap/waitlist, `isTest`, metrics allow-list | Vitest, MSW, Firebase Emulator Suite (`firebase emulators:exec`) | Node 22 | Every push to `broker/**` |
+| Broker | Endpoints, state machine, idempotency, cap/waitlist, `isTest`, metrics allow-list | Node's built-in test runner (`node:test`, TypeScript run directly), in-process fake LogMeal, Firebase Emulator Suite (`firebase emulators:exec`). Not Vitest: its native bundler is blocked by Smart App Control on the dev PC (WBS 3.1) | Node 22 | Every push to `broker/**` |
 | Firestore rules | Deny-all client access | `@firebase/rules-unit-testing` | Emulator | Every push to `broker/**` |
 | Admin console | Components, admin-claim gating | Vitest + Testing Library | Node 22 | Every push to `admin/**` |
 | LogMeal contract | Fixtures still match the real API | `tools/logmeal-contract-check` with the test token | Your PC | Before each milestone (manual) |
@@ -264,7 +264,7 @@ Camera testing on AVDs uses gallery images: `adb push test-fixtures/images/ /sdc
 | --- | --- | --- |
 | `android-ci.yml` | push / PR, paths `android/**`, `test-fixtures/**` | JDK 21 (Temurin), Gradle cache → `ktlintCheck`, `lintLocalDebug`, `unitTests` (root task: app `testLocalDebugUnitTest`, library `testDebugUnitTest`, JVM `test`), `assembleDevDebug` |
 | `android-ui-tests.yml` | PR to `main`, manual | AVD API 34 (`reactivecircus/android-emulator-runner`) → `connectedLocalDebugAndroidTest` |
-| `broker-ci.yml` | push / PR, paths `broker/**`, `test-fixtures/**` | Node 22, JDK 21 → `npm ci`, lint, `tsc`, `firebase emulators:exec --project demo-snackshot "npm test"` |
+| `broker-ci.yml` | push / PR, paths `broker/**`, `tools/fake-logmeal/**`, `test-fixtures/**` | Node 22, JDK 21 → `npm ci`, lint, `tsc`, build, `firebase emulators:exec --project demo-snackshot --only auth,firestore` running `node --test` |
 | `admin-ci.yml` | push / PR, path `admin/**` | Node 22 → `npm ci`, lint, `vitest run`, `vite build` |
 | `deploy-broker.yml` | **dev:** automatic on push to `main`, paths `broker/**`, `admin/**` (after `broker-ci` / `admin-ci` pass); **prod:** manual, input `env: prod` | Deploys Functions, Firestore rules/indexes, and Hosting (admin console) to the project. `prod` waits for approval in the GitHub `prod` environment. |
 | `distribute-android.yml` | manual, input `env: dev \| prod` | `dev`: build `devRelease`, upload to Firebase App Distribution (group `owner`). `prod`: build a signed `prodRelease` AAB and attach it as an artifact, which you upload to the Play internal track. Gradle Play Publisher can automate this upload later. |

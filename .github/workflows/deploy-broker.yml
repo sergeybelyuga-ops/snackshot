@@ -1,0 +1,73 @@
+# docs/Architecture/12_dev-and-test-environment.md §7.1, §7.2
+# dev:  automatic on every push to main that changes the broker, after its tests pass.
+# prod: manual (input env: prod), waits for the owner's approval in the GitHub prod environment.
+# Deploys Cloud Functions and the Firestore rules and indexes with Workload Identity Federation.
+name: deploy-broker
+
+on:
+  push:
+    branches: [main]
+    paths: ['broker/**', '.github/workflows/deploy-broker.yml']
+  workflow_dispatch:
+    inputs:
+      env:
+        description: Environment
+        type: choice
+        options: [dev, prod]
+        default: dev
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-broker-${{ inputs.env || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/broker-ci.yml
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: ${{ inputs.env || 'dev' }}
+    permissions:
+      contents: read
+      id-token: write # Workload Identity Federation
+    defaults:
+      run:
+        working-directory: broker
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            broker/package-lock.json
+            broker/functions/package-lock.json
+
+      - run: npm ci
+      - run: npm ci
+        working-directory: broker/functions
+
+      - uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+
+      # The .firebaserc alias (dev / prod) picks the project; .env.<projectId> picks the LogMeal mode.
+      # --force: delete functions removed from the source and set up the image cleanup policy
+      # without prompting, which a non-interactive deploy cannot answer.
+      - name: Deploy
+        run: npx firebase deploy --project "${{ inputs.env || 'dev' }}" --only functions,firestore --non-interactive --force
+
+      # An unknown route must answer with the broker's JSON 404: the function is up and configured.
+      - name: Smoke check
+        run: |
+          case "${{ inputs.env || 'dev' }}" in dev) project=snackshot-dev-app ;; prod) project=snackshot-prod ;; esac
+          body=$(curl -sS --retry 3 --retry-delay 5 "https://europe-west3-${project}.cloudfunctions.net/api/v1/smoke-check")
+          echo "$body"
+          test "$body" = '{"error":"not_found","message":"Not found"}'
