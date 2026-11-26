@@ -17,10 +17,17 @@ import { EmulatorTokenCipher, KmsTokenCipher } from "./crypto/token-cipher.ts";
 import { createLogMeal } from "./logmeal/client.ts";
 
 // Each project holds only the secret its mode needs (doc 12 §9), so only that one is declared.
-const companyToken = defineSecret("LOGMEAL_COMPANY_TOKEN");
-const testUserToken = defineSecret("LOGMEAL_TEST_USER_TOKEN");
+// The Firebase CLI requires a value for every defineSecret() it finds, used or not, so the other
+// secret must not be defined at all. The CLI loads functions/.env.<projectId> first, so the mode is set.
 const mode = process.env.LOGMEAL_MODE;
-const secrets = mode === "company" ? [companyToken] : mode === "test-user" ? [testUserToken] : [];
+const companyToken = mode === "company" ? defineSecret("LOGMEAL_COMPANY_TOKEN") : undefined;
+const testUserToken = mode === "test-user" ? defineSecret("LOGMEAL_TEST_USER_TOKEN") : undefined;
+const secrets = [companyToken, testUserToken].filter((s) => s !== undefined);
+
+function secretValue(secret: ReturnType<typeof defineSecret> | undefined, name: string): string {
+  if (!secret) throw new Error(`${name} is not declared in LOGMEAL_MODE=${mode}`);
+  return secret.value();
+}
 
 let deps: Deps | undefined;
 let app: Express | undefined;
@@ -34,7 +41,10 @@ function getDeps(): Deps {
     db: getFirestore(),
     auth: getAuth(),
     appCheck: getAppCheck(),
-    logmeal: createLogMeal(config, { companyToken: () => companyToken.value(), testUserToken: () => testUserToken.value() }),
+    logmeal: createLogMeal(config, {
+      companyToken: () => secretValue(companyToken, "LOGMEAL_COMPANY_TOKEN"),
+      testUserToken: () => secretValue(testUserToken, "LOGMEAL_TEST_USER_TOKEN"),
+    }),
     cipher: config.kmsKeyName ? new KmsTokenCipher(config.kmsKeyName) : new EmulatorTokenCipher(),
     // Remote Config has no emulator; locally the switch is a field in settings/broker.
     killSwitch: config.emulator ? new FirestoreKillSwitch(getFirestore()) : new RemoteConfigKillSwitch(getRemoteConfig(), () => new Date()),
