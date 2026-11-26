@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -22,11 +23,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import app.snackshot.domain.meal.MealId
 import app.snackshot.ui.R
+import app.snackshot.ui.home.HomeRoute
 import app.snackshot.ui.privacy.PrivacyDetailsScreen
 import app.snackshot.ui.tabs.DashboardScreen
 import app.snackshot.ui.tabs.HistoryScreen
-import app.snackshot.ui.tabs.HomeScreen
+import app.snackshot.ui.tabs.QuickAddPlaceholderScreen
 import app.snackshot.ui.tabs.SettingsScreen
 import app.snackshot.ui.welcome.WelcomeScreen
 import kotlin.reflect.KClass
@@ -54,6 +57,7 @@ fun SnackshotNavHost(
     environmentName: String,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
+    viewModels: ScreenViewModels = HiltScreenViewModels,
 ) {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val destination = backStackEntry?.destination
@@ -84,7 +88,18 @@ fun SnackshotNavHost(
                 )
             }
             composable<PrivacyDetailsRoute> { PrivacyDetailsScreen(onBack = { navController.popBackStack() }) }
-            composable<HomeRoute> { HomeScreen() }
+            composable<HomeRoute> { entry ->
+                val saved by entry.savedStateHandle.getStateFlow<String?>(SAVED_MEAL_ID, null).collectAsStateWithLifecycle()
+                HomeRoute(
+                    viewModel = viewModels.home(),
+                    savedMealId = saved?.let(::MealId),
+                    onSavedMealConsumed = { entry.savedStateHandle[SAVED_MEAL_ID] = null },
+                    onManualAdd = { navController.navigate(QuickAddRoute) },
+                    onOpenDashboard = { navController.navigateToTab(Tab.DASHBOARD) },
+                    onOpenHistory = { navController.navigateToTab(Tab.HISTORY) },
+                )
+            }
+            composable<QuickAddRoute> { QuickAddPlaceholderScreen(onBack = { navController.popBackStack() }) }
             composable<DashboardRoute> { DashboardScreen() }
             composable<HistoryRoute> { HistoryScreen() }
             composable<SettingsRoute> {
@@ -106,6 +121,9 @@ fun SnackshotNavHost(
         }
     }
 }
+
+/** Set on Home's back stack entry by a screen that saved a meal, so Home can highlight it. */
+internal const val SAVED_MEAL_ID = "saved_meal_id"
 
 /** Standard tab switching: one copy of each tab, state saved and restored, Back from a tab returns to Home. */
 private fun NavHostController.navigateToTab(tab: Tab) {

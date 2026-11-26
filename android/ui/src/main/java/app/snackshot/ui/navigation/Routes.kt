@@ -15,3 +15,5 @@ import kotlinx.serialization.Serializable
 @Serializable data object HistoryRoute
 
 @Serializable data object SettingsRoute
+
+@Serializable data object QuickAddRoute
