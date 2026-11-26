@@ -179,7 +179,7 @@ snackshot/
   android/                Kotlin + Compose (Gradle version catalog, modules from WBS 1.3)
   broker/
     firebase.json         emulators, functions, firestore, hosting
-    .firebaserc           aliases: dev → snackshot-dev-app, prod → snackshot-prod
+    .firebaserc           default → demo-snackshot (so a deploy without --project fails), dev → snackshot-dev-app, prod → snackshot-prod
     firestore.rules       deny-all client access
     functions/            Cloud Functions (TypeScript), Vitest tests
     seed/                 emulator seed data and scripts
@@ -276,7 +276,12 @@ No workflow has the LogMeal APICompany token or the test APIUser token. CI never
 - Deploys use **Workload Identity Federation** (`google-github-actions/auth`), so no service-account JSON keys are stored in GitHub.
 - There is one deploy service account per project, with only the roles that deploying needs (Functions, Firestore rules, Hosting, App Distribution, plus read access to the secrets the functions use).
 - The WIF provider and service account names are GitHub **variables**, not secrets.
-- **Dev (set up in WBS 1.3):** pool `github`, provider `snackshot-repo` in `snackshot-dev-app`, condition `repository_id == 1458924540 && repository_owner_id == 290377895 && environment == 'dev'`. Service account `github-deploy@snackshot-dev-app.iam.gserviceaccount.com` has `roles/firebaseappdistro.admin`; WBS 1.4 adds the deploy roles. Prod is set up in WBS 1.4.
+- **Set up (WBS 1.3 / 1.4, 26 November 2026), the same in both projects:**
+  - WIF pool `github`, provider `snackshot-repo`, condition `repository_id == 1458924540 && repository_owner_id == 290377895 && environment == '<dev|prod>'`.
+  - Deploy service account `github-deploy@<project>`: `cloudfunctions.admin`, `run.admin`, `artifactregistry.admin`, `cloudscheduler.admin`, `firebaserules.admin`, `datastore.indexAdmin`, `firebasehosting.admin`, `secretmanager.viewer`, `serviceusage.serviceUsageConsumer`, `firebaseextensions.viewer` (dev also `firebaseappdistro.admin`). `iam.serviceAccountUser` only on the broker and the build service account. This is the initial set; the first `deploy-broker` run (WBS 3.1) confirms it.
+  - Broker runtime service account `broker@<project>`: `datastore.user`, plus `secretmanager.secretAccessor` on that project's LogMeal secret only. Cloud Functions run as this account, not as the default compute account.
+  - **Default service accounts hardened:** `roles/editor` removed from the default compute and App Engine service accounts, because Editor can deploy a function that runs as `broker@` and so read the LogMeal token. The compute account keeps only `cloudbuild.builds.builder` (it builds the functions).
+  - Firestore `(default)` in `europe-west3` (Native); prod has delete protection. The deny-all `firestore.rules` is released in both projects.
 
 ### 7.3 GitHub environments
 

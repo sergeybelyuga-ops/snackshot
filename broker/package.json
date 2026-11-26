@@ -1,0 +1,15 @@
+{
+  "name": "snackshot-broker",
+  "private": true,
+  "description": "LogMeal Access Broker: Firebase config, Firestore rules, Cloud Functions (WBS 3.x). See docs/Architecture/11 and 12.",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "emulators": "firebase emulators:start --project demo-snackshot",
+    "firebase": "firebase"
+  },
+  "devDependencies": {
+    "firebase-tools": "15.37.0"
+  }
+}
