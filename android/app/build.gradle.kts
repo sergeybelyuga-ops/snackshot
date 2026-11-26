@@ -8,6 +8,34 @@ plugins {
 // Environments: docs/Architecture/12_dev-and-test-environment.md §1, §2.
 private val region = "europe-west3"
 
+/**
+ * Firebase client values for [packageName] from `src/<flavor>/google-services.json` (public
+ * identifiers, not secrets). The app sets Firebase up in code (access/FirebaseSetup.kt) instead of
+ * using the google-services plugin, so the local flavor needs no file.
+ */
+private fun firebaseValues(flavor: String, packageName: String): Map<String, String> {
+    @Suppress("UNCHECKED_CAST")
+    val json = groovy.json.JsonSlurper().parse(file("src/$flavor/google-services.json")) as Map<String, Any?>
+    val project = json["project_info"] as Map<String, Any?>
+    val client = (json["client"] as List<Map<String, Any?>>).single { c ->
+        ((c["client_info"] as Map<String, Any?>)["android_client_info"] as Map<String, Any?>)["package_name"] == packageName
+    }
+    return mapOf(
+        "FIREBASE_PROJECT_ID" to project["project_id"] as String,
+        "FIREBASE_SENDER_ID" to project["project_number"] as String,
+        "FIREBASE_APP_ID" to (client["client_info"] as Map<String, Any?>)["mobilesdk_app_id"] as String,
+        "FIREBASE_API_KEY" to ((client["api_key"] as List<Map<String, Any?>>).first()["current_key"] as String),
+    )
+}
+
+/** The local flavor talks to the Auth emulator of `demo-snackshot`, which accepts any key. */
+private val localFirebase = mapOf(
+    "FIREBASE_PROJECT_ID" to "demo-snackshot",
+    "FIREBASE_SENDER_ID" to "000000000000",
+    "FIREBASE_APP_ID" to "1:000000000000:android:0000000000000000000000",
+    "FIREBASE_API_KEY" to "demo-api-key",
+)
+
 android {
     namespace = "app.snackshot"
     compileSdk {
@@ -42,6 +70,7 @@ android {
             buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "true")
             buildConfigField("String", "APP_CHECK_PROVIDER", "\"none\"")
             buildConfigField("boolean", "SHOW_ATWATER_COMPARISON", "true")
+            localFirebase.forEach { (name, value) -> buildConfigField("String", name, "\"$value\"") }
         }
         create("dev") {
             dimension = "env"
@@ -53,6 +82,7 @@ android {
             buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "false")
             buildConfigField("String", "APP_CHECK_PROVIDER", "\"debug\"")
             buildConfigField("boolean", "SHOW_ATWATER_COMPARISON", "true")
+            firebaseValues("dev", "app.snackshot.dev").forEach { (name, value) -> buildConfigField("String", name, "\"$value\"") }
         }
         create("prod") {
             dimension = "env"
@@ -62,6 +92,7 @@ android {
             buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "false")
             buildConfigField("String", "APP_CHECK_PROVIDER", "\"playIntegrity\"")
             buildConfigField("boolean", "SHOW_ATWATER_COMPARISON", "false")
+            firebaseValues("prod", "app.snackshot").forEach { (name, value) -> buildConfigField("String", name, "\"$value\"") }
         }
     }
 
@@ -126,6 +157,12 @@ dependencies {
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
+
+    // App Check per flavor (FlavorFirebase.kt): no provider locally, debug tokens in dev, Play Integrity in prod.
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.appcheck)
+    "devImplementation"(libs.firebase.appcheck.debug)
+    "prodImplementation"(libs.firebase.appcheck.playintegrity)
 
     androidTestImplementation(libs.androidx.test.runner)
     androidTestImplementation(libs.androidx.test.junit)
