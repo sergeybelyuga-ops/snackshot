@@ -11,7 +11,8 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 
 /** Onboarding flags in the app-private settings DataStore (decision 8). */
-class DataStoreOnboardingRepository @Inject constructor(private val settings: DataStore<Preferences>) : OnboardingRepository {
+class DataStoreOnboardingRepository @Inject constructor(@SettingsStore private val settings: DataStore<Preferences>) :
+    OnboardingRepository {
     override val welcomeCompleted: Flow<Boolean> =
         settings.data.map { it[WELCOME_COMPLETED] ?: false }.distinctUntilChanged()
 

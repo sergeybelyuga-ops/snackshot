@@ -114,7 +114,7 @@ flowchart TB
 | 3.6 | Cost controls | F-33 | Remote Config global kill switch; scheduled credit check with alert e-mail. | 1 |
 | 3.7 | Broker tests | — | Emulator tests (Vitest, MSW with shared fixtures, no real LogMeal calls) for provision, waitlist, profile, picture idempotency, trial end, delete, metrics; Firestore rules tests. | 1 |
 | **4** | **AI access in app** | | | **4** |
-| 4.1 | AI Access module | F-30 | Silent anonymous sign-in on the first AI action (photo or gallery recognition); hashed device ID; Play Integrity App Check; broker client; token in DataStore encrypted with Tink + Android Keystore; backup exclusion; `LogMealCredentialProvider`; status cache (~1 h). | 3.5 |
+| 4.1 | AI Access module | F-30 | Silent anonymous sign-in on the first AI action (photo or gallery recognition); hashed device ID; Play Integrity App Check; broker client; token kept in the `LogMealTokenStore` from 2.4 (DataStore, Android Keystore AES-GCM key); backup exclusion; `LogMealCredentialProvider`; status cache (~1 h). | 3.5 |
 | 4.2 | Language and country | F-01, F-30 | Detect device locale on provisioning; map to a LogMeal-supported language (fallback English) and ISO 3166-1 country. | 0.5 |
 | **5** | **Home, quick add, goals** | | | **4.5** |
 | 5.1 | Home screen (S-02) | F-01, F-09, F-11 | Start screen with the meal-entry carousel (Take a photo → Gallery → Manual add), today's totals, recent meals, sync status, navigation to Dashboard, History, and Settings. | 2 |
