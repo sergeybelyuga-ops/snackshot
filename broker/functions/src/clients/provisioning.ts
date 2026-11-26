@@ -166,7 +166,7 @@ async function completeProvisioning(deps: Deps, clientId: string, input: Provisi
       await logmeal.setProfile(client.logmealUserId!, client.language || input.language, client.country || input.country);
 
       const now = Timestamp.fromDate(deps.now());
-      await ref.update({ status: "trial", statusReason: "provisioned", statusChangedAt: now });
+      await ref.update({ status: "trial", statusReason: "provisioned", statusChangedAt: now, logmealEnabled: true }); // signUp creates it enabled
       await writeAudit(db, { clientId, action: "provisioned", actor: "provision", reason: "provisioned", before: { status: "provisioning" }, after: { status: "trial", logmealUserId: client.logmealUserId } }, deps.now());
     });
   } catch (error) {

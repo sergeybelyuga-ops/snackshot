@@ -44,6 +44,8 @@ export type ClientDoc = {
   statusReason: string;
   /** Order on the waitlist: when the device first tried AI. */
   waitlistedAt: Timestamp | null;
+  /** What LogMeal's `enabled` flag was last set to; differs from the status while a change is pending. */
+  logmealEnabled?: boolean;
   /** Held by one job at a time (store/lease.ts). */
   lease?: { holder: string; until: Timestamp } | null;
 };

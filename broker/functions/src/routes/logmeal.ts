@@ -1,10 +1,11 @@
 import { Router } from "express";
 import type { Deps } from "../app.ts";
+import { deleteAccount, reportPicture } from "../clients/pictures.ts";
 import { updateProfile } from "../clients/profile.ts";
 import { provision, status } from "../clients/provisioning.ts";
 import { callerOf, requireAppCaller } from "../http/auth.ts";
 import { badRequest } from "../http/errors.ts";
-import { COUNTRY, DEVICE_ID, LANGUAGE, matching, objectBody } from "../http/validate.ts";
+import { COUNTRY, DEVICE_ID, LANGUAGE, matching, objectBody, REQUEST_ID } from "../http/validate.ts";
 
 /** `/v1/logmeal/...` (doc 11 §8). */
 export function logmealRoutes(deps: Deps): Router {
@@ -46,5 +47,21 @@ export function logmealRoutes(deps: Deps): Router {
     );
   });
 
+  router.post("/picture", async (req, res) => {
+    const body = objectBody(req.body);
+    res.json(await reportPicture(deps, callerOf(req).uid, matching(body, "requestId", REQUEST_ID, "8–64 letters, digits, - or _")));
+  });
+
+  return router;
+}
+
+/** `/v1/account` (doc 11 §8). */
+export function accountRoutes(deps: Deps): Router {
+  const router = Router();
+  router.use(requireAppCaller(deps));
+  router.delete("/", async (req, res) => {
+    await deleteAccount(deps, callerOf(req).uid);
+    res.status(204).end();
+  });
   return router;
 }
