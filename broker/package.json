@@ -7,6 +7,9 @@
   },
   "scripts": {
     "emulators": "firebase emulators:start --project demo-snackshot",
+    "dev": "node scripts/dev.ts",
+    "seed": "npm --prefix functions run seed",
+    "test": "firebase emulators:exec --project demo-snackshot --only auth,firestore \"npm --prefix functions test\"",
     "firebase": "firebase"
   },
   "devDependencies": {

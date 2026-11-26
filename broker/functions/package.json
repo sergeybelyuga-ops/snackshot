@@ -1,0 +1,31 @@
+{
+  "name": "snackshot-broker-functions",
+  "private": true,
+  "description": "LogMeal Access Broker Cloud Functions (docs/Architecture/11, WBS 3.x).",
+  "type": "module",
+  "main": "lib/index.js",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --test --test-concurrency=1 --test-timeout=30000 \"test/**/*.test.ts\"",
+    "seed": "node scripts/seed.ts"
+  },
+  "dependencies": {
+    "@google-cloud/kms": "6.3.0",
+    "express": "5.3.0",
+    "firebase-admin": "14.5.1",
+    "firebase-functions": "7.4.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@types/express": "5.0.6",
+    "@types/node": "22.20.7",
+    "eslint": "10.15.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.74.0"
+  }
+}

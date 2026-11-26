@@ -1,0 +1,56 @@
+# docs/Architecture/12_dev-and-test-environment.md §5, §7.1
+# Lint, type-check, build, then the broker tests against the Auth and Firestore emulators
+# (project demo-snackshot) and the in-process fake LogMeal. No secrets, no LogMeal calls.
+name: broker-ci
+
+on:
+  push:
+    branches: [main]
+    paths: ['broker/**', 'tools/fake-logmeal/**', 'test-fixtures/**', '.github/workflows/broker-ci.yml']
+  pull_request:
+    paths: ['broker/**', 'tools/fake-logmeal/**', 'test-fixtures/**', '.github/workflows/broker-ci.yml']
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: broker-ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: broker
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: |
+            broker/package-lock.json
+            broker/functions/package-lock.json
+
+      - uses: actions/setup-java@v6 # the Firestore emulator
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - run: npm ci
+      - run: npm ci
+        working-directory: broker/functions
+
+      - run: npm run lint
+        working-directory: broker/functions
+      - run: npm run typecheck
+        working-directory: broker/functions
+      - run: npm run build
+        working-directory: broker/functions
+
+      - name: Tests (emulators)
+        run: npm test

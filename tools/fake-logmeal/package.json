@@ -1,0 +1,8 @@
+{
+  "name": "fake-logmeal",
+  "private": true,
+  "description": "Fake LogMeal API serving test-fixtures/logmeal (docs/Architecture/12 §3.2). No dependencies.",
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": { "start": "node server.ts" }
+}
