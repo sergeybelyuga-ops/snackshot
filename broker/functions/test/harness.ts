@@ -2,11 +2,12 @@ import { getApps, initializeApp } from "firebase-admin/app";
 import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { createHash } from "node:crypto";
 import type { AddressInfo } from "node:net";
 import type { Server } from "node:http";
-import { startFakeLogMeal, type FakeLogMeal } from "../../../tools/fake-logmeal/server.ts";
+import { FAKE_COMPANY_TOKEN, startFakeLogMeal, type FakeLogMeal } from "../../../tools/fake-logmeal/server.ts";
 import { createApp, type Deps } from "../src/app.ts";
-import { loadConfig } from "../src/config.ts";
+import { loadConfig, type LogMealMode } from "../src/config.ts";
 import { EmulatorTokenCipher } from "../src/crypto/token-cipher.ts";
 import { createLogMeal } from "../src/logmeal/client.ts";
 
@@ -39,18 +40,28 @@ export type TestBroker = {
   close(): Promise<void>;
 };
 
-/** The broker app on a random port, in `fake` mode against a fresh fake LogMeal. */
-export async function startBroker(overrides: Partial<Deps> = {}): Promise<TestBroker> {
+/**
+ * The broker app on a random port against a fresh fake LogMeal. `company` mode (the default
+ * here) behaves like prod: real pilot cap, clients not marked as test. `fake` mode is what the
+ * local emulator runs, where every client is a test client.
+ */
+export async function startBroker(options: { mode?: LogMealMode; appCheckRequired?: boolean } = {}, overrides: Partial<Deps> = {}): Promise<TestBroker> {
   requireEmulators();
   const fake = await startFakeLogMeal();
-  const config = loadConfig({ GCLOUD_PROJECT: PROJECT_ID, FUNCTIONS_EMULATOR: "true", LOGMEAL_MODE: "fake", LOGMEAL_BASE_URL: fake.url, APP_CHECK_REQUIRED: "false" });
+  const config = loadConfig({
+    GCLOUD_PROJECT: PROJECT_ID,
+    FUNCTIONS_EMULATOR: "true",
+    LOGMEAL_MODE: options.mode ?? "company",
+    LOGMEAL_BASE_URL: fake.url,
+    APP_CHECK_REQUIRED: options.appCheckRequired ? "true" : "false",
+  });
   let now = new Date("2026-11-26T12:00:00Z");
   const deps: Deps = {
     config,
     db: getFirestore(),
     auth: getAuth(),
     appCheck: getAppCheck(),
-    logmeal: createLogMeal(config, { companyToken: () => "unused", testUserToken: () => "unused" }),
+    logmeal: createLogMeal(config, { companyToken: () => FAKE_COMPANY_TOKEN, testUserToken: () => "unused" }),
     cipher: new EmulatorTokenCipher(),
     now: () => now,
     ...overrides,
@@ -89,6 +100,11 @@ export async function emailIdToken(email: string): Promise<string> {
     { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password: "password-123", returnSecureToken: true }) },
   );
   return ((await res.json()) as { idToken: string }).idToken;
+}
+
+/** A device ID as the app sends it: a SHA-256 hex digest. */
+export function deviceId(name: string): string {
+  return createHash("sha256").update(`test-device-${name}`).digest("hex");
 }
 
 export async function call(broker: TestBroker, method: string, path: string, options: { idToken?: string; body?: unknown } = {}) {

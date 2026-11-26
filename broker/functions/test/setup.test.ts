@@ -106,7 +106,7 @@ describe("token cipher", () => {
 describe("HTTP shell", () => {
   let broker: TestBroker;
   before(async () => {
-    broker = await startBroker();
+    broker = await startBroker({ mode: "fake" });
   });
   after(() => broker.close());
 
