@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "91156622661",
+    "project_id": "snackshot-prod",
+    "storage_bucket": "snackshot-prod.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:91156622661:android:ea9bb0c08e15549822a22c",
+        "android_client_info": {
+          "package_name": "app.snackshot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDbPxPxFnAmgOnO4hxi8uYIFyuaJ2jO91Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
