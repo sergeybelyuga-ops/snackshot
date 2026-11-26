@@ -68,6 +68,7 @@ Sources:
 - **LogMeal language and country:**
   - The broker sets `language` and `country` on each APIUser (`POST /v2/users/modifyUserProfileInfo/{userId}`) at provisioning, taken from the device locale. The user can change them in Settings.
   - LogMeal supports a limited set of languages (spa, cat, eng, ita, nld, fre, ger, tur, gre, heb). Other device languages fall back to English. Country refines recognition and dish relevance.
+  - The app takes the first of the user's device languages that LogMeal supports, otherwise English. The country is the region of the device locales, otherwise the SIM or network country, otherwise the US. A choice in Settings wins over the device (WBS 4.2, `LogMealLocale`).
 - **Goals:** optional calorie and macro goals are entered in Settings → Nutrition preferences and stored only in the local database. Without goals, the app works normally and dashboards show no goal band.
 
 ## 5. Work Breakdown Structure
