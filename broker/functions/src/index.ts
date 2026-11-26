@@ -2,6 +2,7 @@ import { getApps, initializeApp } from "firebase-admin/app";
 import { getAppCheck } from "firebase-admin/app-check";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getRemoteConfig } from "firebase-admin/remote-config";
 import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions";
 import { onRequest } from "firebase-functions/v2/https";
@@ -10,6 +11,8 @@ import type { Express } from "express";
 import { createApp, type Deps } from "./app.ts";
 import { reconcilePending } from "./clients/logmeal-sync.ts";
 import { loadConfig, REGION } from "./config.ts";
+import { checkCredits } from "./cost/credit-check.ts";
+import { FirestoreKillSwitch, RemoteConfigKillSwitch } from "./cost/kill-switch.ts";
 import { EmulatorTokenCipher, KmsTokenCipher } from "./crypto/token-cipher.ts";
 import { createLogMeal } from "./logmeal/client.ts";
 
@@ -33,6 +36,8 @@ function getDeps(): Deps {
     appCheck: getAppCheck(),
     logmeal: createLogMeal(config, { companyToken: () => companyToken.value(), testUserToken: () => testUserToken.value() }),
     cipher: config.kmsKeyName ? new KmsTokenCipher(config.kmsKeyName) : new EmulatorTokenCipher(),
+    // Remote Config has no emulator; locally the switch is a field in settings/broker.
+    killSwitch: config.emulator ? new FirestoreKillSwitch(getFirestore()) : new RemoteConfigKillSwitch(getRemoteConfig(), () => new Date()),
     now: () => new Date(),
   };
   return deps;
@@ -65,4 +70,12 @@ export const api = onRequest(
 export const reconcileClients = onSchedule({ ...runtime, schedule: "every 60 minutes", timeZone: "Europe/Berlin", maxInstances: 1 }, async () => {
   const result = await reconcilePending(getDeps());
   if (result.checked > 0) logger.info("reconcileClients", result);
+});
+
+/**
+ * Every 6 hours: company credits against the monthly plan; one alarm per threshold per month,
+ * which the Cloud Monitoring alert policy turns into an e-mail (doc 11 §6.3).
+ */
+export const checkLogMealCredits = onSchedule({ ...runtime, schedule: "every 6 hours", timeZone: "Europe/Berlin", maxInstances: 1 }, async () => {
+  await checkCredits(getDeps());
 });

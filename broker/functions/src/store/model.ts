@@ -91,6 +91,8 @@ export const refs = (db: Firestore) => ({
   settings: () => db.collection(Collections.settings).doc("broker"),
   /** Read and written by every transaction that may take a pilot slot, which serializes them. */
   pilotLock: () => db.collection(Collections.settings).doc("pilot_lock"),
+  /** Highest credit alarm raised this month (cost/credit-check.ts). */
+  creditAlarm: () => db.collection(Collections.settings).doc("credit_alarm"),
   audit: () => db.collection(Collections.audit).doc(),
   clients: () => db.collection(Collections.clients),
 });

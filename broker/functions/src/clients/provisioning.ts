@@ -18,6 +18,8 @@ export type ClientView = {
   tokenVersion: number;
   pictures: { used: number; limit: number };
   isTest: boolean;
+  /** The global kill switch (Remote Config); the app reads it too. */
+  aiEnabled: boolean;
 };
 
 /** Statuses whose APIUser is enabled, so the app gets the token. */
@@ -35,14 +37,22 @@ export async function findClientByUid(db: Firestore, uid: string): Promise<Docum
  */
 export async function provision(deps: Deps, input: ProvisionInput): Promise<ClientView> {
   const { db } = deps;
+  const aiEnabled = await deps.killSwitch.aiEnabled();
   let clientId = (await findClientByUid(db, input.uid))?.id ?? null;
+  // While the kill switch is off no client and no APIUser is created (doc 11 §6.3).
+  if (!clientId && !aiEnabled) throw aiDisabled();
   if (!clientId) clientId = await attachOrCreate(deps, input);
 
   let client = await getClient(db, clientId);
-  if (client.status === "waitlisted") client = await promoteIfFirst(deps, clientId, client);
-  if (client.status === "provisioning") client = await completeProvisioning(deps, clientId);
-  return viewOf(deps, clientId, client, { includeToken: true });
+  if (aiEnabled && client.status === "waitlisted") client = await promoteIfFirst(deps, clientId, client);
+  if (client.status === "provisioning") {
+    if (!aiEnabled) throw aiDisabled();
+    client = await completeProvisioning(deps, clientId);
+  }
+  return viewOf(deps, clientId, client, { includeToken: true, aiEnabled });
 }
+
+const aiDisabled = () => unavailable("ai_disabled", "AI recognition is switched off for now; Quick add keeps working");
 
 /** `GET /v1/logmeal/status`: the token only when the app's copy is out of date. */
 export async function status(deps: Deps, uid: string, knownTokenVersion: number | null): Promise<ClientView> {
@@ -50,7 +60,7 @@ export async function status(deps: Deps, uid: string, knownTokenVersion: number 
   if (!snap) throw new HttpError(404, "not_provisioned", "No AI access yet; call provision on the first AI action");
   const client = snap.data() as ClientDoc;
   if (client.status === "provisioning") throw new LeaseBusy();
-  return viewOf(deps, snap.id, client, { includeToken: knownTokenVersion !== client.tokenVersion });
+  return viewOf(deps, snap.id, client, { includeToken: knownTokenVersion !== client.tokenVersion, aiEnabled: await deps.killSwitch.aiEnabled() });
 }
 
 async function attachOrCreate(deps: Deps, input: ProvisionInput): Promise<string> {
@@ -203,7 +213,7 @@ export async function getClient(db: Firestore, clientId: string): Promise<Client
   return snap.data() as ClientDoc;
 }
 
-export async function viewOf(deps: Deps, clientId: string, client: ClientDoc, options: { includeToken: boolean }): Promise<ClientView> {
+export async function viewOf(deps: Deps, clientId: string, client: ClientDoc, options: { includeToken: boolean; aiEnabled: boolean }): Promise<ClientView> {
   if (client.status === "provisioning") throw new LeaseBusy();
   const view: ClientView = {
     status: client.status,
@@ -211,6 +221,7 @@ export async function viewOf(deps: Deps, clientId: string, client: ClientDoc, op
     tokenVersion: client.tokenVersion,
     pictures: { used: client.picturesUsed, limit: client.pictureAllowance },
     isTest: client.isTest,
+    aiEnabled: options.aiEnabled,
   };
   if (options.includeToken && TOKEN_STATUSES.includes(client.status) && client.tokenCiphertext) {
     view.token = await deps.cipher.decrypt(client.tokenCiphertext, clientId);

@@ -24,6 +24,18 @@ The broker holds the LogMeal APICompany token and gives each Snackshot client on
 
 APIUser tokens are stored in Firestore only as Cloud KMS ciphertext (`broker/apiuser-token` in europe-west3; only `broker@` can use the key). The ciphertext is bound to its client ID, so it can't be moved to another record. The emulator uses a local AES-GCM stand-in.
 
+## Cost controls (WBS 3.6, doc 11 §6.3)
+
+- **Kill switch:** the Remote Config parameter `ai_recognition_enabled`, published in both projects with the default `true`. Set it to `false` in the Firebase console (Remote Config, then Publish) to stop AI recognition for everybody without touching any LogMeal user.
+  - The app reads the switch itself (WBS 4.x).
+  - The broker reads it too, cached for a minute, and refuses to create clients or APIUsers while it's off (503 `ai_disabled`).
+  - `provision` and `status` return `aiEnabled`.
+  - If the template can't be read, the broker treats AI as on.
+  - On the emulator the switch is `settings/broker.aiRecognitionEnabled`.
+- **Credit check:** `checkLogMealCredits` runs every 6 hours. It reads the company credits from LogMeal's free `info/limitations` headers and logs one `logmeal_credit_alarm` warning per threshold per month (70 % and 90 % from `settings/broker.creditAlarmThresholds`, plus 100 %). The state is in `settings/credit_alarm`.
+- **E-mail:** a Cloud Monitoring log-match alert policy turns that log entry into an e-mail. Set it up once with `node broker/scripts/setup-credit-alert.ts --email <owner address>`. The script is idempotent and covers both projects.
+- **Reconcile:** `reconcileClients` runs hourly and finishes LogMeal changes that failed at the time (3.5).
+
 ## Local loop
 
 ```powershell

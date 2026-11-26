@@ -8,6 +8,7 @@ import type { Server } from "node:http";
 import { FAKE_COMPANY_TOKEN, startFakeLogMeal, type FakeLogMeal } from "../../../tools/fake-logmeal/server.ts";
 import { createApp, type Deps } from "../src/app.ts";
 import { loadConfig, type LogMealMode } from "../src/config.ts";
+import { FirestoreKillSwitch } from "../src/cost/kill-switch.ts";
 import { EmulatorTokenCipher } from "../src/crypto/token-cipher.ts";
 import { createLogMeal } from "../src/logmeal/client.ts";
 
@@ -63,6 +64,7 @@ export async function startBroker(options: { mode?: LogMealMode; appCheckRequire
     appCheck: getAppCheck(),
     logmeal: createLogMeal(config, { companyToken: () => FAKE_COMPANY_TOKEN, testUserToken: () => "unused" }),
     cipher: new EmulatorTokenCipher(),
+    killSwitch: new FirestoreKillSwitch(getFirestore()),
     now: () => now,
     ...overrides,
   };

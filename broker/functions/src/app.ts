@@ -3,6 +3,7 @@ import type { AppCheck } from "firebase-admin/app-check";
 import type { Auth } from "firebase-admin/auth";
 import type { Firestore } from "firebase-admin/firestore";
 import type { BrokerConfig } from "./config.ts";
+import type { KillSwitch } from "./cost/kill-switch.ts";
 import type { TokenCipher } from "./crypto/token-cipher.ts";
 import { errorHandler, notFound } from "./http/errors.ts";
 import type { LogMealCompany } from "./logmeal/client.ts";
@@ -16,6 +17,7 @@ export type Deps = {
   appCheck: AppCheck;
   logmeal: LogMealCompany;
   cipher: TokenCipher;
+  killSwitch: KillSwitch;
   now: () => Date;
 };
 
