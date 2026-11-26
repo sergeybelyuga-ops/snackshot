@@ -10,7 +10,8 @@
     "dev": "node scripts/dev.ts",
     "seed": "npm --prefix functions run seed",
     "test": "firebase emulators:exec --project demo-snackshot --only auth,firestore \"npm --prefix functions test\"",
-    "firebase": "firebase"
+    "firebase": "firebase",
+    "test:e2e": "npm --prefix functions run build && firebase emulators:exec --project demo-snackshot --only functions,auth,firestore \"npm --prefix functions run test:e2e\""
   },
   "devDependencies": {
     "firebase-tools": "15.37.0"

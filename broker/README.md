@@ -51,9 +51,23 @@ The broker is then at `http://127.0.0.1:5001/demo-snackshot/europe-west3/api` (t
 
 ```powershell
 cd broker
-npm test             # Auth + Firestore emulators, then node --test in functions/
+npm test             # Auth + Firestore emulators, then node --test in functions/ (endpoints, state machine, rules)
+npm run test:e2e     # the built api function in the Functions emulator, as deployed
 npm --prefix functions run lint; npm --prefix functions run typecheck
 ```
+
+| Suite | Covers |
+| --- | --- |
+| `setup.test.ts` | Config guard rails, the LogMeal client against the fake (read-before-toggle, errors without tokens), test-user mode, token ciphers (KMS and emulator) |
+| `provision.test.ts` | Auth and App Check, validation, Trial, reinstall re-attach, pilot cap and ordered waitlist (also under concurrency), double tap, device counter after Delete all data, status and token versions |
+| `profile.test.ts` | Language and country to LogMeal and the registry, waitlisted clients, LogMeal failures |
+| `pictures.test.ts` | Picture idempotency (also concurrent), trial end at 90 and disable, in-flight pictures, Delete all data |
+| `state-machine.test.ts` | Allowed transitions, idempotency, audit, cancel, waitlist approval, LogMeal down and the hourly reconcile, per-client leases |
+| `cost.test.ts` | Kill switch (emulator and Remote Config), credit alarms per threshold and month |
+| `rules.test.ts` | Deny-all for every collection: signed out, anonymous app user, admin claim |
+| `e2e/api.e2e.ts` | The deployed function shape end to end |
+
+The `metrics` endpoint and its tests come with WBS 10.3.
 
 - **The tests use Node's built-in runner** (`node:test`), and Node runs the TypeScript directly. There is no bundler and no native binary, because Smart App Control on the dev PC blocks unsigned native modules such as Vitest's rolldown.
 - **LogMeal is the fake server, started in-process for each suite.** It's the same code the emulator uses, so no LogMeal call or secret is needed.
