@@ -52,5 +52,8 @@ jobs:
       - run: npm run build
         working-directory: broker/functions
 
-      - name: Tests (emulators)
-        run: npm test
+      - name: Tests and Firestore rules (Auth + Firestore emulators)
+        run: npx firebase emulators:exec --project demo-snackshot --only auth,firestore "npm --prefix functions run test:coverage"
+
+      - name: End-to-end through the Functions emulator
+        run: npm run test:e2e
