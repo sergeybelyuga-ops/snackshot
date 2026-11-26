@@ -34,6 +34,7 @@ Sources:
 | 5 | 18 Nov 2026 | **Development and test environment per [12](Architecture/12_dev-and-test-environment.md).** Local emulators + `snackshot-dev-app` + `snackshot-prod`; automated tests never call real LogMeal; manual testing uses one test APIUser marked `isTest`; App Distribution for dev builds, Play internal testing for prod. | Scope of 1.1, 1.3, 1.4, 3.1, 3.2, 3.7, 9.3, 10.3, 11.3, 11.4 extended. The extra 1.5 h is taken from contingency (8 h → 6.5 h) and re-checked at M1. |
 | 6 | 18 Nov 2026 | **Scope revision.** F-05 AI Chat and F-10 Manual Text Search are **out** of the MVP. F-11 Quick Add is **in** the MVP and is always free. F-09 Gallery is in the MVP. Multi-item (F-04) and product recognition (F-08) are post-MVP. The dashboard has D / W / M / 3M / Y ranges. The user can set optional calorie and macro goals in the app; goals are stored only locally and are not synchronized with Google Health Connect. | The start screen is S-02 Home. Quick Add is the fallback for every case where AI is unavailable (failure, trial ended, waitlisted, broker down, LogMeal daily limit). WBS 5 "AI chat and text logging" is replaced by "Home, quick add, and goals". |
 | 7 | 18 Nov 2026 (quota measured 25 Nov 2026) | **LogMeal special conditions.** LogMeal has agreed to special conditions with no limit on the number of APIUsers. The query quota is the standard 200 per month shared by all APIUsers (20 per day per APIUser); one picture costs 1 credit ([13](Architecture/13_spike-1.1-results.md) §4). | The pilot cap of 5 is Snackshot's own limit only; the test APIUser and the owner's devices do not take pilot places. The pilot can recognise at most 200 pictures per month. |
+| 8 | 26 Nov 2026 | **Local persistence (WBS 1.2).** Room for meals, goals, sync metadata and metric counters, in app-private internal storage, encrypted at rest by Android file-based encryption (no SQLCipher). Jetpack DataStore for settings. The per-client LogMeal APIUser token is encrypted with an Android Keystore AES-GCM key and excluded from backup. | WBS 2.4 scope: settings move from Room to DataStore. [02](Architecture/02_answers-architecture-checklist.md) 8.2 / 8.6 wording aligned. |
 
 ## 3. MVP scope baseline
 
@@ -61,7 +62,7 @@ Sources:
 
 - **App:** native Android, Kotlin, Jetpack Compose, CameraX, Android Photo Picker, Health Connect SDK, LogMeal REST API ([04](Architecture/04_stack-comparative-analysis.md) §9).
 - **Broker:** Firebase Auth (anonymous), Cloud Functions (TypeScript), Firestore, Secret Manager, App Check, Remote Config, Hosting ([11](Architecture/11_logmeal-access-token-management.md) §0).
-- **Local persistence (proposed):** Room behind repository interfaces. Confirmed in WBS 1.2.
+- **Local persistence (confirmed in WBS 1.2, decision 8):** Room behind repository interfaces, relying on Android file-based encryption; DataStore for settings; LogMeal token encrypted with an Android Keystore key.
 - **Estimation basis:** AI-assisted (GitHub Copilot) development hours for one developer, including unit tests for each item. Contingency is about 8 %.
 - **Capacity and start:** 7 hours per week (Mon 2 h, Wed 2 h, Sun 3 h), starting Monday, November 16, 2026.
 - **LogMeal language and country:**
@@ -102,7 +103,7 @@ flowchart TB
 | 2.1 | Design system | all | Material 3 theme and tokens ([10](Architecture/10_architecture_ux_spec.md) §3), shared state contract components (loading, empty, error + retry, snackbar). | 1.5 |
 | 2.2 | Navigation shell and entry screens | F-30 | Global navigation with S-02 Home as the start screen, S-01 Welcome, S-01A Privacy details (including the product metrics notice). No sign-in screens. | 1.5 |
 | 2.3 | Domain model and nutrition calculation | F-01, F-03, F-11, F-16 | `MealEntry` (source: photo, gallery, or quick add), `NutritionValues`, `MealDraft`, `NutritionGoals`, `SyncState`; proportional recalculation after a grams edit; Atwater comparison for test builds only; unit tests. | 1.5 |
-| 2.4 | Local persistence | F-16, F-20, F-23 | Room schema (meals, goals, settings, sync metadata, metric counters), DAOs, repositories, migration strategy, app-private storage. | 2 |
+| 2.4 | Local persistence | F-16, F-20, F-23 | Room schema (meals, goals, sync metadata, metric counters), DAOs, repositories, migration strategy, app-private storage; DataStore for settings; Keystore-encrypted LogMeal token store (decision 8). | 2 |
 | 2.5 | Meal draft and image store | F-01, F-09 | Draft survives backgrounding and process death; processed image stored locally (raw photo deleted, 365-day retention) per [02](Architecture/02_answers-architecture-checklist.md) §1.5, §8.4. | 1 |
 | **3** | **LogMeal Access Broker** | | | **10** |
 | 3.1 | Broker project setup | F-30 | Cloud Functions (TypeScript), Firestore collections (`clients`, `devices`, `usage`, `audit`, `settings`, `metrics_daily`) with deny-all client rules, LogMeal company client with `LOGMEAL_MODE` (`fake` / `test-user` / `company`), token encryption, emulator config, fake LogMeal server, seed data, `broker-ci` workflow ([12](Architecture/12_dev-and-test-environment.md) §3.3, §10). | 1.5 |
