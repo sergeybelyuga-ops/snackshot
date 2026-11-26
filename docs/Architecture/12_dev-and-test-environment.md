@@ -311,8 +311,18 @@ For different **Android OS versions** and devices, use the AVD set, Firebase Tes
 | LogMeal test APIUser token | `snackshot-dev-app` Secret Manager; optionally `broker/functions/.secret.local` on your PC | Dev broker service account; the local emulator |
 | Upload keystore + passwords | GitHub `prod` environment secrets; offline backup | `distribute-android.yml` (prod) |
 | App Check debug tokens | Registered in the `snackshot-dev-app` console; on the device / in `local.properties` | Dev builds only |
-| Firebase config (`google-services.json`, web config) | Committed | Public by design; API keys restricted per app |
+| Firebase config (`google-services.json`, web config) | Committed | Public by design (GitHub secret scanning flags the `AIza…` keys; they are not secrets). API keys restricted (26 November 2026, see below) |
 | WIF provider, deploy service account names | GitHub variables | Workflows |
+
+**Firebase API key restrictions** (set 26 November 2026; zero API-key requests were recorded before):
+
+| Key | Application restriction | API restriction |
+| --- | --- | --- |
+| Android key, `snackshot-dev-app` | `app.snackshot.dev` signed with the owner's debug key (SHA-1 `85:72:A2:21:…`) or the CI dev key (`CN=Snackshot Dev`, SHA-1 `75:DF:33:26:…`) | Auth (`identitytoolkit`, `securetoken`), `firebaseinstallations`, `firebaseappcheck`, `firebaseremoteconfig`, `firebaseremoteconfigrealtime` |
+| Android key, `snackshot-prod` | Android, no app pinned yet: add `app.snackshot` with the Play App Signing and upload key SHA-1s in WBS 11.4 | same as dev |
+| Browser key, both projects | `https://<project>.web.app/*`, `https://<project>.firebaseapp.com/*` (admin console) | Auth, `firebaseinstallations`, `firebaseappcheck` |
+
+A new Firebase API used by the app or the admin console must be added to the key's API restriction. `distribute-android` filters the 1-hour APK download link out of its public log.
 
 Rules:
 
