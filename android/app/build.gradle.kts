@@ -18,7 +18,8 @@ android {
         applicationId = "app.snackshot"
         minSdk = 28 // Health Connect minimum
         targetSdk = 37
-        versionCode = 1
+        // CI passes -PversionCode=<run number> so every distributed build is newer than the last.
+        versionCode = providers.gradleProperty("versionCode").orNull?.toInt() ?: 1
         versionName = "0.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -61,8 +62,24 @@ android {
         }
     }
 
+    // Release signing comes only from CI (distribute-android.yml): dev builds use the dev key
+    // from the GitHub `dev` environment, prod builds the Play upload key from `prod`.
+    val keystorePath = providers.environmentVariable("SIGNING_KEYSTORE_PATH").orNull
+    signingConfigs {
+        if (keystorePath != null) {
+            create("ci") {
+                storeFile = file(keystorePath)
+                storeType = "pkcs12"
+                storePassword = providers.environmentVariable("SIGNING_KEYSTORE_PASSWORD").get()
+                keyAlias = providers.environmentVariable("SIGNING_KEY_ALIAS").get()
+                keyPassword = providers.environmentVariable("SIGNING_KEY_PASSWORD").get()
+            }
+        }
+    }
+
     buildTypes {
         release {
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("ci")
             optimization {
                 enable = true
             }

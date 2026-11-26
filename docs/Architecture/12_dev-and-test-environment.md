@@ -22,12 +22,13 @@ Sources:
 | 1 | How many environments? | **Local (Firebase Emulator Suite), Dev (`snackshot-dev-app`), Prod (`snackshot-prod`).** | Two Firebase projects on Blaze, each with a budget alert. Pilot data never mixes with test data. §1 |
 | 2 | Real LogMeal in automated tests? | **No.** Automated tests (unit, UI, broker, CI) use recorded LogMeal responses served by fakes. | Zero credits and no LogMeal secret in CI. Real LogMeal is used only in manual testing. §3 |
 | 3 | Which LogMeal credentials for manual testing? | **One dedicated test APIUser** with its own token. It is a real APIUser of the Snackshot company, so its usage appears in LogMeal statistics and in the admin console, marked as test. | The APICompany token stays in the prod project only. The dev broker never creates APIUsers. §3.3 |
-| 4 | Repository | **One private GitHub monorepo** (`sergeybelyuga-ops/snackshot`, already exists). | Android, broker, admin console, shared test fixtures, and docs (`docs/`, renamed from `Project documentation/`) live together. GitHub Actions with path filters. §4, §7 |
+| 4 | Repository | **One GitHub monorepo** (`sergeybelyuga-ops/snackshot`, already exists; **public**, confirmed 26 November 2026). | Android, broker, admin console, shared test fixtures, and docs (`docs/`, renamed from `Project documentation/`) live together. GitHub Actions with path filters. §4, §7 |
 | 5 | Test devices | **One physical Android phone + Android Studio emulators**, plus Firebase Test Lab and the Play pre-launch report for other devices and OS versions. | §6 |
 | 6 | Test APIUser and the LogMeal user limit | ~~The test APIUser counts against the LogMeal plan's user limit.~~ **Superseded (18 November 2026):** LogMeal has agreed to special conditions with no limit on the number of APIUsers. | All 5 pilot users fit; the test APIUser and the owner's devices (`isTest`) do not take pilot places. §3.4 |
 | 7 | Broker deploys to dev | **Automatic on every push to `main`** that changes `broker/**` or `admin/**`. Prod stays manual with approval. | §7.1 |
 | 8 | Test build distribution | **Firebase App Distribution** for dev builds, **Google Play internal testing** for prod builds. (TestFlight is iOS-only.) | §8 |
 | 9 | Dev project ID (25 November 2026) | **`snackshot-dev-app`** (display name `snackshot-dev`). The ID `snackshot-dev` was already taken globally. Budgets are in USD, the billing account currency: 5 USD dev, 10 USD prod, alerts at 50 / 90 / 100 % and forecast 100 %. | All references updated. §1 |
+| 10 | Android project (26 November 2026, WBS 1.3) | **Application ID `app.snackshot`**; broker region **`europe-west3`** (Frankfurt); one Gradle module per layer. Because the repo is public, the GitHub `dev` and `prod` environments accept deployments from `main` only, and the dev WIF provider accepts only jobs in this repo's `dev` environment. Dev builds are signed with a dedicated dev key (secrets in the `dev` environment). | §1, §2, §7 |
 
 ---
 
@@ -65,7 +66,7 @@ flowchart LR
 | Purpose | Daily development, automated tests | Manual testing against real LogMeal on your phone | Pilot (5 users) |
 | Firebase | Emulator Suite, project ID `demo-snackshot` (the `demo-` prefix means no real cloud resource can be touched) | Project `snackshot-dev-app`, Blaze, budget alert (5 USD) | Project `snackshot-prod`, Blaze, budget alert (10 USD) |
 | Android flavor | `local` | `dev` | `prod` |
-| Application ID | `…snackshot.local` | `…snackshot.dev` | `…snackshot` |
+| Application ID | `app.snackshot.local` | `app.snackshot.dev` | `app.snackshot` |
 | App Check | Not enforced in the emulator | Debug provider (debug tokens registered in the console) | Play Integrity (works only for Play-distributed builds) |
 | Broker LogMeal mode | `fake` | `test-user` | `company` |
 | LogMeal | Fake server, 0 credits | Test APIUser token (real credits) | APICompany token + one APIUser per client |
@@ -84,7 +85,7 @@ One flavor dimension, `env`, with `local`, `dev`, and `prod`. Each flavor sets `
 
 | `BuildConfig` field | `local` | `dev` | `prod` |
 | --- | --- | --- | --- |
-| `BROKER_BASE_URL` | `http://localhost:5001/demo-snackshot/<region>/api` | `https://<region>-snackshot-dev-app.cloudfunctions.net/api` | `https://<region>-snackshot-prod.cloudfunctions.net/api` |
+| `BROKER_BASE_URL` | `http://localhost:5001/demo-snackshot/europe-west3/api` | `https://europe-west3-snackshot-dev-app.cloudfunctions.net/api` | `https://europe-west3-snackshot-prod.cloudfunctions.net/api` |
 | `LOGMEAL_BASE_URL` | `http://localhost:8090` | `https://api.logmeal.com` | `https://api.logmeal.com` |
 | `USE_FIREBASE_EMULATORS` | `true` | `false` | `false` |
 | `APP_CHECK_PROVIDER` | `none` | `debug` | `playIntegrity` |
@@ -240,7 +241,7 @@ Coverage is a guide, not a gate: aim for high coverage on `domain`, `logmeal` ma
 
 ## 6. Devices and Android versions
 
-minSdk is **28 (Android 9)**, the Health Connect minimum. targetSdk is the latest stable API.
+minSdk is **28 (Android 9)**, the Health Connect minimum. targetSdk is the latest stable API (37). compileSdk is **37.2**, because Compose 1.13 needs SDK 37.1 or later.
 
 | Target | Device | Purpose |
 | --- | --- | --- |
@@ -261,7 +262,7 @@ Camera testing on AVDs uses gallery images: `adb push test-fixtures/images/ /sdc
 
 | Workflow | Trigger | Steps |
 | --- | --- | --- |
-| `android-ci.yml` | push / PR, paths `android/**`, `test-fixtures/**` | JDK 21 (Temurin), Gradle cache → `ktlintCheck`, `lintLocalDebug`, `testLocalDebugUnitTest`, `assembleDevDebug` |
+| `android-ci.yml` | push / PR, paths `android/**`, `test-fixtures/**` | JDK 21 (Temurin), Gradle cache → `ktlintCheck`, `lintLocalDebug`, `unitTests` (root task: app `testLocalDebugUnitTest`, library `testDebugUnitTest`, JVM `test`), `assembleDevDebug` |
 | `android-ui-tests.yml` | PR to `main`, manual | AVD API 34 (`reactivecircus/android-emulator-runner`) → `connectedLocalDebugAndroidTest` |
 | `broker-ci.yml` | push / PR, paths `broker/**`, `test-fixtures/**` | Node 22, JDK 21 → `npm ci`, lint, `tsc`, `firebase emulators:exec --project demo-snackshot "npm test"` |
 | `admin-ci.yml` | push / PR, path `admin/**` | Node 22 → `npm ci`, lint, `vitest run`, `vite build` |
@@ -275,13 +276,14 @@ No workflow has the LogMeal APICompany token or the test APIUser token. CI never
 - Deploys use **Workload Identity Federation** (`google-github-actions/auth`), so no service-account JSON keys are stored in GitHub.
 - There is one deploy service account per project, with only the roles that deploying needs (Functions, Firestore rules, Hosting, App Distribution, plus read access to the secrets the functions use).
 - The WIF provider and service account names are GitHub **variables**, not secrets.
+- **Dev (set up in WBS 1.3):** pool `github`, provider `snackshot-repo` in `snackshot-dev-app`, condition `repository_id == 1458924540 && repository_owner_id == 290377895 && environment == 'dev'`. Service account `github-deploy@snackshot-dev-app.iam.gserviceaccount.com` has `roles/firebaseappdistro.admin`; WBS 1.4 adds the deploy roles. Prod is set up in WBS 1.4.
 
 ### 7.3 GitHub environments
 
 | Environment | Protection | Secrets |
 | --- | --- | --- |
-| `dev` | none | — |
-| `prod` | Required reviewer: owner | `UPLOAD_KEYSTORE_BASE64`, `UPLOAD_KEYSTORE_PASSWORD`, `UPLOAD_KEY_ALIAS`, `UPLOAD_KEY_PASSWORD` |
+| `dev` | Deployments from `main` only | `SIGNING_KEYSTORE_BASE64`, `SIGNING_KEYSTORE_PASSWORD`, `SIGNING_KEY_ALIAS`, `SIGNING_KEY_PASSWORD` (dev signing key, so App Distribution builds update each other). Variables: `GCP_WIF_PROVIDER`, `GCP_DEPLOY_SA`, `FIREBASE_ANDROID_APP_ID` |
+| `prod` | Required reviewer: owner; deployments from `main` only | `UPLOAD_KEYSTORE_BASE64`, `UPLOAD_KEYSTORE_PASSWORD`, `UPLOAD_KEY_ALIAS`, `UPLOAD_KEY_PASSWORD` |
 
 The app uses **Play App Signing**: Google holds the app signing key, and the repo signs with an upload key only. You keep an offline backup of the upload keystore outside the repo.
 
