@@ -46,6 +46,8 @@ export type ClientDoc = {
   waitlistedAt: Timestamp | null;
   /** What LogMeal's `enabled` flag was last set to; differs from the status while a change is pending. */
   logmealEnabled?: boolean;
+  /** A status change whose LogMeal side (enable, disable, delete) has not gone through yet. */
+  logmealPending?: boolean;
   /** Held by one job at a time (store/lease.ts). */
   lease?: { holder: string; until: Timestamp } | null;
 };

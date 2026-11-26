@@ -40,7 +40,7 @@ export async function provision(deps: Deps, input: ProvisionInput): Promise<Clie
 
   let client = await getClient(db, clientId);
   if (client.status === "waitlisted") client = await promoteIfFirst(deps, clientId, client);
-  if (client.status === "provisioning") client = await completeProvisioning(deps, clientId, input);
+  if (client.status === "provisioning") client = await completeProvisioning(deps, clientId);
   return viewOf(deps, clientId, client, { includeToken: true });
 }
 
@@ -142,33 +142,44 @@ async function promoteIfFirst(deps: Deps, clientId: string, client: ClientDoc): 
 
 /**
  * Creates the APIUser while holding the client's lease, so a double tap or a retry never makes
- * two. Each step is stored before the next, so a retry resumes instead of starting over.
+ * two. Each step is stored before the next, so a retry resumes instead of starting over. The
+ * state machine calls this with the lease already held when an admin approves a waitlisted client.
  */
-async function completeProvisioning(deps: Deps, clientId: string, input: ProvisionInput): Promise<ClientDoc> {
+export async function completeProvisioning(
+  deps: Deps,
+  clientId: string,
+  options: { leaseHeld?: boolean; targetStatus?: "trial" | "active" } = {},
+): Promise<ClientDoc> {
   const { db, logmeal, cipher } = deps;
   const ref = refs(db).client(clientId);
+  const target = options.targetStatus ?? "trial";
+
+  const work = async () => {
+    let client = await getClient(db, clientId);
+    if (client.status !== "provisioning") return;
+
+    if (!client.tokenCiphertext) {
+      const username = `snk_${randomBytes(8).toString("hex")}`; // opaque, no personal data
+      const user = await logmeal.signUp(username, client.language);
+      await ref.update({
+        logmealUserId: user.id,
+        logmealUsername: username,
+        tokenCiphertext: await cipher.encrypt(user.token, clientId),
+        tokenVersion: FieldValue.increment(1),
+      });
+      client = await getClient(db, clientId);
+    }
+    await logmeal.setProfile(client.logmealUserId!, client.language, client.country);
+
+    const now = Timestamp.fromDate(deps.now());
+    // signUp creates the APIUser enabled, which matches both target statuses.
+    await ref.update({ status: target, statusReason: client.statusReason === "provisioning" ? "provisioned" : client.statusReason, statusChangedAt: now, logmealEnabled: true, logmealPending: false });
+    await writeAudit(db, { clientId, action: "provisioned", actor: "provision", reason: "provisioned", before: { status: "provisioning" }, after: { status: target, logmealUserId: client.logmealUserId } }, deps.now());
+  };
+
   try {
-    await withClientLease(db, clientId, deps.now, async () => {
-      let client = await getClient(db, clientId);
-      if (client.status !== "provisioning") return;
-
-      if (!client.tokenCiphertext) {
-        const username = `snk_${randomBytes(8).toString("hex")}`; // opaque, no personal data
-        const user = await logmeal.signUp(username, client.language);
-        await ref.update({
-          logmealUserId: user.id,
-          logmealUsername: username,
-          tokenCiphertext: await cipher.encrypt(user.token, clientId),
-          tokenVersion: FieldValue.increment(1),
-        });
-        client = await getClient(db, clientId);
-      }
-      await logmeal.setProfile(client.logmealUserId!, client.language || input.language, client.country || input.country);
-
-      const now = Timestamp.fromDate(deps.now());
-      await ref.update({ status: "trial", statusReason: "provisioned", statusChangedAt: now, logmealEnabled: true }); // signUp creates it enabled
-      await writeAudit(db, { clientId, action: "provisioned", actor: "provision", reason: "provisioned", before: { status: "provisioning" }, after: { status: "trial", logmealUserId: client.logmealUserId } }, deps.now());
-    });
+    if (options.leaseHeld) await work();
+    else await withClientLease(db, clientId, deps.now, work);
   } catch (error) {
     if (error instanceof LogMealError) {
       logger.warn("Provisioning failed at LogMeal; the client stays provisioning for a retry", { clientId, status: error.status, code: error.code });
