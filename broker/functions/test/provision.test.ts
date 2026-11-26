@@ -208,7 +208,7 @@ describe("status", () => {
     const client = (await getFirestore().collection("clients").get()).docs[0]!;
     await client.ref.update({ status: "trial_ended", statusReason: "trial_allowance_used", picturesUsed: 90, isTest: true });
     const res = await call(broker, "GET", "/v1/logmeal/status", { idToken });
-    assert.deepEqual(res.body, { status: "trial_ended", reason: "trial_allowance_used", tokenVersion: 1, pictures: { used: 90, limit: 90 }, isTest: true });
+    assert.deepEqual(res.body, { status: "trial_ended", reason: "trial_allowance_used", tokenVersion: 1, pictures: { used: 90, limit: 90 }, isTest: true, aiEnabled: true });
   });
 });
 
