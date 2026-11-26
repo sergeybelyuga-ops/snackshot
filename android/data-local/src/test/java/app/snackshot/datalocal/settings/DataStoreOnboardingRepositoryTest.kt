@@ -1,6 +1,6 @@
 package app.snackshot.datalocal.settings
 
-import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import app.snackshot.datalocal.testDataStore
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,8 +18,7 @@ import org.junit.rules.TemporaryFolder
 class DataStoreOnboardingRepositoryTest {
     @get:Rule val tmp = TemporaryFolder()
 
-    private fun repository(file: File, scope: CoroutineScope) =
-        DataStoreOnboardingRepository(PreferenceDataStoreFactory.create(scope = scope) { file })
+    private fun repository(file: File, scope: CoroutineScope) = DataStoreOnboardingRepository(testDataStore(file, scope))
 
     @Test
     fun `welcome is not completed on a fresh install`() = runTest {

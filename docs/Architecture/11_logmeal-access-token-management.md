@@ -115,12 +115,12 @@ flowchart LR
 | --- | --- | --- | --- |
 | **APICompany token** | Secret Manager of `snackshot-prod` only ([12](./12_dev-and-test-environment.md) §9). Loaded at function cold start. | Broker service account only. | In the APK, repo, CI logs, Firestore, client responses. |
 | **APIUser token (server copy)** | Client registry, encrypted with a KMS key (envelope encryption). | Broker only. | Plaintext in DB, logs, analytics. |
-| **APIUser token (device copy)** | Encrypted DataStore; AES-GCM key held in **Android Keystore** (hardware-backed where available, e.g. via Tink `AndroidKeysetManager`). | The app process only. | `SharedPreferences` plaintext, logs, crash reports, Health Connect, cloud backup (exclude via `dataExtractionRules` / `fullBackupContent`). |
+| **APIUser token (device copy)** | Encrypted DataStore; AES-256-GCM key held in **Android Keystore** (hardware-backed where available), used directly through the `AndroidKeyStore` provider (WBS 2.4, decision 8). | The app process only. | `SharedPreferences` plaintext, logs, crash reports, Health Connect, cloud backup (exclude via `dataExtractionRules` / `fullBackupContent`). |
 | **Snackshot session** | Firebase Auth SDK, anonymous user (short-lived ID token, auto-refreshed). Lost on uninstall; recovered through the device ID (§5.3). | App + broker. | — |
 
 Notes:
 
-- Do **not** use `androidx.security:security-crypto` (`EncryptedSharedPreferences`) for new code — the library is deprecated; use Keystore + Tink + DataStore.
+- Do **not** use `androidx.security:security-crypto` (`EncryptedSharedPreferences`) for new code — the library is deprecated; use a Keystore key + DataStore.
 - Excluding the token from Android Auto Backup is intentional: after restore on a new device the app re-provisions via the broker, which keeps one active token per client and lets the broker see device changes.
 - The OkHttp/Ktor client must redact the `Authorization` header in any logging interceptor.
 
