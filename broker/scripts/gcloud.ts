@@ -5,10 +5,14 @@ import { spawnSync } from "node:child_process";
 export const GCLOUD_CONFIG = "snackshot";
 
 export function gcloud(args: string[], input?: string): string {
-  const res = spawnSync("gcloud", [...args, `--configuration=${GCLOUD_CONFIG}`], {
+  const all = [...args, `--configuration=${GCLOUD_CONFIG}`];
+  const windows = process.platform === "win32";
+  // gcloud is a .cmd wrapper on Windows, so it runs through cmd.exe, which splits unquoted
+  // arguments at spaces. Quote every argument there.
+  const res = spawnSync("gcloud", windows ? all.map(quoteForCmd) : all, {
     input,
     encoding: "utf8",
-    shell: process.platform === "win32", // gcloud is a .cmd/.ps1 wrapper on Windows
+    shell: windows,
   });
   if (res.status !== 0) {
     // Drop the harmless Windows certificate-store warning gcloud prints.
@@ -19,6 +23,11 @@ export function gcloud(args: string[], input?: string): string {
     throw new Error(`gcloud ${args.slice(0, 3).join(" ")} failed:\n${err}`);
   }
   return res.stdout;
+}
+
+function quoteForCmd(arg: string): string {
+  if (/[%!]/.test(arg)) throw new Error(`Argument not supported on Windows: ${arg}`);
+  return `"${arg.replace(/"/g, '""')}"`;
 }
 
 export function secretExists(project: string, name: string): boolean {
