@@ -65,15 +65,18 @@ jobs:
         with:
           node-version-file: .nvmrc
 
+      # The CLI prints a 1-hour APK download link; this repo is public, so filter it out of the log.
       - name: Upload to App Distribution
         env:
           NOTES: ${{ inputs.notes }}
-        run: >
-          npx --yes firebase-tools@15.37.0 appdistribution:distribute
-          app/build/outputs/apk/dev/release/app-dev-release.apk
-          --app "${{ vars.FIREBASE_ANDROID_APP_ID }}"
-          --groups owner
-          --release-notes "${NOTES:-dev build} (${GITHUB_SHA::7}, run ${{ github.run_number }})"
+        run: |
+          set -o pipefail
+          npx --yes firebase-tools@15.37.0 appdistribution:distribute \
+            app/build/outputs/apk/dev/release/app-dev-release.apk \
+            --app "${{ vars.FIREBASE_ANDROID_APP_ID }}" \
+            --groups owner \
+            --release-notes "${NOTES:-dev build} (${GITHUB_SHA::7}, run ${{ github.run_number }})" \
+            2>&1 | grep -v -e 'app-binary-downloads' -e 'Download the release binary'
 
   prod:
     if: inputs.env == 'prod'
