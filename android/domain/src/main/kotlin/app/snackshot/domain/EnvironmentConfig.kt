@@ -27,12 +27,17 @@ data class EnvironmentConfig(
     val logmealBaseUrl: String,
     val useFirebaseEmulators: Boolean,
     val appCheckProvider: AppCheckProvider,
+    /** Test builds (local, dev) show the Atwater comparison next to LogMeal's energy (doc 03 §5). */
+    val showAtwaterComparison: Boolean,
 ) {
     init {
         if (!useFirebaseEmulators) {
             require(brokerBaseUrl.startsWith("https://")) { "Broker URL must use HTTPS outside the emulator: $brokerBaseUrl" }
             require(logmealBaseUrl.startsWith("https://")) { "LogMeal URL must use HTTPS outside the emulator: $logmealBaseUrl" }
             require(appCheckProvider != AppCheckProvider.NONE) { "App Check is required outside the emulator" }
+        }
+        require(!(showAtwaterComparison && appCheckProvider == AppCheckProvider.PLAY_INTEGRITY)) {
+            "The Atwater comparison is for test builds only"
         }
     }
 }
