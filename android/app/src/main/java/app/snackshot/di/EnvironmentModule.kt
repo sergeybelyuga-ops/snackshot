@@ -21,5 +21,6 @@ object EnvironmentModule {
         logmealBaseUrl = BuildConfig.LOGMEAL_BASE_URL,
         useFirebaseEmulators = BuildConfig.USE_FIREBASE_EMULATORS,
         appCheckProvider = AppCheckProvider.fromBuildConfig(BuildConfig.APP_CHECK_PROVIDER),
+        showAtwaterComparison = BuildConfig.SHOW_ATWATER_COMPARISON,
     )
 }

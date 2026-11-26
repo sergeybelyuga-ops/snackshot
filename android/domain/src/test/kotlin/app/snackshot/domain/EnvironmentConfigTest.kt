@@ -5,13 +5,15 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 
 class EnvironmentConfigTest {
-    private fun config(broker: String, emulators: Boolean, appCheck: AppCheckProvider = AppCheckProvider.DEBUG) = EnvironmentConfig(
-        name = "test",
-        brokerBaseUrl = broker,
-        logmealBaseUrl = if (emulators) "http://localhost:8090" else "https://api.logmeal.com",
-        useFirebaseEmulators = emulators,
-        appCheckProvider = appCheck,
-    )
+    private fun config(broker: String, emulators: Boolean, appCheck: AppCheckProvider = AppCheckProvider.DEBUG, atwater: Boolean = false) =
+        EnvironmentConfig(
+            name = "test",
+            brokerBaseUrl = broker,
+            logmealBaseUrl = if (emulators) "http://localhost:8090" else "https://api.logmeal.com",
+            useFirebaseEmulators = emulators,
+            appCheckProvider = appCheck,
+            showAtwaterComparison = atwater,
+        )
 
     @Test
     fun `local flavor may use cleartext localhost`() {
@@ -27,6 +29,14 @@ class EnvironmentConfigTest {
     fun `cloud flavors must use App Check`() {
         assertThrows<IllegalArgumentException> {
             config("https://example.com/api", emulators = false, appCheck = AppCheckProvider.NONE)
+        }
+    }
+
+    @Test
+    fun `Atwater comparison is not allowed in the Play Integrity build`() {
+        config("https://example.com/api", emulators = false, atwater = true)
+        assertThrows<IllegalArgumentException> {
+            config("https://example.com/api", emulators = false, appCheck = AppCheckProvider.PLAY_INTEGRITY, atwater = true)
         }
     }
 

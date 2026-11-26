@@ -41,6 +41,7 @@ android {
             buildConfigField("String", "LOGMEAL_BASE_URL", "\"http://localhost:8090\"")
             buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "true")
             buildConfigField("String", "APP_CHECK_PROVIDER", "\"none\"")
+            buildConfigField("boolean", "SHOW_ATWATER_COMPARISON", "true")
         }
         create("dev") {
             dimension = "env"
@@ -51,6 +52,7 @@ android {
             buildConfigField("String", "LOGMEAL_BASE_URL", "\"https://api.logmeal.com\"")
             buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "false")
             buildConfigField("String", "APP_CHECK_PROVIDER", "\"debug\"")
+            buildConfigField("boolean", "SHOW_ATWATER_COMPARISON", "true")
         }
         create("prod") {
             dimension = "env"
@@ -59,6 +61,7 @@ android {
             buildConfigField("String", "LOGMEAL_BASE_URL", "\"https://api.logmeal.com\"")
             buildConfigField("boolean", "USE_FIREBASE_EMULATORS", "false")
             buildConfigField("String", "APP_CHECK_PROVIDER", "\"playIntegrity\"")
+            buildConfigField("boolean", "SHOW_ATWATER_COMPARISON", "false")
         }
     }
 
