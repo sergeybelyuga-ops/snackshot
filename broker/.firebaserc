@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "demo-snackshot",
+    "dev": "snackshot-dev-app",
+    "prod": "snackshot-prod"
+  }
+}

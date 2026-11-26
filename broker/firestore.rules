@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Deny-all for clients. The app and the admin console reach data only
+// through Cloud Functions, which use the Admin SDK and bypass these rules
+// (docs/Architecture/11_logmeal-access-token-management.md).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
