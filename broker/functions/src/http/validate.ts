@@ -17,3 +17,6 @@ export function matching(body: Record<string, unknown>, field: string, pattern: 
   if (typeof value !== "string" || !pattern.test(value)) throw badRequest(`${field} must be ${description}`);
   return value;
 }
+
+/** Client-generated idempotency key for a picture report. */
+export const REQUEST_ID = /^[A-Za-z0-9_-]{8,64}$/;

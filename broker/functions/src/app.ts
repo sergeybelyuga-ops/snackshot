@@ -6,7 +6,7 @@ import type { BrokerConfig } from "./config.ts";
 import type { TokenCipher } from "./crypto/token-cipher.ts";
 import { errorHandler, notFound } from "./http/errors.ts";
 import type { LogMealCompany } from "./logmeal/client.ts";
-import { logmealRoutes } from "./routes/logmeal.ts";
+import { accountRoutes, logmealRoutes } from "./routes/logmeal.ts";
 
 /** Everything a request handler needs; tests build it against the emulators and the fake LogMeal. */
 export type Deps = {
@@ -28,6 +28,7 @@ export function createApp(deps: Deps): Express {
 
   const v1 = express.Router();
   v1.use("/logmeal", logmealRoutes(deps));
+  v1.use("/account", accountRoutes(deps));
   app.use("/v1", v1);
 
   app.use((_req, _res, next) => next(notFound()));
