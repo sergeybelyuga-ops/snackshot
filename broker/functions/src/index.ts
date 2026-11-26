@@ -58,8 +58,13 @@ function getApp(): Express {
   return app;
 }
 
+// The full e-mail from functions/.env.<projectId>: the Firebase CLI grants secret access to the
+// service account as written, and Secret Manager rejects the short form "broker@".
+const serviceAccount = process.env.BROKER_SERVICE_ACCOUNT ?? (process.env.FUNCTIONS_EMULATOR === "true" ? "broker@" : undefined);
+if (!serviceAccount) throw new Error("BROKER_SERVICE_ACCOUNT is not set in functions/.env.<projectId>");
+
 /** Shared by every function: the broker account, its LogMeal secret, Frankfurt. */
-const runtime = { region: REGION, serviceAccount: "broker@", secrets, memory: "256MiB" } as const;
+const runtime = { region: REGION, serviceAccount, secrets, memory: "256MiB" } as const;
 
 /** `https://europe-west3-<project>.cloudfunctions.net/api/v1/...` (Android BuildConfig.BROKER_BASE_URL). */
 export const api = onRequest(
