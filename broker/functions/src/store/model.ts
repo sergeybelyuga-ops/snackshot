@@ -14,7 +14,11 @@ export const Collections = {
   pictureReports: "picture_reports",
 } as const;
 
-export type ClientStatus = "trial" | "trial_ended" | "active" | "paused" | "suspended" | "cancelled" | "waitlisted";
+/** `provisioning` is internal: a pilot slot is held while the APIUser is being created. */
+export type ClientStatus = "provisioning" | "trial" | "trial_ended" | "active" | "paused" | "suspended" | "cancelled" | "waitlisted";
+
+/** Statuses that hold a pilot slot (doc 11 §6.3); `isTest` clients never count. */
+export const SLOT_STATUSES: ClientStatus[] = ["provisioning", "trial", "trial_ended", "active", "paused"];
 
 /** `clients/{clientId}` */
 export type ClientDoc = {
@@ -40,6 +44,8 @@ export type ClientDoc = {
   statusReason: string;
   /** Order on the waitlist: when the device first tried AI. */
   waitlistedAt: Timestamp | null;
+  /** Held by one job at a time (store/lease.ts). */
+  lease?: { holder: string; until: Timestamp } | null;
 };
 
 /** `devices/{deviceId}`: survives "Delete all data", so deleting does not grant a new trial. */
@@ -79,6 +85,8 @@ export const refs = (db: Firestore) => ({
   client: (id: string) => db.collection(Collections.clients).doc(id),
   device: (deviceId: string) => db.collection(Collections.devices).doc(deviceId),
   settings: () => db.collection(Collections.settings).doc("broker"),
+  /** Read and written by every transaction that may take a pilot slot, which serializes them. */
+  pilotLock: () => db.collection(Collections.settings).doc("pilot_lock"),
   audit: () => db.collection(Collections.audit).doc(),
   clients: () => db.collection(Collections.clients),
 });
