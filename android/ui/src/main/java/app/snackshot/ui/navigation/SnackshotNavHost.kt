@@ -64,11 +64,14 @@ fun SnackshotNavHost(
             navController = navController,
             startDestination = if (welcomeCompleted) HomeRoute else WelcomeRoute,
             modifier = Modifier.weight(1f),
-            // Screens switch instantly: no fade or slide between destinations, including predictive Back.
+            // Screens switch instantly: no fade, slide or scale between destinations.
             enterTransition = { EnterTransition.None },
             exitTransition = { ExitTransition.None },
             popEnterTransition = { EnterTransition.None },
             popExitTransition = { ExitTransition.None },
+            // The Back gesture has its own transitions with a non-empty default; switch them off too.
+            predictivePopEnterTransition = { EnterTransition.None },
+            predictivePopExitTransition = { ExitTransition.None },
             sizeTransform = null,
         ) {
             composable<WelcomeRoute> {
