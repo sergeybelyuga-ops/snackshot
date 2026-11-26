@@ -1,5 +1,6 @@
 import { Router } from "express";
 import type { Deps } from "../app.ts";
+import { updateProfile } from "../clients/profile.ts";
 import { provision, status } from "../clients/provisioning.ts";
 import { callerOf, requireAppCaller } from "../http/auth.ts";
 import { badRequest } from "../http/errors.ts";
@@ -31,6 +32,18 @@ export function logmealRoutes(deps: Deps): Router {
     }
     res.setHeader("Cache-Control", "no-store");
     res.json(await status(deps, callerOf(req).uid, knownTokenVersion));
+  });
+
+  router.post("/profile", async (req, res) => {
+    const body = objectBody(req.body);
+    res.json(
+      await updateProfile(
+        deps,
+        callerOf(req).uid,
+        matching(body, "language", LANGUAGE, "a three-letter LogMeal language code"),
+        matching(body, "country", COUNTRY, "an ISO 3166-1 alpha-2 country code"),
+      ),
+    );
   });
 
   return router;
