@@ -2,6 +2,8 @@ package app.snackshot.ui.navigation
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Icon
@@ -62,6 +64,12 @@ fun SnackshotNavHost(
             navController = navController,
             startDestination = if (welcomeCompleted) HomeRoute else WelcomeRoute,
             modifier = Modifier.weight(1f),
+            // Screens switch instantly: no fade or slide between destinations, including predictive Back.
+            enterTransition = { EnterTransition.None },
+            exitTransition = { ExitTransition.None },
+            popEnterTransition = { EnterTransition.None },
+            popExitTransition = { ExitTransition.None },
+            sizeTransform = null,
         ) {
             composable<WelcomeRoute> {
                 WelcomeScreen(
