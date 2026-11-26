@@ -565,7 +565,7 @@ Every screen exposes explicit `Loading`, `Empty`, `Error`, and `Success/Default`
 1. Validate LogMeal's single-photo grams response, latency, quota, image retention, and training-use terms. Mobile credential protection is resolved by [11_logmeal-access-token-management.md](./11_logmeal-access-token-management.md).
 2. ✅ Resolved (2026-11-14): no Google sign-in or registration in Snackshot, including for AI. AI access uses a silent anonymous identity (F-30), a 90-picture free trial with a paywall screen (F-32), and a 5-user pilot cap.
 3. ✅ Resolved (2026-11-18): F-09 gallery selection is in the MVP.
-4. Define the exact local persistence technology and schema migration strategy behind the repository boundary (Room proposed; confirmed in WBS 1.2).
+4. ✅ Local persistence confirmed in WBS 1.2 ([WBS](../04_wbs_and_mvp_implementation_plan.md) decision 8): Room behind the repository boundary, DataStore for settings, Keystore-encrypted LogMeal token. The schema migration strategy is defined in WBS 2.4.
 5. Validate Health Connect permission scopes, bootstrap import behavior, client record version handling, and deletion semantics on physical Android devices.
 
 ## 8. Quality Checklist
