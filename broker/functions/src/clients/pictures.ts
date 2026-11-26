@@ -38,7 +38,7 @@ export async function reportPicture(deps: Deps, uid: string, requestId: string) 
     const picturesUsed = client.picturesUsed + 1;
     const ended = client.status === "trial" && picturesUsed >= client.pictureAllowance;
     const update: Partial<ClientDoc> = { picturesUsed };
-    if (ended) Object.assign(update, { status: "trial_ended", statusReason: "trial_allowance_used", statusChangedAt: Timestamp.fromDate(now) });
+    if (ended) Object.assign(update, { status: "trial_ended", statusReason: "trial_allowance_used", statusChangedAt: Timestamp.fromDate(now), logmealPending: true });
 
     tx.create(reportRef, { clientId, at: Timestamp.fromDate(now), expireAt: Timestamp.fromMillis(now.getTime() + REPORT_TTL_DAYS * 86_400_000) });
     tx.update(r.client(clientId), update);
