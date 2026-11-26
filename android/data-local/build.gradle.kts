@@ -1,9 +1,10 @@
-// Room database (meals, goals, sync metadata, metric counters) and DataStore settings (WBS 2.4, decision 8).
+// Room database, DataStore settings, token store (WBS 2.4, decision 8); meal draft and image store (WBS 2.5).
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.room)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -34,6 +35,7 @@ dependencies {
     implementation(libs.androidx.datastore.preferences)
     implementation(libs.room.runtime)
     implementation(libs.room.ktx)
+    implementation(libs.kotlinx.serialization.json)
     ksp(libs.room.compiler)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.hilt.android)
