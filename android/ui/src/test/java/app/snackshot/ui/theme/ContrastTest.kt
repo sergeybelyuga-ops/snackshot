@@ -23,6 +23,7 @@ class ContrastTest {
     private fun textPairs(s: ColorScheme) = mapOf(
         "onPrimary/primary" to (s.onPrimary to s.primary),
         "onPrimaryContainer/primaryContainer" to (s.onPrimaryContainer to s.primaryContainer),
+        "onSecondaryContainer/secondaryContainer (selected tab)" to (s.onSecondaryContainer to s.secondaryContainer),
         "onSurface/surface" to (s.onSurface to s.surface),
         "onSurface/surfaceContainer" to (s.onSurface to s.surfaceContainer),
         "onSurface/surfaceContainerHigh" to (s.onSurface to s.surfaceContainerHigh),

@@ -1,6 +1,75 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Shared states -->
     <string name="state_loading">Loading</string>
     <string name="state_retry">Retry</string>
     <string name="state_error">Error</string>
+    <string name="action_back">Back</string>
+
+    <!-- Navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+
+    <!-- S-01 Welcome (docs/UX_UI/Prototype/s01_welcome.html) -->
+    <string name="welcome_title">Welcome to Snackshot</string>
+    <string name="welcome_body">Your AI recognition and privacy-first nutrition tracker. No registration needed. We do not store your personal health data on external servers. Your first 90 AI pictures are free.</string>
+    <string name="welcome_continue">Continue</string>
+    <string name="welcome_privacy_details">Privacy details</string>
+    <string name="welcome_loading_title">Getting things ready</string>
+    <string name="welcome_loading_body">Restoring your settings and any unfinished meal on this device.</string>
+    <string name="welcome_error_title">Couldn\'t open local storage</string>
+    <string name="welcome_error_body">Snackshot couldn\'t start its on-device database. Nothing was deleted or sent anywhere. Try again, or restart the app.</string>
+    <string name="brand_mark">Snackshot</string>
+
+    <!-- S-01A Privacy details (prototype s01a_privacy.html + language/country and product metrics, doc 10 §4.3) -->
+    <string name="privacy_title">Privacy details</string>
+    <string name="privacy_headline">Your data stays on your phone</string>
+    <string name="privacy_intro">Here is where your information is kept, what leaves your phone for food recognition, and what changes if you connect Google Health Connect.</string>
+
+    <string name="privacy_usage_heading">How Snackshot uses your information</string>
+    <string name="privacy_usage_body">Snackshot needs no registration and keeps no health data on its servers. Your meals, calories and macros are saved in the app\'s database on this phone and keep working offline.</string>
+    <string name="privacy_not_stored_title">Not stored on Snackshot servers</string>
+    <string name="privacy_not_stored_body">Customer profiles, nutrition logs, personal health data and photos</string>
+    <string name="privacy_access_title">AI access service</string>
+    <string name="privacy_access_body">To count your 90 free AI pictures and manage AI access, a small Snackshot service keeps an anonymous ID, a scrambled device identifier, the number of pictures used and your AI access status. Nothing that identifies you, and no photos or meals.</string>
+    <string name="privacy_goals_title">Your goals</string>
+    <string name="privacy_goals_body">Calorie and macro goals stay on this phone only.</string>
+
+    <string name="privacy_ai_heading">AI food recognition</string>
+    <string name="privacy_ai_body">To recognize a meal, Snackshot sends only the picture you selected to LogMeal, the recognition service, together with your language and country so that food names and regional dishes are recognized correctly. It is not linked with your personal information.</string>
+    <string name="privacy_sent_title">Sent to LogMeal</string>
+    <string name="privacy_sent_body">The one photo you took or picked from your gallery, and your language and country</string>
+    <string name="privacy_never_title">Never sent</string>
+    <string name="privacy_never_body">Your name, account, goals, meal history or other photos</string>
+    <string name="privacy_kept_title">Kept on this phone</string>
+    <string name="privacy_kept_body">The processed meal picture is kept with your meal for up to 365 days. The original capture is deleted after processing.</string>
+
+    <string name="privacy_metrics_heading">Product metrics</string>
+    <string name="privacy_metrics_body">To make Snackshot better, the app sends one anonymous summary per day, for example how long AI recognition took and how often features were used.</string>
+    <string name="privacy_metrics_contains_title">What it contains</string>
+    <string name="privacy_metrics_contains_body">Counts and timings only. No personal data, no identifiers, no food names, photos or nutrition values.</string>
+    <string name="privacy_metrics_off_title">Your choice</string>
+    <string name="privacy_metrics_off_body">Switch product metrics off at any time in Settings</string>
+
+    <string name="privacy_hc_heading">Google Health Connect</string>
+    <string name="privacy_hc_body">Health Connect is optional. Snackshot works fully without it, and your meals stay only on this phone.</string>
+    <string name="privacy_hc_account_title">Your Google account</string>
+    <string name="privacy_hc_account_body">To use it, sign in to the Google Health app with an existing Google account or create a new one, and link Snackshot there</string>
+    <string name="privacy_hc_connected_title">When connected</string>
+    <string name="privacy_hc_connected_body">New meals are saved to Health Connect too, which keeps your history and can share it with compatible apps you allow, for recommendations or other services</string>
+    <string name="privacy_hc_choice_title">Your choice, any time</string>
+    <string name="privacy_hc_choice_body">Connect or disconnect later in Settings</string>
+
+    <string name="privacy_footer">Bundled with the app · Version 1.2 · Updated Nov 26, 2026</string>
+    <string name="privacy_done">Got it</string>
+
+    <!-- Placeholder tabs until their increments (I-1, I-2, I-5, I-9) -->
+    <string name="home_title">Today</string>
+    <string name="home_placeholder">Meal logging arrives in the next increment: take a photo, pick from the gallery, or use Quick add.</string>
+    <string name="dashboard_placeholder">Daily, weekly, monthly and yearly totals will appear here.</string>
+    <string name="history_placeholder">Your logged meals will appear here.</string>
+    <string name="settings_placeholder">Health Connect, goals, AI recognition and other settings will appear here.</string>
+    <string name="settings_build">Build: %1$s</string>
 </resources>

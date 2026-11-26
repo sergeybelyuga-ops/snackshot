@@ -1,6 +1,8 @@
-// Room database (meals, goals, sync metadata, metric counters) and DataStore settings. WBS 2.4.
+// Room database (meals, goals, sync metadata, metric counters) and DataStore settings (WBS 2.4, decision 8).
 plugins {
     alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
+    alias(libs.plugins.hilt)
 }
 
 android {
@@ -19,4 +21,11 @@ android {
 
 dependencies {
     implementation(project(":domain"))
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.hilt.android)
+    ksp(libs.hilt.compiler)
+
+    testImplementation(libs.junit4)
+    testImplementation(libs.kotlinx.coroutines.test)
 }
