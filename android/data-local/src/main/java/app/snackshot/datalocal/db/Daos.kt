@@ -23,6 +23,16 @@ interface MealDao {
 
     @Query("DELETE FROM meals WHERE id = :id")
     suspend fun delete(id: String)
+
+    @Query("SELECT DISTINCT image_ref FROM meals WHERE image_ref IS NOT NULL")
+    suspend fun imageRefs(): List<String>
+
+    @Query("SELECT COUNT(*) FROM meals WHERE image_ref = :ref")
+    suspend fun countWithImage(ref: String): Int
+
+    /** Image retention only: the photo is not part of the Health Connect record, so no sync change. */
+    @Query("UPDATE meals SET image_ref = NULL WHERE image_ref = :ref")
+    suspend fun clearImageRef(ref: String): Int
 }
 
 @Dao
