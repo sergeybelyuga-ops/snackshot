@@ -324,26 +324,26 @@ Avoid four equal statistic cards, donut charts that hide exact values, decorativ
 
 ### 3.3 Typography hierarchy
 
-The Android implementation uses Google Fonts through the Google Play services font provider. `GoogleSansFontFamily` is reserved for screen headings and large health metrics, while `GoogleSansTextFontFamily` is used for interface controls, body copy, metadata, and labels. The provider requires the Google Fonts provider authority, package, and certificate resource configured in `theme.kt`; screens must retain a readable fallback if the downloadable font is unavailable.
+The Android implementation **bundles Google Sans Flex** (decided in WBS 2.1, 26 November 2026) instead of loading it through the Google Play services font provider: it works offline, needs no Play services or certificate resource, and the first frame never switches fonts. The bundled files are static Medium (500) and Bold (700) instances at optical size 32, subset to Latin (the font has no Greek, Cyrillic, or Hebrew; those scripts fall back to the system font), about 110 KB each, under the SIL Open Font License (`android/ui/licenses/`). `GoogleSansFontFamily` is reserved for screen headings and large health metrics; text styles use the system font (Roboto) as `TextFontFamily`.
 
 Use the following `HealthTypography` Material 3 mapping from `docs/UX_UI/theme.kt`. Do not use display typography inside dense data surfaces. The negative tracking on `DisplayLarge` is an implementation-defined exception for large metric values; all other tracking values are explicit and must not be replaced with platform defaults.
 
 | Token | Font family | Size / line height | Weight | Letter spacing | Usage |
 |---|---|---:|---|---:|---|
-| DisplayLarge | Google Sans Flex | 57 / 64sp | Normal | -0.25sp | Primary dashboard metrics and large health totals. |
-| DisplaySmall | Google Sans Flex | 36 / 44sp | Normal | 0sp | Secondary metrics and prominent summary values. |
-| HeadlineLarge | Google Sans Flex | 32 / 40sp | Normal | 0sp | Main screen headings such as “Today”. |
-| TitleLarge | Google Sans Flex | 22 / 28sp | Normal | 0sp | Section and card headings. |
-| TitleMedium | Roboto | 16 / 24sp | Normal | 0.15sp | Menu items, meal names, and important subheadings. |
+| DisplayLarge | Google Sans Flex | 57 / 64sp | Bold | -0.25sp | Primary dashboard metrics and large health totals. |
+| DisplaySmall | Google Sans Flex | 36 / 44sp | Medium | 0sp | Secondary metrics and prominent summary values. |
+| HeadlineLarge | Google Sans Flex | 32 / 40sp | Medium | 0sp | Main screen headings such as “Today”. |
+| TitleLarge | Google Sans Flex | 22 / 28sp | Medium | 0sp | Section and card headings. |
+| TitleMedium | Roboto | 16 / 24sp | Medium | 0.15sp | Menu items, meal names, and important subheadings. |
 | BodyLarge | Roboto | 16 / 24sp | Normal | 0.5sp | Primary readable text, explanations, and insights. |
 | BodyMedium | Roboto | 14 / 20sp | Normal | 0.25sp | Supporting copy, feed metadata, and state messages. |
-| LabelLarge | Roboto | 14 / 20sp | Normal | 0.1sp | Buttons and segmented controls. |
+| LabelLarge | Roboto | 14 / 20sp | Medium | 0.1sp | Buttons and segmented controls. |
 | LabelSmall | Roboto | 11 / 16sp | Normal | 0.5sp | Chart captions, timestamps, and compact metadata. |
 
 #### Typography implementation rules
 
 - Load `Google Sans Flex` with `Medium` and `Bold` weights in `GoogleSansFontFamily`.
-- Load `Roboto` with `Normal` and `Medium` weights in `GoogleSansTextFontFamily`.
+- Text styles use the system font (Roboto) with `Normal` and `Medium` weights (`TextFontFamily`).
 - Use `sp` dimensions and preserve the listed line heights so dynamic font scaling remains predictable.
 - Use `HeadlineLarge` for the primary screen title; existing UX screen descriptions that refer to `HeadlineSmall` should use the nearest available implementation token unless a smaller title style is added to `HealthTypography`.
 - Keep `DisplayLarge` and `DisplaySmall` out of forms, feed rows, dialogs, and other dense surfaces.
