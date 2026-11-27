@@ -55,6 +55,9 @@ class FakeMealRepository(initial: List<MealEntry> = emptyList()) : MealRepositor
 
     override suspend fun getMeal(id: MealId): MealEntry? = meals.value.firstOrNull { it.id == id }
 
+    override suspend fun lastGramsFor(name: String): Double? =
+        meals.value.filter { it.name.equals(name.trim(), ignoreCase = true) && it.grams != null }.maxByOrNull { it.updatedAt }?.grams
+
     override suspend fun save(entry: MealEntry) {
         meals.value = meals.value.filterNot { it.id == entry.id } + entry
     }

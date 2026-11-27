@@ -32,6 +32,8 @@ class RoomMealRepository @Inject constructor(private val db: SnackshotDatabase, 
 
     override suspend fun getMeal(id: MealId): MealEntry? = meals.get(id.value)?.toDomain()
 
+    override suspend fun lastGramsFor(name: String): Double? = name.trim().takeIf { it.isNotEmpty() }?.let { meals.lastGrams(it) }
+
     override suspend fun save(entry: MealEntry) = db.withTransaction {
         meals.upsert(entry.toEntity())
         val state = sync.get(entry.id.value)?.toDomain()?.edited() ?: SyncState.newMeal(entry.id)

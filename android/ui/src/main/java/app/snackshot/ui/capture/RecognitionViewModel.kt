@@ -202,10 +202,12 @@ class RecognitionViewModel @Inject constructor(
             is RecognitionOutcome.Success -> {
                 val r = outcome.recognition
                 val local = meal.capturedAt.atZone(zone.get()).toLocalTime()
+                val portion = calibrator.portionFor(r)
+                latency("portion: ${portion.source}")
                 val draft = MealDraft.fromRecognition(
                     source = source,
                     recognition = r,
-                    portion = calibrator.portionFor(r),
+                    portion = portion,
                     eatenAt = meal.capturedAt,
                     zoneOffset = meal.zoneOffset,
                     mealType = MealType.suggestFor(local),
@@ -238,7 +240,7 @@ class RecognitionViewModel @Inject constructor(
 
     /**
      * Latency for the I-4 measurement on a physical device (`adb logcat -s Snackshot`): durations and
-     * outcome only, never the photo, the food or a token. Plain JVM tests have no Log.
+     * outcome and where the portion came from, never the photo, the food or a token. Plain JVM tests have no Log.
      */
     private fun latency(message: String) {
         runCatching { Log.i(TAG, message) }

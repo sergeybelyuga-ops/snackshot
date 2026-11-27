@@ -2,6 +2,7 @@ package app.snackshot.domain.meal
 
 import java.time.Instant
 import java.time.ZoneOffset
+import kotlin.coroutines.cancellation.CancellationException
 
 /** Where the starting grams of a review come from (WBS 6.5). */
 enum class PortionSource {
@@ -39,6 +40,45 @@ fun interface PortionCalibrator {
                 ?: CalibratedPortion(DEFAULT_GRAMS, PortionSource.DEFAULT)
         }
     }
+}
+
+/**
+ * WBS 6.5, in this order:
+ * 1. the grams the user saved last time for the same food, since people tend to eat the same
+ *    portion again and the user has already corrected that one;
+ * 2. LogMeal's grams when the recognition is confident ([NutritionEstimate.HIGH_CONFIDENCE]);
+ * 3. the reference weight of a single food ([ReferencePortions]);
+ * 4. LogMeal's grams even when the recognition is uncertain;
+ * 5. [PortionCalibrator.DEFAULT_GRAMS].
+ *
+ * Grams outside the review's 1–5,000 g are skipped. History is only a hint, so a failed lookup
+ * falls through to the next source and never fails the recognition.
+ */
+class HistoryPortionCalibrator(
+    private val lastGrams: suspend (foodName: String) -> Double?,
+    private val referenceGrams: (foodName: String) -> Double? = ReferencePortions::gramsFor,
+) : PortionCalibrator {
+    constructor(meals: MealRepository) : this(meals::lastGramsFor)
+
+    override suspend fun portionFor(recognition: Recognition): CalibratedPortion {
+        val name = recognition.foodName
+        val history = try {
+            lastGrams(name)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (_: Exception) {
+            null
+        }
+        val provider = recognition.grams
+        return history.portion(PortionSource.LAST_LOGGED)
+            ?: provider.takeIf { recognition.confidence >= NutritionEstimate.HIGH_CONFIDENCE }.portion(PortionSource.PROVIDER)
+            ?: referenceGrams(name).portion(PortionSource.REFERENCE)
+            ?: provider.portion(PortionSource.PROVIDER)
+            ?: CalibratedPortion(PortionCalibrator.DEFAULT_GRAMS, PortionSource.DEFAULT)
+    }
+
+    private fun Double?.portion(source: PortionSource): CalibratedPortion? =
+        this?.takeIf { it.isFinite() && it in MealDraft.MIN_GRAMS..MealDraft.MAX_GRAMS }?.let { CalibratedPortion(it, source) }
 }
 
 /**

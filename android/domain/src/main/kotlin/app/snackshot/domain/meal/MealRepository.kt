@@ -13,6 +13,12 @@ interface MealRepository {
     suspend fun getMeal(id: MealId): MealEntry?
 
     /**
+     * The grams of the most recently saved meal named [name], ignoring case, or null when no meal
+     * with that name has grams. Portion calibration uses it (WBS 6.5).
+     */
+    suspend fun lastGramsFor(name: String): Double?
+
+    /**
      * Creates or replaces the meal and marks it for Health Connect upload in the same
      * transaction. Saving a deleted meal again (undo) brings it back with a newer version.
      */

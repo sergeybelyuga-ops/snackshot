@@ -18,6 +18,11 @@ interface MealDao {
     @Query("SELECT * FROM meals WHERE id = :id")
     suspend fun get(id: String): MealEntity?
 
+    // NOCASE folds ASCII only; LogMeal's names are English. The latest change wins, so a corrected
+    // older meal counts as the user's newest portion.
+    @Query("SELECT grams FROM meals WHERE name = :name COLLATE NOCASE AND grams IS NOT NULL ORDER BY updated_at DESC LIMIT 1")
+    suspend fun lastGrams(name: String): Double?
+
     @Upsert
     suspend fun upsert(meal: MealEntity)
 
