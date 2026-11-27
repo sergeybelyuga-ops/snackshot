@@ -83,10 +83,11 @@
     <!-- S-02 Home (docs/UX_UI/Prototype/s02_home.html) -->
     <string name="home_today">Today</string>
     <string name="home_yesterday">Yesterday</string>
-    <string name="home_of_kcal">of %1$s kcal</string>
-    <string name="home_macro_share">%1$s · %2$d%% · %3$d g</string>
-    <string name="home_macro_goal">%1$s · %2$d%% · %3$d / %4$d g</string>
-    <string name="home_macro_goal_over">%1$s · %2$d%% over · %3$d / %4$d g</string>
+    <string name="home_ring_title">Calories</string>
+    <string name="home_ring_of">%1$s of %2$s kcal</string>
+    <string name="home_ring_no_goal">kcal today</string>
+    <string name="home_ring_percent">%1$d%%</string>
+    <string name="home_macro_over">%1$s · over goal</string>
     <string name="home_kcal_amount">%1$s kcal</string>
     <string name="home_kcal_left">%1$s left of your daily goal</string>
     <string name="home_kcal_over">%1$s over your daily goal</string>
@@ -112,7 +113,7 @@
     <string name="home_entry_photo">Take a photo</string>
     <string name="home_entry_gallery">Gallery</string>
     <string name="home_entry_manual">Manual add</string>
-    <string name="home_entry_hint">Swipe up or down to change the action</string>
+    <string name="home_entry_hint">Hold and slide up or down to change the action</string>
     <string name="home_entry_switch_to">Switch to %1$s</string>
 
     <!-- AI access from Home until the camera and gallery arrive (WBS 6.1) -->
@@ -149,7 +150,7 @@
     <string name="quick_add_serving">Serving size</string>
     <string name="quick_add_optional">Optional</string>
     <string name="quick_add_error_number">Enter a number</string>
-    <string name="quick_add_error_negative">Can\t be negative</string>
+    <string name="quick_add_error_negative">Can\'t be negative</string>
     <string name="quick_add_error_energy_high">Up to 10,000 kcal</string>
     <string name="quick_add_error_grams_high">Up to 1,000 g</string>
     <string name="quick_add_error_name_long">Up to 80 characters</string>
@@ -184,15 +185,24 @@
     <string name="goals_increase_grams">Increase %1$s by 1 gram</string>
     <string name="goals_target">Target %1$s kcal · middle of your range</string>
     <string name="goals_shown_as">Shown as %1$d–%2$d g on your dashboard</string>
+    <string name="goals_band_g">%1$d–%2$d g</string>
+    <string name="goals_note_carbs">Carbs are your main source of steady energy during the day.</string>
+    <string name="goals_note_fat">Fat supports nutrient absorption and keeps you full for longer.</string>
+    <string name="goals_note_protein">Protein supports muscle recovery and keeps you feeling full.</string>
     <string name="goals_about">About this goal</string>
     <string name="goals_about_calories">Days between your minimum and maximum count as in range on your dashboard. The starting range is 2,300 kcal ±10%.</string>
     <string name="goals_about_macro">%1$d g of %2$s is about %3$s kcal.</string>
     <string name="goals_about_macro_share">%1$d g of %2$s is about %3$s kcal, or %4$d%% of your %5$s kcal target.</string>
     <string name="goals_advice">For personalized nutrition advice, it\'s always best to consult a doctor or registered dietitian.</string>
 
-    <!-- Placeholder tabs until their increments (I-2, I-5, I-9) -->
+    <!-- Placeholder tabs until their increments (I-2, I-5) -->
     <string name="dashboard_placeholder">Daily, weekly, monthly and yearly totals will appear here.</string>
     <string name="history_placeholder">Your logged meals will appear here.</string>
-    <string name="settings_placeholder">Health Connect, AI recognition and other settings will appear here.</string>
+    <!-- S-16 Settings hub (prototype s16_settings.html, view-settings) -->
+    <string name="settings_privacy_support">Where your data is stored and shared</string>
+    <string name="settings_storage_note">Your meals are stored on this device. Snackshot keeps no health data on its servers; only an anonymous AI-picture counter.</string>
+    <string name="settings_goal_carbs">C %1$d</string>
+    <string name="settings_goal_fat">F %1$d</string>
+    <string name="settings_goal_protein">P %1$d</string>
     <string name="settings_build">Build: %1$s</string>
 </resources>

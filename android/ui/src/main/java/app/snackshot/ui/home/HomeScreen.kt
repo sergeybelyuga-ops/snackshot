@@ -2,11 +2,8 @@ package app.snackshot.ui.home
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,12 +19,9 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,36 +36,20 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size as GeometrySize
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
@@ -79,8 +57,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.snackshot.domain.meal.MealId
 import app.snackshot.domain.meal.MealSource
 import app.snackshot.domain.meal.MealType
-import app.snackshot.domain.nutrition.NutritionGoals
-import app.snackshot.domain.nutrition.NutritionTotals
 import app.snackshot.ui.R
 import app.snackshot.ui.state.ErrorState
 import app.snackshot.ui.state.SnackshotSnackbarHost
@@ -92,15 +68,7 @@ import app.snackshot.ui.theme.Spacing
 import java.text.NumberFormat
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
-import kotlin.math.abs
 import kotlin.math.roundToInt
-
-/** The three ways to log a meal, in carousel order (doc 10 §4.4). */
-enum class EntryAction(@StringRes val label: Int, @DrawableRes val icon: Int) {
-    TAKE_PHOTO(R.string.home_entry_photo, R.drawable.ic_photo_camera),
-    GALLERY(R.string.home_entry_gallery, R.drawable.ic_photo_library),
-    MANUAL_ADD(R.string.home_entry_manual, R.drawable.ic_edit_note),
-}
 
 /** S-02 Home: today's totals, Recent meals and the meal-entry carousel (doc 10 §4.4, WBS 5.1). */
 @Composable
@@ -257,207 +225,6 @@ private fun SyncStatus(modifier: Modifier = Modifier) {
     }
 }
 
-// ---------------------------------------------------------------- Daily summary
-
-@Composable
-private fun DailySummary(totals: NutritionTotals, goals: NutritionGoals, onClick: () -> Unit) {
-    val kcal = totals.energyKcal.roundToInt()
-    val target = goals.calories?.targetKcal
-    val macros = listOf(
-        MacroLine(R.string.macro_carbs, totals.carbsGrams, goals.carbsGrams, SnackshotTheme.colors.macroCarbs),
-        MacroLine(R.string.macro_fat, totals.fatGrams, goals.fatGrams, SnackshotTheme.colors.macroFat),
-        MacroLine(R.string.macro_protein, totals.proteinGrams, goals.proteinGrams, SnackshotTheme.colors.macroProtein),
-    )
-    val description = summaryDescription(kcal, target, macros)
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(MaterialTheme.shapes.large)
-            .clickable(onClickLabel = stringResource(R.string.home_open_dashboard), onClick = onClick)
-            .clearAndSetSemantics {
-                contentDescription = description
-                role = Role.Button
-            }
-            .padding(vertical = Spacing.medium),
-        verticalArrangement = Arrangement.spacedBy(Spacing.medium),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.content)) {
-            CalorieRing(kcal, target)
-            val sum = totals.carbsGrams + totals.fatGrams + totals.proteinGrams
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.medium)) {
-                macros.forEach { MacroRow(it, sum) }
-            }
-        }
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(caption(kcal, target), style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-            Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-    }
-}
-
-private data class MacroLine(@StringRes val name: Int, val grams: Double, val goal: Int?, val color: Color)
-
-@Composable
-private fun CalorieRing(kcal: Int, target: Int?) {
-    val track = MaterialTheme.colorScheme.surfaceContainerHigh
-    val value = MaterialTheme.colorScheme.primary
-    Box(Modifier.size(RING), contentAlignment = Alignment.Center) {
-        Canvas(Modifier.fillMaxSize()) {
-            val stroke = 12.dp.toPx()
-            val inset = stroke / 2
-            val arcSize = GeometrySize(size.width - stroke, size.height - stroke)
-            drawArc(track, 0f, 360f, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(stroke))
-            if (target != null && kcal > 0) {
-                val sweep = 360f * (kcal.toFloat() / target).coerceIn(0f, 1f)
-                // Starts at 6 o'clock and runs clockwise, as in the prototype.
-                drawArc(
-                    value,
-                    90f,
-                    sweep,
-                    useCenter = false,
-                    topLeft = Offset(inset, inset),
-                    size = arcSize,
-                    style = Stroke(stroke, cap = StrokeCap.Round),
-                )
-            }
-        }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                stringResource(R.string.home_today),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(formatInt(kcal), style = MaterialTheme.typography.headlineMedium)
-            Text(
-                if (target != null) stringResource(R.string.home_of_kcal, formatInt(target)) else stringResource(R.string.unit_kcal),
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-    }
-}
-
-@Composable
-private fun MacroRow(line: MacroLine, sumGrams: Double) {
-    val grams = line.grams.roundToInt()
-    val name = stringResource(line.name)
-    val (label, fraction, over) = if (line.goal != null && line.goal > 0) {
-        val pct = (line.grams / line.goal * 100).roundToInt()
-        val over = line.grams > line.goal
-        Triple(
-            stringResource(if (over) R.string.home_macro_goal_over else R.string.home_macro_goal, name, pct, grams, line.goal),
-            (
-                line.grams /
-                    line.goal
-                ).toFloat(),
-            over,
-        )
-    } else {
-        val share = if (sumGrams > 0) (line.grams / sumGrams * 100).roundToInt() else 0
-        Triple(
-            stringResource(R.string.home_macro_share, name, share, grams),
-            if (sumGrams >
-                0
-            ) {
-                (line.grams / sumGrams).toFloat()
-            } else {
-                0f
-            },
-            false,
-        )
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.grid)) {
-        Text(
-            label,
-            style = MaterialTheme.typography.labelLarge,
-            color = if (over) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface,
-        )
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(14.dp)
-                .clip(RoundedCornerShape(7.dp))
-                .background(SnackshotTheme.colors.macroTrack),
-        ) {
-            if (grams > 0) {
-                Box(
-                    Modifier
-                        .fillMaxWidth(fraction.coerceIn(0.08f, 1f))
-                        .height(14.dp)
-                        .clip(RoundedCornerShape(7.dp))
-                        .background(line.color),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun caption(kcal: Int, target: Int?) = buildAnnotatedString {
-    if (target == null) {
-        append(stringResource(R.string.home_no_goal))
-        return@buildAnnotatedString
-    }
-    val left = target - kcal
-    val amount = stringResource(R.string.home_kcal_amount, formatInt(abs(left)))
-    val template = stringResource(if (left >= 0) R.string.home_kcal_left else R.string.home_kcal_over, amount)
-    val start = template.indexOf(amount)
-    append(template)
-    if (start >= 0) addStyle(SpanStyle(fontWeight = FontWeight.SemiBold), start, start + amount.length)
-}
-
-@Composable
-private fun summaryDescription(kcal: Int, target: Int?, macros: List<MacroLine>): String {
-    val parts = macros.map { m ->
-        val name = stringResource(m.name)
-        if (m.goal != null) {
-            stringResource(R.string.home_a11y_macro_goal, name, m.grams.roundToInt(), m.goal)
-        } else {
-            stringResource(R.string.home_a11y_macro, name, m.grams.roundToInt())
-        }
-    }.joinToString(", ")
-    return if (target != null) {
-        stringResource(
-            R.string.home_a11y_summary_goal,
-            formatInt(kcal),
-            formatInt(target),
-            formatInt((target - kcal).coerceAtLeast(0)),
-            parts,
-        )
-    } else {
-        stringResource(R.string.home_a11y_summary, formatInt(kcal), parts)
-    }
-}
-
-@Composable
-private fun SummarySkeleton() {
-    val label = stringResource(R.string.state_loading)
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.medium)
-            .semantics { contentDescription = label },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Spacing.content),
-    ) {
-        Box(Modifier.size(RING).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh))
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.medium)) {
-            repeat(3) {
-                Box(
-                    Modifier.fillMaxWidth(
-                        0.7f,
-                    ).height(14.dp).clip(RoundedCornerShape(4.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                )
-                Box(
-                    Modifier.fillMaxWidth().height(
-                        14.dp,
-                    ).clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
-                )
-            }
-        }
-    }
-}
-
 // ---------------------------------------------------------------- Recent meals
 
 @Composable
@@ -600,105 +367,6 @@ private fun MealRowSkeleton() {
     )
 }
 
-// ---------------------------------------------------------------- Meal-entry carousel
-
-/**
- * The meal-entry carousel (doc 10 §4.4): a vertical, icon-only dock in the thumb zone. Only the
- * centered action is enabled; the previous one is shown above it and the next one below, smaller and
- * not interactive. Swipe up or down to rotate; TalkBack users get "previous" and "next" actions.
- */
-@Composable
-fun EntryDock(enabled: Boolean, busy: Boolean, onAction: (EntryAction) -> Unit, modifier: Modifier = Modifier) {
-    val actions = EntryAction.entries
-    var index by rememberSaveable { mutableIntStateOf(0) }
-    val current = actions[index]
-    val previous = actions[(index - 1 + actions.size) % actions.size]
-    val next = actions[(index + 1) % actions.size]
-    val threshold = with(LocalDensity.current) { 24.dp.toPx() }
-    var drag by remember { mutableFloatStateOf(0f) }
-
-    val label = stringResource(current.label)
-    val toPrevious = stringResource(R.string.home_entry_switch_to, stringResource(previous.label))
-    val toNext = stringResource(R.string.home_entry_switch_to, stringResource(next.label))
-    val hint = stringResource(R.string.home_entry_hint)
-
-    Column(
-        modifier = modifier
-            .width(DOCK_WIDTH)
-            .height(DOCK_HEIGHT)
-            .pointerInput(Unit) {
-                detectVerticalDragGestures(
-                    onDragStart = { drag = 0f },
-                    onVerticalDrag = { change, amount ->
-                        change.consume()
-                        drag += amount
-                        if (abs(drag) > threshold) {
-                            // Dragging up brings the next action to the center.
-                            index = if (drag < 0) (index + 1) % actions.size else (index - 1 + actions.size) % actions.size
-                            drag = 0f
-                        }
-                    },
-                )
-            },
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.SpaceBetween,
-    ) {
-        EntryPreview(previous)
-        Surface(
-            onClick = { onAction(current) },
-            enabled = enabled && !busy,
-            shape = RoundedCornerShape(18.dp),
-            color = MaterialTheme.colorScheme.primary,
-            contentColor = MaterialTheme.colorScheme.onPrimary,
-            shadowElevation = 6.dp,
-            modifier = Modifier
-                .size(60.dp)
-                .semantics {
-                    contentDescription = "$label. $hint"
-                    customActions = listOf(
-                        CustomAccessibilityAction(toPrevious) {
-                            index = (index - 1 + actions.size) % actions.size
-                            true
-                        },
-                        CustomAccessibilityAction(toNext) {
-                            index = (index + 1) % actions.size
-                            true
-                        },
-                    )
-                },
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (busy) {
-                    CircularProgressIndicator(Modifier.size(28.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 3.dp)
-                } else {
-                    Icon(painterResource(current.icon), contentDescription = null, modifier = Modifier.size(28.dp))
-                }
-            }
-        }
-        EntryPreview(next)
-    }
-}
-
-@Composable
-private fun EntryPreview(action: EntryAction) {
-    Box(
-        Modifier
-            .size(40.dp)
-            .alpha(0.6f)
-            .clip(RoundedCornerShape(12.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
-            .clearAndSetSemantics { },
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            painterResource(action.icon),
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(22.dp),
-        )
-    }
-}
-
 // ---------------------------------------------------------------- Shared helpers
 
 @StringRes
@@ -717,7 +385,3 @@ private fun sourceIcon(source: MealSource): Int = when (source) {
 }
 
 internal fun formatInt(value: Int): String = NumberFormat.getIntegerInstance().format(value)
-
-private val RING = 136.dp
-private val DOCK_WIDTH = 64.dp
-private val DOCK_HEIGHT = 168.dp
