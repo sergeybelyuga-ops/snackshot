@@ -1,6 +1,7 @@
 package app.snackshot.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
@@ -9,7 +10,10 @@ import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performCustomAccessibilityActionWithLabel
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performTextInput
+import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
@@ -19,6 +23,8 @@ import app.snackshot.ui.FakeMealRepository
 import app.snackshot.ui.MutableClock
 import app.snackshot.ui.TEST_ZONE
 import app.snackshot.ui.home.HomeViewModel
+import app.snackshot.ui.meal.MealSaver
+import app.snackshot.ui.quickadd.QuickAddViewModel
 import app.snackshot.ui.theme.SnackshotTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -26,9 +32,12 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
 /** Global navigation for I-0: S-01 → S-02, tabs, S-01A (doc 10 §2.2, WBS §7.5 I-0). */
+@OptIn(ExperimentalTestApi::class)
 @RunWith(RobolectricTestRunner::class)
+@Config(qualifiers = "w411dp-h891dp")
 class NavigationTest {
     @get:Rule val compose = createComposeRule()
 
@@ -44,16 +53,22 @@ class NavigationTest {
                     onWelcomeCompleted = { completed++ },
                     environmentName = "local",
                     navController = nav,
-                    viewModels = FakeViewModels,
+                    viewModels = fakeViewModels,
                 )
             }
         }
     }
 
-    private object FakeViewModels : ScreenViewModels {
+    private val meals = FakeMealRepository()
+    private val clock = MutableClock()
+
+    private val fakeViewModels = object : ScreenViewModels {
         @Composable
-        override fun home(): HomeViewModel = viewModel {
-            HomeViewModel(FakeMealRepository(), FakeGoals(), FakeAccess(), MutableClock()) { TEST_ZONE }
+        override fun home(): HomeViewModel = viewModel { HomeViewModel(meals, FakeGoals(), FakeAccess(), clock) { TEST_ZONE } }
+
+        @Composable
+        override fun quickAdd(): QuickAddViewModel = viewModel {
+            QuickAddViewModel(createSavedStateHandle(), MealSaver(meals, clock), clock) { TEST_ZONE }
         }
     }
 
@@ -109,5 +124,40 @@ class NavigationTest {
         compose.onNodeWithText("Dashboard").assertDoesNotExist()
         compose.onNodeWithText("Got it").performScrollTo().performClick()
         tab("Settings").assertIsSelected()
+    }
+
+    @Test
+    fun `Manual add opens Quick add, and a saved meal shows on Home`() {
+        launch(welcomeCompleted = true)
+        compose.onNodeWithContentDescription(
+            "Take a photo",
+            substring = true,
+        ).performCustomAccessibilityActionWithLabel("Switch to Manual add")
+        compose.onNodeWithContentDescription("Manual add", substring = true).performClick()
+        compose.onNodeWithText("Log calories and macros you already know. No photo or search needed.").assertIsDisplayed()
+        compose.onNodeWithText("Dashboard").assertDoesNotExist()
+
+        compose.onNodeWithText("Name").performTextInput("Protein bar")
+        compose.onNodeWithText("Calories").performTextInput("210")
+        compose.onNodeWithText("Save").performClick()
+
+        compose.onNodeWithText("Recent meals").assertIsDisplayed()
+        compose.onNodeWithContentDescription("Protein bar, Lunch at", substring = true).assertIsDisplayed()
+        assertEquals(1, meals.meals.value.size)
+        assertNull("Back from Home leaves the app", nav.previousBackStackEntry)
+    }
+
+    @Test
+    fun `Back from Quick add returns Home without saving`() {
+        launch(welcomeCompleted = true)
+        compose.onNodeWithContentDescription(
+            "Take a photo",
+            substring = true,
+        ).performCustomAccessibilityActionWithLabel("Switch to Manual add")
+        compose.onNodeWithContentDescription("Manual add", substring = true).performClick()
+        compose.onNodeWithText("Calories").performTextInput("210")
+        compose.onNodeWithText("Cancel").performClick()
+        compose.onNodeWithText("Recent meals").assertIsDisplayed()
+        assertEquals(0, meals.meals.value.size)
     }
 }

@@ -50,16 +50,6 @@ fun SettingsScreen(environmentName: String, onPrivacyDetails: () -> Unit, modifi
         )
     }
 
-/** Until WBS 5.2. */
-@Composable
-fun QuickAddPlaceholderScreen(onBack: () -> Unit, modifier: Modifier = Modifier) =
-    TabScreen(stringResource(R.string.quick_add_title), modifier) {
-        PlaceholderText(stringResource(R.string.settings_placeholder))
-        OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = Size.minTouchTarget)) {
-            Text(stringResource(R.string.action_back))
-        }
-    }
-
 /** A tab screen above the NavigationBar, which handles the bottom inset itself. */
 @Composable
 private fun TabScreen(title: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {

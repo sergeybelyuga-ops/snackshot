@@ -27,9 +27,9 @@ import app.snackshot.domain.meal.MealId
 import app.snackshot.ui.R
 import app.snackshot.ui.home.HomeRoute
 import app.snackshot.ui.privacy.PrivacyDetailsScreen
+import app.snackshot.ui.quickadd.QuickAddRoute as QuickAddScreenRoute
 import app.snackshot.ui.tabs.DashboardScreen
 import app.snackshot.ui.tabs.HistoryScreen
-import app.snackshot.ui.tabs.QuickAddPlaceholderScreen
 import app.snackshot.ui.tabs.SettingsScreen
 import app.snackshot.ui.welcome.WelcomeScreen
 import kotlin.reflect.KClass
@@ -99,7 +99,17 @@ fun SnackshotNavHost(
                     onOpenHistory = { navController.navigateToTab(Tab.HISTORY) },
                 )
             }
-            composable<QuickAddRoute> { QuickAddPlaceholderScreen(onBack = { navController.popBackStack() }) }
+            composable<QuickAddRoute> {
+                QuickAddScreenRoute(
+                    viewModel = viewModels.quickAdd(),
+                    onSaved = { id ->
+                        // Back to Home, which highlights the new meal (doc 10 §4.4).
+                        navController.getBackStackEntry<HomeRoute>().savedStateHandle[SAVED_MEAL_ID] = id.value
+                        navController.popBackStack<HomeRoute>(inclusive = false)
+                    },
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable<DashboardRoute> { DashboardScreen() }
             composable<HistoryRoute> { HistoryScreen() }
             composable<SettingsRoute> {
