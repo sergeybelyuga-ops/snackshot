@@ -23,13 +23,8 @@ import app.snackshot.ui.R
 import app.snackshot.ui.theme.Size
 import app.snackshot.ui.theme.Spacing
 
-// Tab screens. Home, Dashboard, History and Settings are placeholders until their
-// increments (I-1/I-2, I-5, I-2, I-9); the I-0 Definition of Done allows that.
-
-@Composable
-fun HomeScreen(modifier: Modifier = Modifier) = TabScreen(stringResource(R.string.home_title), modifier) {
-    PlaceholderText(stringResource(R.string.home_placeholder))
-}
+// Tab screens. Dashboard, History and Settings are placeholders until their increments
+// (I-5, I-2, I-9); Home is home/HomeScreen.kt.
 
 @Composable
 fun DashboardScreen(modifier: Modifier = Modifier) = TabScreen(stringResource(R.string.nav_dashboard), modifier) {
@@ -53,6 +48,16 @@ fun SettingsScreen(environmentName: String, onPrivacyDetails: () -> Unit, modifi
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+
+/** Until WBS 5.2. */
+@Composable
+fun QuickAddPlaceholderScreen(onBack: () -> Unit, modifier: Modifier = Modifier) =
+    TabScreen(stringResource(R.string.quick_add_title), modifier) {
+        PlaceholderText(stringResource(R.string.settings_placeholder))
+        OutlinedButton(onClick = onBack, modifier = Modifier.heightIn(min = Size.minTouchTarget)) {
+            Text(stringResource(R.string.action_back))
+        }
     }
 
 /** A tab screen above the NavigationBar, which handles the bottom inset itself. */

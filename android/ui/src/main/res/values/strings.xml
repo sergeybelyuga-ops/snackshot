@@ -65,9 +65,73 @@
     <string name="privacy_footer">Bundled with the app · Version 1.2 · Updated Nov 26, 2026</string>
     <string name="privacy_done">Got it</string>
 
-    <!-- Placeholder tabs until their increments (I-1, I-2, I-5, I-9) -->
-    <string name="home_title">Today</string>
-    <string name="home_placeholder">Meal logging arrives in the next increment: take a photo, pick from the gallery, or use Quick add.</string>
+    <!-- Shared units and labels -->
+    <string name="unit_kcal">kcal</string>
+    <string name="unit_g">g</string>
+    <string name="value_unknown">–</string>
+    <string name="macro_carbs">Carbs</string>
+    <string name="macro_fat">Fat</string>
+    <string name="macro_protein">Protein</string>
+    <string name="meal_type_breakfast">Breakfast</string>
+    <string name="meal_type_lunch">Lunch</string>
+    <string name="meal_type_dinner">Dinner</string>
+    <string name="meal_type_snack">Snack</string>
+
+    <!-- S-02 Home (docs/UX_UI/Prototype/s02_home.html) -->
+    <string name="home_today">Today</string>
+    <string name="home_yesterday">Yesterday</string>
+    <string name="home_of_kcal">of %1$s kcal</string>
+    <string name="home_macro_share">%1$s · %2$d%% · %3$d g</string>
+    <string name="home_macro_goal">%1$s · %2$d%% · %3$d / %4$d g</string>
+    <string name="home_macro_goal_over">%1$s · %2$d%% over · %3$d / %4$d g</string>
+    <string name="home_kcal_amount">%1$s kcal</string>
+    <string name="home_kcal_left">%1$s left of your daily goal</string>
+    <string name="home_kcal_over">%1$s over your daily goal</string>
+    <string name="home_no_goal">No daily goal set</string>
+    <string name="home_open_dashboard">Open daily dashboard</string>
+    <string name="home_a11y_summary">Today: %1$s kcal, no daily goal. %2$s.</string>
+    <string name="home_a11y_summary_goal">Today: %1$s of %2$s kcal, %3$s left. %4$s.</string>
+    <string name="home_a11y_macro">%1$s %2$d grams</string>
+    <string name="home_a11y_macro_goal">%1$s %2$d of %3$d grams</string>
+    <string name="home_recent_meals">Recent meals</string>
+    <string name="home_see_all">See all</string>
+    <string name="home_empty_title">No meals yet</string>
+    <string name="home_empty_body">Log your first meal with the button below: take a photo, pick one from your gallery, or add it by hand.</string>
+    <string name="home_meal_meta">%1$s · %2$s</string>
+    <string name="home_meal_kcal">%1$s kcal</string>
+    <string name="home_a11y_meal">%1$s, %2$s at %3$s, %4$d kilocalories, protein %5$d grams, carbs %6$d grams, fat %7$d grams</string>
+    <string name="home_sync_local">On device</string>
+    <string name="home_error">Couldn\'t load your meals</string>
+    <string name="home_error_detail">Your meals are still on this phone. Try again, or add a meal with Quick add.</string>
+    <string name="home_meal_saved">Meal saved on this device</string>
+
+    <!-- Meal-entry carousel -->
+    <string name="home_entry_photo">Take a photo</string>
+    <string name="home_entry_gallery">Gallery</string>
+    <string name="home_entry_manual">Manual add</string>
+    <string name="home_entry_hint">Swipe up or down to change the action</string>
+    <string name="home_entry_switch_to">Switch to %1$s</string>
+
+    <!-- AI access from Home until the camera and gallery arrive (WBS 6.1) -->
+    <plurals name="home_ai_ready">
+        <item quantity="one">AI access is ready, %d free picture left.</item>
+        <item quantity="other">AI access is ready, %d free pictures left.</item>
+    </plurals>
+    <string name="home_ai_camera_soon">%1$s The camera arrives in the next update.</string>
+    <string name="home_ai_gallery_soon">%1$s Picking from the gallery arrives in the next update.</string>
+    <string name="home_ai_trial_ended">You\'ve used your 90 free AI pictures. Quick add is always free.</string>
+    <string name="home_ai_waitlisted">AI recognition is in a closed pilot and all places are taken. You\'re on the waitlist; meanwhile, use Quick add.</string>
+    <string name="home_ai_paused">AI recognition is paused right now. Quick add keeps working.</string>
+    <string name="home_ai_unavailable">AI recognition isn\'t available on this device right now. Quick add keeps working.</string>
+    <string name="home_ai_offline">Couldn\'t check AI access. Check your connection and try again.</string>
+    <string name="home_ai_busy">AI access is being updated. Try again in a moment.</string>
+    <string name="home_ai_error">Couldn\'t check AI access. Try again later, or use Quick add.</string>
+
+    <!-- S-09 Quick add -->
+    <string name="quick_add_title">Quick add</string>
+    <string name="quick_add_default_name">Quick add</string>
+
+    <!-- Placeholder tabs until their increments (I-2, I-5, I-9) -->
     <string name="dashboard_placeholder">Daily, weekly, monthly and yearly totals will appear here.</string>
     <string name="history_placeholder">Your logged meals will appear here.</string>
     <string name="settings_placeholder">Health Connect, goals, AI recognition and other settings will appear here.</string>

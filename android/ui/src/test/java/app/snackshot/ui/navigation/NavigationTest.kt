@@ -1,5 +1,6 @@
 package app.snackshot.ui.navigation
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasClickAction
@@ -9,8 +10,15 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import app.snackshot.ui.FakeAccess
+import app.snackshot.ui.FakeGoals
+import app.snackshot.ui.FakeMealRepository
+import app.snackshot.ui.MutableClock
+import app.snackshot.ui.TEST_ZONE
+import app.snackshot.ui.home.HomeViewModel
 import app.snackshot.ui.theme.SnackshotTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -36,8 +44,16 @@ class NavigationTest {
                     onWelcomeCompleted = { completed++ },
                     environmentName = "local",
                     navController = nav,
+                    viewModels = FakeViewModels,
                 )
             }
+        }
+    }
+
+    private object FakeViewModels : ScreenViewModels {
+        @Composable
+        override fun home(): HomeViewModel = viewModel {
+            HomeViewModel(FakeMealRepository(), FakeGoals(), FakeAccess(), MutableClock()) { TEST_ZONE }
         }
     }
 
@@ -54,7 +70,7 @@ class NavigationTest {
     fun `Continue opens Home and removes Welcome from the back stack`() {
         launch(welcomeCompleted = false)
         compose.onNodeWithText("Continue").performClick()
-        compose.onNodeWithText("Today").assertIsDisplayed()
+        compose.onNodeWithText("Recent meals").assertIsDisplayed()
         tab("Home").assertIsSelected()
         assertEquals(1, completed)
         assertNull("Back from Home must leave the app, not return to Welcome", nav.previousBackStackEntry)
@@ -74,14 +90,14 @@ class NavigationTest {
     @Test
     fun `returning user starts on Home and can switch tabs`() {
         launch(welcomeCompleted = true)
-        compose.onNodeWithText("Today").assertIsDisplayed()
+        compose.onNodeWithText("Recent meals").assertIsDisplayed()
         listOf("Dashboard", "History", "Settings").forEach { label ->
             tab(label).performClick()
             tab(label).assertIsSelected()
         }
         compose.onNodeWithText("Build: local").assertIsDisplayed()
         tab("Home").performClick()
-        compose.onNodeWithText("Today").assertIsDisplayed()
+        compose.onNodeWithText("Recent meals").assertIsDisplayed()
     }
 
     @Test
