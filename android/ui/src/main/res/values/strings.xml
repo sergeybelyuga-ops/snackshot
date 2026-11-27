@@ -102,7 +102,6 @@
     <string name="home_empty_title">No meals yet</string>
     <string name="home_empty_body">Log your first meal with the button below: take a photo, pick one from your gallery, or add it by hand.</string>
     <string name="home_meal_meta">%1$s · %2$s</string>
-    <string name="home_meal_kcal">%1$s kcal</string>
     <string name="home_a11y_meal">%1$s, %2$s at %3$s, %4$d kilocalories, protein %5$d grams, carbs %6$d grams, fat %7$d grams</string>
     <string name="home_sync_local">On device</string>
     <string name="home_error">Couldn\'t load your meals</string>

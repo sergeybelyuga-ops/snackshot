@@ -53,6 +53,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.snackshot.domain.meal.MealId
 import app.snackshot.domain.meal.MealSource
@@ -62,6 +63,7 @@ import app.snackshot.ui.state.ErrorState
 import app.snackshot.ui.state.SnackshotSnackbarHost
 import app.snackshot.ui.state.UiError
 import app.snackshot.ui.state.UiState
+import app.snackshot.ui.theme.GoogleSansFontFamily
 import app.snackshot.ui.theme.Size
 import app.snackshot.ui.theme.SnackshotTheme
 import app.snackshot.ui.theme.Spacing
@@ -325,7 +327,22 @@ private fun MealRow(meal: HomeMeal, highlighted: Boolean) {
             )
             MacroDots(carbs, fat, protein)
         }
-        Text(stringResource(R.string.home_meal_kcal, formatInt(kcal)), style = MaterialTheme.typography.titleSmall)
+        // Prototype `.meal-kcal`: an 18 sp display number with a small "kcal", top-right beside the name.
+        Text(
+            buildAnnotatedString {
+                append(formatInt(kcal))
+                withStyle(
+                    SpanStyle(
+                        fontFamily = MaterialTheme.typography.bodySmall.fontFamily,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    ),
+                ) { append(" " + stringResource(R.string.unit_kcal)) }
+            },
+            style = MaterialTheme.typography.titleMedium.copy(fontFamily = GoogleSansFontFamily, fontSize = 18.sp, lineHeight = 24.sp),
+            maxLines = 1,
+            modifier = Modifier.align(Alignment.Top),
+        )
     }
 }
 
@@ -333,21 +350,15 @@ private fun MealRow(meal: HomeMeal, highlighted: Boolean) {
 private fun MacroDots(carbs: Int?, fat: Int?, protein: Int?) {
     val colors = SnackshotTheme.colors
     val dash = stringResource(R.string.value_unknown)
+    val unit = stringResource(R.string.unit_g)
     Text(
         buildAnnotatedString {
-            listOf(
-                Triple(R.string.macro_carbs, carbs, colors.macroCarbs),
-                Triple(R.string.macro_fat, fat, colors.macroFat),
-                Triple(R.string.macro_protein, protein, colors.macroProtein),
-            ).forEachIndexed { i, (name, grams, color) ->
+            // The dot's color names the macro (carbs, fat, protein); the row's description says it in words.
+            listOf(carbs to colors.macroCarbs, fat to colors.macroFat, protein to colors.macroProtein).forEachIndexed { i, (grams, color) ->
                 if (i > 0) append("   ")
                 withStyle(SpanStyle(color = color)) { append("● ") }
-                append(stringResource(name))
-                append(" ")
-                append(grams?.toString() ?: dash)
+                append(if (grams == null) dash else "$grams $unit")
             }
-            append(" ")
-            append(stringResource(R.string.unit_g))
         },
         style = MaterialTheme.typography.labelMedium,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
