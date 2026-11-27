@@ -327,7 +327,7 @@ private fun MealRow(meal: HomeMeal, highlighted: Boolean) {
             )
             MacroDots(carbs, fat, protein)
         }
-        // Prototype `.meal-kcal`: an 18 sp display number with a small "kcal", top-right beside the name.
+        // Prototype `.meal-kcal`: an 18 sp display number with a small "kcal", centered vertically in the row.
         Text(
             buildAnnotatedString {
                 append(formatInt(kcal))
@@ -341,7 +341,6 @@ private fun MealRow(meal: HomeMeal, highlighted: Boolean) {
             },
             style = MaterialTheme.typography.titleMedium.copy(fontFamily = GoogleSansFontFamily, fontSize = 18.sp, lineHeight = 24.sp),
             maxLines = 1,
-            modifier = Modifier.align(Alignment.Top),
         )
     }
 }
