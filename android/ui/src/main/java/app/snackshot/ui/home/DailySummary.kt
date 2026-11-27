@@ -6,6 +6,10 @@ import android.graphics.RectF
 import android.graphics.Typeface
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +31,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -82,6 +87,10 @@ internal fun DailySummary(totals: NutritionTotals, goals: NutritionGoals, onClic
         MacroLine(R.string.macro_protein, R.drawable.ic_egg_alt, totals.proteinGrams, goals.proteinGrams, colors.macroProtein),
     )
     val description = summaryDescription(kcal, target, macros)
+    // Each time Home opens, the ring and the pills fill from 0 to today's values.
+    val reveal = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { reveal.animateTo(1f, tween(REVEAL_MS, easing = LinearEasing)) }
+    val p = reveal.value
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -95,10 +104,10 @@ internal fun DailySummary(totals: NutritionTotals, goals: NutritionGoals, onClic
         verticalArrangement = Arrangement.spacedBy(Spacing.medium),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.medium)) {
-            CalorieRing(kcal, target, Modifier.weight(1f))
+            CalorieRing(kcal, target, progress = stage(p, 0f, RING_SHARE), modifier = Modifier.weight(1f))
             val sum = totals.carbsGrams + totals.fatGrams + totals.proteinGrams
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(PILL_GAP)) {
-                macros.forEach { MacroPill(it, sum) }
+                macros.forEachIndexed { i, line -> MacroPill(line, sum, progress = stage(p, PILL_START + i * PILL_STAGGER, PILL_SHARE)) }
             }
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = Spacing.grid)) {
@@ -107,6 +116,9 @@ internal fun DailySummary(totals: NutritionTotals, goals: NutritionGoals, onClic
         }
     }
 }
+
+/** The eased progress of a part that runs from [start] for [length] of the whole reveal. */
+private fun stage(p: Float, start: Float, length: Float) = FastOutSlowInEasing.transform(((p - start) / length).coerceIn(0f, 1f))
 
 internal data class MacroLine(@StringRes val name: Int, @DrawableRes val icon: Int, val grams: Double, val goal: Int?, val color: Color)
 
@@ -117,7 +129,8 @@ internal data class MacroLine(@StringRes val name: Int, @DrawableRes val icon: I
  * the share of the target in the middle and "750 of 2,300 kcal" curved along the bottom.
  */
 @Composable
-private fun CalorieRing(kcal: Int, target: Int?, modifier: Modifier = Modifier) {
+private fun CalorieRing(kcal: Int, target: Int?, progress: Float, modifier: Modifier = Modifier) {
+    val shown = (kcal * progress).roundToInt()
     val track = MaterialTheme.colorScheme.surfaceContainerHigh
     val value = MaterialTheme.colorScheme.primary
     val titleColor = MaterialTheme.colorScheme.onSurface
@@ -137,8 +150,8 @@ private fun CalorieRing(kcal: Int, target: Int?, modifier: Modifier = Modifier) 
             val inset = stroke / 2
             val arcSize = GeometrySize(size.width - stroke, size.height - stroke)
             drawArc(track, 0f, 360f, useCenter = false, topLeft = Offset(inset, inset), size = arcSize, style = Stroke(stroke))
-            if (target != null && kcal > 0) {
-                val sweep = 360f * (kcal.toFloat() / target).coerceIn(0f, 1f)
+            if (target != null && kcal > 0 && progress > 0f) {
+                val sweep = 360f * (kcal.toFloat() / target).coerceIn(0f, 1f) * progress
                 drawArc(
                     value,
                     90f,
@@ -156,7 +169,7 @@ private fun CalorieRing(kcal: Int, target: Int?, modifier: Modifier = Modifier) 
             curvedText(bottom, inner - gap - textPx * 0.2f, top = false, textPx, value, typeface)
         }
         Text(
-            if (target != null) stringResource(R.string.home_ring_percent, (kcal * 100.0 / target).roundToInt()) else formatInt(kcal),
+            if (target != null) stringResource(R.string.home_ring_percent, (shown * 100.0 / target).roundToInt()) else formatInt(shown),
             style = MaterialTheme.typography.displaySmall.copy(fontFamily = GoogleSansFontFamily, fontWeight = FontWeight.Medium),
             maxLines = 1,
         )
@@ -190,15 +203,16 @@ private fun DrawScope.curvedText(text: String, radius: Float, top: Boolean, text
  * to the goal, or the macro's share of today's grams when no goal is set.
  */
 @Composable
-private fun MacroPill(line: MacroLine, sumGrams: Double) {
-    val grams = line.grams.roundToInt()
+private fun MacroPill(line: MacroLine, sumGrams: Double, progress: Float) {
+    val grams = (line.grams * progress).roundToInt()
     val goal = line.goal?.takeIf { it > 0 }
     val fraction = when {
         goal != null -> (line.grams / goal).toFloat()
         sumGrams > 0 -> (line.grams / sumGrams).toFloat()
         else -> 0f
-    }.coerceIn(0f, 1f)
-    val over = goal != null && line.grams > goal
+    }.coerceIn(0f, 1f) * progress
+    // Turns on as the count passes the goal.
+    val over = goal != null && line.grams * progress > goal
 
     val scheme = MaterialTheme.colorScheme
     val dark = scheme.surface.luminance() < 0.5f
@@ -313,6 +327,13 @@ internal fun SummarySkeleton() {
         }
     }
 }
+
+/** The reveal: the ring over its first 80%, the pills one after another, each over 60%. */
+private const val REVEAL_MS = 1100
+private const val RING_SHARE = 0.8f
+private const val PILL_START = 0.15f
+private const val PILL_STAGGER = 0.1f
+private const val PILL_SHARE = 0.6f
 
 private val RING = 176.dp
 private val RING_STROKE = 26.dp
