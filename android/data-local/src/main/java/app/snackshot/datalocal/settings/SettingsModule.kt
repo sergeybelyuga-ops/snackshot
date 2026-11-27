@@ -8,6 +8,7 @@ import androidx.datastore.preferences.preferencesDataStoreFile
 import app.snackshot.datalocal.secure.AesGcmCipher
 import app.snackshot.datalocal.secure.DataStoreLogMealTokenStore
 import app.snackshot.datalocal.secure.KeystoreKeys
+import app.snackshot.domain.access.AiAccessCache
 import app.snackshot.domain.access.LogMealTokenStore
 import app.snackshot.domain.onboarding.OnboardingRepository
 import app.snackshot.domain.settings.SettingsRepository
@@ -42,6 +43,9 @@ abstract class SettingsModule {
 
     @Binds
     abstract fun logMealTokenStore(impl: DataStoreLogMealTokenStore): LogMealTokenStore
+
+    @Binds
+    abstract fun aiAccessCache(impl: DataStoreAiAccessCache): AiAccessCache
 
     companion object {
         // Both files live in app-private storage and are excluded from backup (data_extraction_rules.xml).
