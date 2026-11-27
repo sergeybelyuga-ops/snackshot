@@ -8,9 +8,12 @@ import app.snackshot.domain.access.PictureAllowance
 import app.snackshot.domain.meal.MealEdit
 import app.snackshot.domain.meal.MealEntry
 import app.snackshot.domain.meal.MealId
+import app.snackshot.domain.meal.MealImageStore
 import app.snackshot.domain.meal.MealRepository
 import app.snackshot.domain.meal.MealSource
 import app.snackshot.domain.meal.MealType
+import app.snackshot.domain.meal.PendingMeal
+import app.snackshot.domain.meal.PendingMealStore
 import app.snackshot.domain.nutrition.GoalsRepository
 import app.snackshot.domain.nutrition.NutritionGoals
 import app.snackshot.domain.nutrition.NutritionValues
@@ -52,6 +55,9 @@ class FakeMealRepository(initial: List<MealEntry> = emptyList()) : MealRepositor
 
     override suspend fun getMeal(id: MealId): MealEntry? = meals.value.firstOrNull { it.id == id }
 
+    override suspend fun lastGramsFor(name: String): Double? =
+        meals.value.filter { it.name.equals(name.trim(), ignoreCase = true) && it.grams != null }.maxByOrNull { it.updatedAt }?.grams
+
     override suspend fun save(entry: MealEntry) {
         meals.value = meals.value.filterNot { it.id == entry.id } + entry
     }
@@ -92,7 +98,12 @@ class FakeAccess : AiAccessRepository {
         return null
     }
 
-    override suspend fun reportPicture(requestId: String): AccessCheck = next
+    val reported = mutableListOf<String>()
+
+    override suspend fun reportPicture(requestId: String): AccessCheck {
+        reported += requestId
+        return next
+    }
 
     override suspend fun updateProfile(language: String, country: String) = true
 
@@ -136,3 +147,47 @@ fun photoMeal(id: String, eatenAt: Instant, kcal: Double) = quickAddMeal(id, eat
     confidence = 0.9,
     edit = MealEdit.NONE,
 )
+
+/** The pending meal flow in memory; [discarded] and [completed] count the endings. */
+class FakePendingMeals(initial: PendingMeal? = null) : PendingMealStore {
+    val state = MutableStateFlow(initial)
+    var completed = 0
+    var discarded = 0
+
+    override val pending: Flow<PendingMeal?> = state
+
+    override suspend fun save(meal: PendingMeal) {
+        state.value = meal
+    }
+
+    override suspend fun complete() {
+        completed++
+        state.value = null
+    }
+
+    override suspend fun discard() {
+        discarded++
+        state.value = null
+    }
+}
+
+/** Processed photos in a temporary folder. */
+class FakeImages(private val dir: java.io.File) : MealImageStore {
+    override suspend fun newCaptureFile(): java.io.File = java.io.File.createTempFile("capture", ".jpg", dir)
+
+    override suspend fun deleteCapture(file: java.io.File) {
+        file.delete()
+    }
+
+    override suspend fun saveProcessed(jpeg: ByteArray): String {
+        val name = "meal-images/${java.util.UUID.randomUUID()}.jpg"
+        java.io.File(dir, name).apply { parentFile?.mkdirs() }.writeBytes(jpeg)
+        return name
+    }
+
+    override fun fileFor(ref: String): java.io.File? = java.io.File(dir, ref).takeIf { it.isFile }
+
+    override suspend fun delete(ref: String) {
+        java.io.File(dir, ref).delete()
+    }
+}

@@ -66,9 +66,6 @@ data class HomeContent(
 sealed interface HomeMessage {
     data class MealSaved(val id: MealId) : HomeMessage
 
-    /** AI access works; the camera and gallery arrive with WBS 6.1. */
-    data class AiReady(val source: MealSource, val picturesLeft: Int, val isTest: Boolean) : HomeMessage
-
     data object TrialEnded : HomeMessage
 
     data object Waitlisted : HomeMessage
@@ -139,6 +136,11 @@ class HomeViewModel @Inject constructor(
     /** An AI action is waiting for the broker; the entry action shows progress. */
     val checkingAccess: StateFlow<Boolean> = _checkingAccess.asStateFlow()
 
+    private val _capture = MutableStateFlow<MealSource?>(null)
+
+    /** AI access is available: open the camera (S-03) or the photo picker (S-04), then [captureOpened]. */
+    val capture: StateFlow<MealSource?> = _capture.asStateFlow()
+
     private val _highlighted = MutableStateFlow<MealId?>(null)
 
     /** The meal just saved, highlighted in Recent meals. */
@@ -165,11 +167,16 @@ class HomeViewModel @Inject constructor(
         _checkingAccess.value = true
         viewModelScope.launch {
             try {
-                _message.value = messageFor(source, access.ensureAccess())
+                val check = access.ensureAccess()
+                if (check is AccessCheck.Available) _capture.value = source else _message.value = messageFor(check)
             } finally {
                 _checkingAccess.value = false
             }
         }
+    }
+
+    fun captureOpened() {
+        _capture.value = null
     }
 
     fun onMealSaved(id: MealId) {
@@ -181,8 +188,8 @@ class HomeViewModel @Inject constructor(
         _message.value = null
     }
 
-    private fun messageFor(source: MealSource, check: AccessCheck): HomeMessage = when (check) {
-        is AccessCheck.Available -> HomeMessage.AiReady(source, check.access.pictures.left, check.access.isTest)
+    private fun messageFor(check: AccessCheck): HomeMessage? = when (check) {
+        is AccessCheck.Available -> null
         is AccessCheck.NotAvailable -> when {
             !check.access.aiEnabled -> HomeMessage.AiPaused
             check.access.status == AiAccessStatus.TRIAL_ENDED -> HomeMessage.TrialEnded

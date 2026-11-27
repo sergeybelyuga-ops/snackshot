@@ -36,6 +36,12 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.activity.compose)
+    // S-03 camera (WBS 6.1).
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
     implementation(libs.kotlinx.serialization.core)
     implementation(libs.kotlinx.coroutines.core)
     implementation(libs.hilt.android)

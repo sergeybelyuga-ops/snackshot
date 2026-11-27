@@ -155,6 +155,32 @@ class RoomRepositoriesTest {
     }
 
     @Test
+    fun `the last grams for a food come from its latest change, ignoring case`() = runTest {
+        val older = meal("a", "2026-11-25T12:00:00Z").copy(name = "Apple", grams = 150.0)
+        // Eaten earlier but corrected later: the correction is the user's newest portion.
+        val corrected = meal("b", "2026-11-20T12:00:00Z").copy(
+            name = "apple",
+            grams = 170.0,
+            updatedAt = Instant.parse("2026-11-26T11:30:00Z"),
+        )
+        // A newer Quick add without grams does not hide the portion.
+        val noGrams = meal("c", "2026-11-26T09:00:00Z").copy(
+            source = MealSource.QUICK_ADD,
+            name = "APPLE",
+            grams = null,
+            imageRef = null,
+            confidence = null,
+            edit = null,
+            updatedAt = Instant.parse("2026-11-26T11:50:00Z"),
+        )
+        listOf(older, corrected, noGrams).forEach { meals.save(it) }
+
+        assertEquals(170.0, meals.lastGramsFor(" apple ")!!, 0.0)
+        assertNull(meals.lastGramsFor("Banana"))
+        assertNull(meals.lastGramsFor(""))
+    }
+
+    @Test
     fun `goals start empty and can be set partly and cleared`() = runTest {
         assertEquals(NutritionGoals.NONE, goals.goals.first())
         val set = NutritionGoals(calories = CalorieRange(2070, 2530), proteinGrams = 150)

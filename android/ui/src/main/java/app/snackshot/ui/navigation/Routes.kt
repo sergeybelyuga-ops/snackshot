@@ -16,7 +16,20 @@ import kotlinx.serialization.Serializable
 
 @Serializable data object SettingsRoute
 
-@Serializable data object QuickAddRoute
+/** S-09. [fromDraft]: opened from a failed recognition, keeping its photo and time (doc 10 §4.8). */
+@Serializable data class QuickAddRoute(val fromDraft: Boolean = false)
+
+/** S-03 camera (WBS 6.1). */
+@Serializable data object CameraRoute
+
+/**
+ * S-05 recognition progress (WBS 6.4). [capturePath] (a camera capture) or [pickedUri] (a Photo
+ * Picker item) starts a new recognition; with neither, it resumes the pending one.
+ */
+@Serializable data class RecognitionRoute(val source: String, val capturePath: String? = null, val pickedUri: String? = null)
+
+/** S-15 meal review of the pending draft. */
+@Serializable data object MealReviewRoute
 
 @Serializable data object NutritionPreferencesRoute
 

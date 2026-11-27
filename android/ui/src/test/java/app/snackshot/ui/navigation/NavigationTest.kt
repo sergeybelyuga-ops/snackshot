@@ -22,13 +22,17 @@ import app.snackshot.domain.nutrition.NutritionGoals
 import app.snackshot.ui.FakeAccess
 import app.snackshot.ui.FakeGoals
 import app.snackshot.ui.FakeMealRepository
+import app.snackshot.ui.FakePendingMeals
 import app.snackshot.ui.MutableClock
 import app.snackshot.ui.TEST_ZONE
+import app.snackshot.ui.capture.CameraViewModel
+import app.snackshot.ui.capture.RecognitionViewModel
 import app.snackshot.ui.goals.GoalDetailViewModel
 import app.snackshot.ui.goals.NutritionPreferencesViewModel
 import app.snackshot.ui.home.HomeViewModel
 import app.snackshot.ui.meal.MealSaver
 import app.snackshot.ui.quickadd.QuickAddViewModel
+import app.snackshot.ui.review.MealReviewViewModel
 import app.snackshot.ui.theme.SnackshotTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -74,7 +78,7 @@ class NavigationTest {
 
         @Composable
         override fun quickAdd(): QuickAddViewModel = viewModel {
-            QuickAddViewModel(createSavedStateHandle(), MealSaver(meals, clock), clock) { TEST_ZONE }
+            QuickAddViewModel(createSavedStateHandle(), MealSaver(meals, clock), clock, FakePendingMeals()) { TEST_ZONE }
         }
 
         @Composable
@@ -82,6 +86,16 @@ class NavigationTest {
 
         @Composable
         override fun goalDetail(): GoalDetailViewModel = viewModel { GoalDetailViewModel(createSavedStateHandle(), goals) }
+
+        // The capture flow has its own tests; navigation here never opens it.
+        @Composable
+        override fun camera(): CameraViewModel = error("not used")
+
+        @Composable
+        override fun recognition(): RecognitionViewModel = error("not used")
+
+        @Composable
+        override fun review(): MealReviewViewModel = error("not used")
     }
 
     private fun tab(label: String) = compose.onNode(hasText(label) and hasClickAction())
