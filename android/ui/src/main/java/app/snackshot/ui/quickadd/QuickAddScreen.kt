@@ -54,7 +54,6 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import app.snackshot.domain.meal.MealId
 import app.snackshot.domain.meal.MealType
@@ -132,7 +131,8 @@ fun QuickAddScreen(state: QuickAddState, actions: QuickAddActions, modifier: Mod
         },
         bottomBar = {
             // Outside the scrolling form, so large text never hides Save (doc 10 §4.8).
-            Surface(tonalElevation = 2.dp, modifier = Modifier.imePadding()) {
+            // Same color as the screen: the buttons sit on the page, not on a separate panel.
+            Surface(color = MaterialTheme.colorScheme.background, modifier = Modifier.imePadding()) {
                 Row(
                     Modifier.fillMaxWidth().navigationBarsPadding().padding(Spacing.content),
                     horizontalArrangement = Arrangement.spacedBy(Spacing.medium),
@@ -165,47 +165,7 @@ fun QuickAddScreen(state: QuickAddState, actions: QuickAddActions, modifier: Mod
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            SectionTitle(R.string.quick_add_section_meal)
-            OutlinedTextField(
-                value = form.name,
-                onValueChange = actions.onName,
-                label = { Text(stringResource(R.string.quick_add_name)) },
-                supportingText = {
-                    Text(
-                        errorText(QuickAddField.NAME, state.errors[QuickAddField.NAME]) ?: stringResource(R.string.quick_add_name_hint),
-                    )
-                },
-                isError = state.errors[QuickAddField.NAME] != null,
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(stringResource(R.string.quick_add_meal_type), style = MaterialTheme.typography.labelLarge)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
-                MealType.entries.forEach { type ->
-                    FilterChip(
-                        selected = form.mealType == type,
-                        onClick = { actions.onMealType(type) },
-                        label = { Text(stringResource(mealTypeLabel(type))) },
-                        modifier = Modifier.heightIn(min = Size.minTouchTarget),
-                    )
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
-                OutlinedButton(onClick = { picker = Picker.DATE }, modifier = Modifier.heightIn(min = Size.minTouchTarget)) {
-                    Text(dateLabel(state.eatenAt.toLocalDate(), LocalDate.now(state.zone)))
-                }
-                OutlinedButton(onClick = { picker = Picker.TIME }, modifier = Modifier.heightIn(min = Size.minTouchTarget)) {
-                    Icon(
-                        painterResource(R.drawable.ic_schedule),
-                        contentDescription = null,
-                        modifier = Modifier.padding(end = Spacing.small),
-                    )
-                    Text(state.eatenAt.toLocalTime().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)))
-                }
-            }
-
-            HorizontalDivider(Modifier.padding(vertical = Spacing.small))
+            // 1. Nutrition facts
             SectionTitle(R.string.quick_add_section_nutrition)
             if (state.nothingEntered) {
                 Text(
@@ -235,8 +195,23 @@ fun QuickAddScreen(state: QuickAddState, actions: QuickAddActions, modifier: Mod
             AmountField(state, QuickAddField.FAT, form.fat, actions.onFat, R.string.macro_fat, R.string.unit_g)
             AmountField(state, QuickAddField.PROTEIN, form.protein, actions.onProtein, R.string.macro_protein, R.string.unit_g)
 
+            // 2. Save as custom food: its name and serving size
             HorizontalDivider(Modifier.padding(vertical = Spacing.small))
-            SectionTitle(R.string.quick_add_section_details)
+            SectionTitle(R.string.quick_add_section_custom_food)
+            OutlinedTextField(
+                value = form.name,
+                onValueChange = actions.onName,
+                label = { Text(stringResource(R.string.quick_add_name)) },
+                supportingText = {
+                    Text(
+                        errorText(QuickAddField.NAME, state.errors[QuickAddField.NAME]) ?: stringResource(R.string.quick_add_name_hint),
+                    )
+                },
+                isError = state.errors[QuickAddField.NAME] != null,
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Next),
+                modifier = Modifier.fillMaxWidth(),
+            )
             AmountField(
                 state,
                 QuickAddField.GRAMS,
@@ -248,6 +223,33 @@ fun QuickAddScreen(state: QuickAddState, actions: QuickAddActions, modifier: Mod
                 last = true,
                 onDone = actions.onSave,
             )
+
+            // 3. Meal type: the type, then the date and time
+            HorizontalDivider(Modifier.padding(vertical = Spacing.small))
+            SectionTitle(R.string.quick_add_meal_type)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
+                MealType.entries.forEach { type ->
+                    FilterChip(
+                        selected = form.mealType == type,
+                        onClick = { actions.onMealType(type) },
+                        label = { Text(stringResource(mealTypeLabel(type))) },
+                        modifier = Modifier.heightIn(min = Size.minTouchTarget),
+                    )
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.small)) {
+                OutlinedButton(onClick = { picker = Picker.DATE }, modifier = Modifier.heightIn(min = Size.minTouchTarget)) {
+                    Text(dateLabel(state.eatenAt.toLocalDate(), LocalDate.now(state.zone)))
+                }
+                OutlinedButton(onClick = { picker = Picker.TIME }, modifier = Modifier.heightIn(min = Size.minTouchTarget)) {
+                    Icon(
+                        painterResource(R.drawable.ic_schedule),
+                        contentDescription = null,
+                        modifier = Modifier.padding(end = Spacing.small),
+                    )
+                    Text(state.eatenAt.toLocalTime().format(DateTimeFormatter.ofLocalizedTime(FormatStyle.SHORT)))
+                }
+            }
         }
     }
 

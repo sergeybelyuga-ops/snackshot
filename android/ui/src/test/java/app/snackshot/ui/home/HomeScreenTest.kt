@@ -1,5 +1,6 @@
 package app.snackshot.ui.home
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
@@ -12,6 +13,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeDown
 import androidx.compose.ui.test.swipeUp
+import androidx.compose.ui.unit.dp
 import app.snackshot.domain.meal.MealId
 import app.snackshot.domain.meal.MealSource
 import app.snackshot.domain.meal.MealType
@@ -76,7 +78,7 @@ class HomeScreenTest {
         }
     }
 
-    private fun center(label: String) = compose.onNodeWithContentDescription("$label. Swipe up or down to change the action")
+    private fun center(label: String) = compose.onNodeWithContentDescription("$label. Hold and slide up or down to change the action")
 
     @Test
     fun `without goals the summary shows totals and says no goal is set`() {
@@ -117,14 +119,36 @@ class HomeScreenTest {
     fun `the carousel starts on Take a photo and loops through Gallery and Manual add`() {
         show(UiState.Success(content()))
         center("Take a photo").performClick()
-        center("Take a photo").performTouchInput { swipeUp() }
-        center("Gallery").performClick()
-        center("Gallery").performTouchInput { swipeUp() }
-        center("Manual add").performClick()
-        center("Manual add").performTouchInput { swipeUp() }
+        // Sliding down points at the next action on the arc, up at the previous; lifting the finger picks it.
         center("Take a photo").performTouchInput { swipeDown() }
+        center("Gallery").performClick()
+        center("Gallery").performTouchInput { swipeDown() }
+        center("Manual add").performClick()
+        center("Manual add").performTouchInput { swipeDown() }
+        center("Take a photo").performTouchInput { swipeUp() }
         center("Manual add").assertIsDisplayed()
         assertEquals(listOf(EntryAction.TAKE_PHOTO, EntryAction.GALLERY, EntryAction.MANUAL_ADD), entries)
+    }
+
+    @Test
+    fun `holding and sliding changes the action without starting it`() {
+        show(UiState.Success(content()))
+        center("Take a photo").performTouchInput {
+            down(center)
+            moveBy(Offset(0f, 20.dp.toPx()))
+            moveBy(Offset(0f, 20.dp.toPx()))
+            moveBy(Offset(0f, 20.dp.toPx()))
+            up()
+        }
+        center("Gallery").assertIsDisplayed()
+        center("Gallery").performTouchInput {
+            down(center)
+            // A slide inside the dead zone stays on the action it started from.
+            moveBy(Offset(0f, -24.dp.toPx()))
+            up()
+        }
+        center("Gallery").assertIsDisplayed()
+        assertEquals(emptyList<EntryAction>(), entries)
     }
 
     @Test

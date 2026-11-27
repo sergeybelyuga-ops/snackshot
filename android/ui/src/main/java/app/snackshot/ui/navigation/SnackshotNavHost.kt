@@ -30,9 +30,9 @@ import app.snackshot.ui.goals.NutritionPreferencesRoute as NutritionPreferencesS
 import app.snackshot.ui.home.HomeRoute
 import app.snackshot.ui.privacy.PrivacyDetailsScreen
 import app.snackshot.ui.quickadd.QuickAddRoute as QuickAddScreenRoute
+import app.snackshot.ui.settings.SettingsScreen
 import app.snackshot.ui.tabs.DashboardScreen
 import app.snackshot.ui.tabs.HistoryScreen
-import app.snackshot.ui.tabs.SettingsScreen
 import app.snackshot.ui.welcome.WelcomeScreen
 import kotlin.reflect.KClass
 
@@ -129,7 +129,9 @@ fun SnackshotNavHost(
             composable<DashboardRoute> { DashboardScreen() }
             composable<HistoryRoute> { HistoryScreen() }
             composable<SettingsRoute> {
+                val goals by viewModels.nutritionPreferences().goals.collectAsStateWithLifecycle()
                 SettingsScreen(
+                    goals = goals,
                     environmentName = environmentName,
                     onPrivacyDetails = { navController.navigate(PrivacyDetailsRoute) },
                     onNutritionPreferences = { navController.navigate(NutritionPreferencesRoute) },
