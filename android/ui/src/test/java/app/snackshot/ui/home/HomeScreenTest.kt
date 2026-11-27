@@ -119,7 +119,7 @@ class HomeScreenTest {
     fun `the carousel starts on Take a photo and loops through Gallery and Manual add`() {
         show(UiState.Success(content()))
         center("Take a photo").performClick()
-        // Sliding points at the action below (next) or above (previous); lifting the finger picks it.
+        // Sliding down points at the next action on the arc, up at the previous; lifting the finger picks it.
         center("Take a photo").performTouchInput { swipeDown() }
         center("Gallery").performClick()
         center("Gallery").performTouchInput { swipeDown() }
@@ -143,7 +143,7 @@ class HomeScreenTest {
         center("Gallery").assertIsDisplayed()
         center("Gallery").performTouchInput {
             down(center)
-            // A slide shorter than half a row stays on the action it started from.
+            // A slide inside the dead zone stays on the action it started from.
             moveBy(Offset(0f, -24.dp.toPx()))
             up()
         }
