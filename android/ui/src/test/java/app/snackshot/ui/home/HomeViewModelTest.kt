@@ -146,7 +146,11 @@ class HomeViewModelTest {
 
         assertEquals(1, access.ensureCalls)
         assertFalse(vm.checkingAccess.value)
-        assertEquals(HomeMessage.AiReady(MealSource.PHOTO, picturesLeft = 87, isTest = true), vm.message.value)
+        // Access is available: the camera opens instead of a message.
+        assertEquals(MealSource.PHOTO, vm.capture.value)
+        assertEquals(null, vm.message.value)
+        vm.captureOpened()
+        assertEquals(null, vm.capture.value)
     }
 
     @Test
