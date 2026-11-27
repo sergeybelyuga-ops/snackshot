@@ -47,3 +47,8 @@ dependencies {
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.room.testing)
 }
+
+// Robolectric's native graphics can be blocked on Windows by Smart App Control. CI runs these on Linux.
+tasks.withType<Test>().configureEach {
+    if (System.getProperty("os.name").startsWith("Windows")) exclude("**/AndroidPhotoPreprocessorTest*")
+}

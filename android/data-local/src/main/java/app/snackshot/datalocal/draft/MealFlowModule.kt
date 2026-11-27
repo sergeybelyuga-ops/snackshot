@@ -5,10 +5,12 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.preferencesDataStoreFile
+import app.snackshot.datalocal.images.AndroidPhotoPreprocessor
 import app.snackshot.datalocal.images.FileMealImageStore
 import app.snackshot.datalocal.images.ImageDirectories
 import app.snackshot.domain.meal.MealImageStore
 import app.snackshot.domain.meal.PendingMealStore
+import app.snackshot.domain.meal.PhotoPreprocessor
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -26,6 +28,9 @@ abstract class MealFlowModule {
 
     @Binds
     abstract fun pendingMealStore(impl: DataStorePendingMealStore): PendingMealStore
+
+    @Binds
+    abstract fun photoPreprocessor(impl: AndroidPhotoPreprocessor): PhotoPreprocessor
 
     companion object {
         @Provides

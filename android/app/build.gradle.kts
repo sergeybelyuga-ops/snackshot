@@ -146,6 +146,7 @@ dependencies {
     implementation(project(":domain"))
     implementation(project(":data-local"))
     implementation(project(":logmeal"))
+    implementation(libs.okhttp)
     implementation(project(":healthconnect"))
     implementation(project(":access"))
     implementation(project(":metrics"))
