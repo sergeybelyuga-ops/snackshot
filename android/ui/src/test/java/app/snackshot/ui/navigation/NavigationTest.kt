@@ -17,17 +17,22 @@ import androidx.lifecycle.createSavedStateHandle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.rememberNavController
+import app.snackshot.domain.nutrition.CalorieRange
+import app.snackshot.domain.nutrition.NutritionGoals
 import app.snackshot.ui.FakeAccess
 import app.snackshot.ui.FakeGoals
 import app.snackshot.ui.FakeMealRepository
 import app.snackshot.ui.MutableClock
 import app.snackshot.ui.TEST_ZONE
+import app.snackshot.ui.goals.GoalDetailViewModel
+import app.snackshot.ui.goals.NutritionPreferencesViewModel
 import app.snackshot.ui.home.HomeViewModel
 import app.snackshot.ui.meal.MealSaver
 import app.snackshot.ui.quickadd.QuickAddViewModel
 import app.snackshot.ui.theme.SnackshotTheme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -61,15 +66,22 @@ class NavigationTest {
 
     private val meals = FakeMealRepository()
     private val clock = MutableClock()
+    private val goals = FakeGoals()
 
     private val fakeViewModels = object : ScreenViewModels {
         @Composable
-        override fun home(): HomeViewModel = viewModel { HomeViewModel(meals, FakeGoals(), FakeAccess(), clock) { TEST_ZONE } }
+        override fun home(): HomeViewModel = viewModel { HomeViewModel(meals, goals, FakeAccess(), clock) { TEST_ZONE } }
 
         @Composable
         override fun quickAdd(): QuickAddViewModel = viewModel {
             QuickAddViewModel(createSavedStateHandle(), MealSaver(meals, clock), clock) { TEST_ZONE }
         }
+
+        @Composable
+        override fun nutritionPreferences(): NutritionPreferencesViewModel = viewModel { NutritionPreferencesViewModel(goals) }
+
+        @Composable
+        override fun goalDetail(): GoalDetailViewModel = viewModel { GoalDetailViewModel(createSavedStateHandle(), goals) }
     }
 
     private fun tab(label: String) = compose.onNode(hasText(label) and hasClickAction())
@@ -159,5 +171,40 @@ class NavigationTest {
         compose.onNodeWithText("Cancel").performClick()
         compose.onNodeWithText("Recent meals").assertIsDisplayed()
         assertEquals(0, meals.meals.value.size)
+    }
+
+    @Test
+    fun `Settings → Nutrition preferences sets a calorie goal that Home uses`() {
+        launch(welcomeCompleted = true)
+        tab("Settings").performClick()
+        compose.onNodeWithText("Nutrition preferences").performClick()
+        compose.onNodeWithText("Daily goals").assertIsDisplayed()
+        compose.onNodeWithText("Calories").performClick()
+        compose.onNodeWithContentDescription("Increase minimum by 10 kcal").performClick()
+        compose.onNodeWithText("Set goal").performClick()
+
+        compose.onNodeWithText("Range 2,080–2,530 kcal").assertIsDisplayed()
+        assertEquals(CalorieRange(2080, 2530), goals.state.value.calories)
+
+        compose.onNodeWithContentDescription("Back").performClick()
+        tab("Home").performClick()
+        compose.onNodeWithContentDescription("Today: 0 of 2,305 kcal", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun `a goal can be cleared, and Clear all asks first`() {
+        goals.state.value = NutritionGoals(calories = CalorieRange(2000, 2400), proteinGrams = 120)
+        launch(welcomeCompleted = true)
+        tab("Settings").performClick()
+        compose.onNodeWithText("Nutrition preferences").performClick()
+        compose.onNodeWithText("Protein").performClick()
+        compose.onNodeWithText("Clear goal").performClick()
+        compose.onNodeWithText("Daily goals").assertIsDisplayed()
+        assertNull(goals.state.value.proteinGrams)
+
+        compose.onNodeWithText("Clear all goals").performClick()
+        compose.onNodeWithText("Clear all goals?").assertIsDisplayed()
+        compose.onNodeWithText("Clear goal").performClick()
+        assertTrue(goals.state.value.isEmpty)
     }
 }

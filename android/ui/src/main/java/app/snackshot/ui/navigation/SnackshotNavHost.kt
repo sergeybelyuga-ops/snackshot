@@ -25,6 +25,8 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import app.snackshot.domain.meal.MealId
 import app.snackshot.ui.R
+import app.snackshot.ui.goals.GoalDetailRoute as GoalDetailScreenRoute
+import app.snackshot.ui.goals.NutritionPreferencesRoute as NutritionPreferencesScreenRoute
 import app.snackshot.ui.home.HomeRoute
 import app.snackshot.ui.privacy.PrivacyDetailsScreen
 import app.snackshot.ui.quickadd.QuickAddRoute as QuickAddScreenRoute
@@ -99,6 +101,20 @@ fun SnackshotNavHost(
                     onOpenHistory = { navController.navigateToTab(Tab.HISTORY) },
                 )
             }
+            composable<NutritionPreferencesRoute> {
+                NutritionPreferencesScreenRoute(
+                    viewModel = viewModels.nutritionPreferences(),
+                    onGoal = { navController.navigate(GoalRoute(it.name)) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
+            composable<GoalRoute> {
+                GoalDetailScreenRoute(
+                    viewModel = viewModels.goalDetail(),
+                    onDone = { navController.popBackStack<NutritionPreferencesRoute>(inclusive = false) },
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable<QuickAddRoute> {
                 QuickAddScreenRoute(
                     viewModel = viewModels.quickAdd(),
@@ -113,7 +129,11 @@ fun SnackshotNavHost(
             composable<DashboardRoute> { DashboardScreen() }
             composable<HistoryRoute> { HistoryScreen() }
             composable<SettingsRoute> {
-                SettingsScreen(environmentName = environmentName, onPrivacyDetails = { navController.navigate(PrivacyDetailsRoute) })
+                SettingsScreen(
+                    environmentName = environmentName,
+                    onPrivacyDetails = { navController.navigate(PrivacyDetailsRoute) },
+                    onNutritionPreferences = { navController.navigate(NutritionPreferencesRoute) },
+                )
             }
         }
         if (currentTab != null) {

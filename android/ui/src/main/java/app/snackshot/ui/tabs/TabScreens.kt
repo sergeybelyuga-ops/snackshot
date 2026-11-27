@@ -1,5 +1,6 @@
 package app.snackshot.ui.tabs
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
@@ -10,12 +11,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
@@ -37,18 +41,30 @@ fun HistoryScreen(modifier: Modifier = Modifier) = TabScreen(stringResource(R.st
 }
 
 @Composable
-fun SettingsScreen(environmentName: String, onPrivacyDetails: () -> Unit, modifier: Modifier = Modifier) =
-    TabScreen(stringResource(R.string.nav_settings), modifier) {
-        PlaceholderText(stringResource(R.string.settings_placeholder))
-        OutlinedButton(onClick = onPrivacyDetails, modifier = Modifier.heightIn(min = Size.minTouchTarget)) {
-            Text(stringResource(R.string.welcome_privacy_details))
-        }
-        Text(
-            stringResource(R.string.settings_build, environmentName),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+fun SettingsScreen(
+    environmentName: String,
+    onPrivacyDetails: () -> Unit,
+    onNutritionPreferences: () -> Unit,
+    modifier: Modifier = Modifier,
+) = TabScreen(stringResource(R.string.nav_settings), modifier) {
+    PlaceholderText(stringResource(R.string.settings_placeholder))
+    // The first S-16 section (WBS 5.3); the rest of Settings comes with WBS 11.1.
+    ListItem(
+        headlineContent = { Text(stringResource(R.string.goals_title)) },
+        supportingContent = { Text(stringResource(R.string.goals_settings_support)) },
+        leadingContent = { Icon(painterResource(R.drawable.ic_nutrition), contentDescription = null) },
+        trailingContent = { Icon(painterResource(R.drawable.ic_chevron_right), contentDescription = null) },
+        modifier = Modifier.clickable(onClick = onNutritionPreferences),
+    )
+    OutlinedButton(onClick = onPrivacyDetails, modifier = Modifier.heightIn(min = Size.minTouchTarget)) {
+        Text(stringResource(R.string.welcome_privacy_details))
     }
+    Text(
+        stringResource(R.string.settings_build, environmentName),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
 
 /** A tab screen above the NavigationBar, which handles the bottom inset itself. */
 @Composable

@@ -17,3 +17,8 @@ import kotlinx.serialization.Serializable
 @Serializable data object SettingsRoute
 
 @Serializable data object QuickAddRoute
+
+@Serializable data object NutritionPreferencesRoute
+
+/** One goal's detail; [goal] is a `GoalKind` name, read by `GoalDetailViewModel`. */
+@Serializable data class GoalRoute(val goal: String)
