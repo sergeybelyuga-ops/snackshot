@@ -7,6 +7,8 @@ import app.snackshot.domain.meal.DraftProblem
 import app.snackshot.domain.meal.MealDraft
 import app.snackshot.domain.meal.MealId
 import app.snackshot.domain.meal.MealType
+import app.snackshot.domain.meal.PendingMeal
+import app.snackshot.domain.meal.PendingMealStore
 import app.snackshot.domain.nutrition.Atwater
 import app.snackshot.domain.nutrition.NutrientField
 import app.snackshot.domain.nutrition.NutritionValues
@@ -24,6 +26,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -89,8 +92,15 @@ class QuickAddViewModel @Inject constructor(
     private val handle: SavedStateHandle,
     private val saver: MealSaver,
     private val clock: Clock,
+    private val pending: PendingMealStore,
     private val zone: Provider<ZoneId>,
 ) : ViewModel() {
+    /** Opened from a failed or unwanted recognition: the meal keeps that photo and time (doc 10 §4.8). */
+    private val fromDraft: Boolean = handle.get<Boolean>(ARG_FROM_DRAFT) == true
+
+    /** The draft's processed photo, once it is read. */
+    private var imageRef: String? = handle[KEY_IMAGE]
+
     private val attempted = MutableStateFlow(handle.get<Boolean>(KEY_ATTEMPTED) ?: false)
     private val form = MutableStateFlow(restore())
     private val _state = MutableStateFlow(stateOf(form.value, saving = false))
@@ -100,6 +110,22 @@ class QuickAddViewModel @Inject constructor(
 
     /** Set once the meal is saved; the screen then returns to Home. */
     val saved: StateFlow<MealId?> = _saved.asStateFlow()
+
+    init {
+        if (fromDraft && handle.get<Boolean>(KEY_DRAFT_READ) != true) {
+            viewModelScope.launch {
+                val (at, ref) = when (val meal = pending.pending.first()) {
+                    is PendingMeal.AwaitingRecognition -> meal.capturedAt to meal.imageRef
+                    is PendingMeal.Reviewing -> meal.draft.eatenAt to meal.draft.imageRef
+                    null -> return@launch
+                }
+                imageRef = ref
+                handle[KEY_IMAGE] = ref
+                handle[KEY_DRAFT_READ] = true
+                edit { f -> moveTo(f, at) }
+            }
+        }
+    }
 
     fun onName(value: String) = edit { it.copy(name = value) }
 
@@ -149,7 +175,10 @@ class QuickAddViewModel @Inject constructor(
         if (draft == null) return
         viewModelScope.launch {
             try {
-                _saved.value = saver.save(draft).id
+                val id = saver.save(draft).id
+                // The photo now belongs to the saved meal; the pending draft is done.
+                if (fromDraft) pending.complete()
+                _saved.value = id
             } finally {
                 _state.update { it.copy(saving = false) }
             }
@@ -178,7 +207,7 @@ class QuickAddViewModel @Inject constructor(
     private fun baseDraft(f: QuickAddForm): MealDraft? {
         if (numberErrors(f).isNotEmpty()) return null
         val z = zone.get()
-        return MealDraft.quickAdd(f.eatenAt, z.rules.getOffset(f.eatenAt), f.mealType)
+        return MealDraft.quickAdd(f.eatenAt, z.rules.getOffset(f.eatenAt), f.mealType, imageRef = imageRef)
             .withName(f.name)
             .withGrams(parseAmount(f.grams).value)
             .withOverrides(
@@ -259,6 +288,9 @@ class QuickAddViewModel @Inject constructor(
         const val KEY_TYPE_CHOSEN = "meal_type_chosen"
         const val KEY_AT = "eaten_at"
         const val KEY_ATTEMPTED = "save_attempted"
+        const val KEY_IMAGE = "draft_image"
+        const val KEY_DRAFT_READ = "draft_read"
+        const val ARG_FROM_DRAFT = "fromDraft"
 
         fun fieldOf(field: NutrientField) = when (field) {
             NutrientField.ENERGY -> QuickAddField.ENERGY

@@ -22,6 +22,8 @@ sealed interface PendingMeal {
         val capturedAt: Instant,
         val zoneOffset: ZoneOffset,
         val failedAttempts: Int = 0,
+        /** Why the last attempt failed, so S-05 can show it again after the app was closed. */
+        val lastFailure: RecognitionFailure? = null,
     ) : PendingMeal {
         init {
             require(source.isAiRecognition) { "Only photo and gallery meals wait for recognition" }

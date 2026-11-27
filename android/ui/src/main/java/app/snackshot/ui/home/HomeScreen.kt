@@ -1,5 +1,9 @@
 package app.snackshot.ui.home
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -42,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
@@ -79,11 +82,24 @@ fun HomeRoute(
     savedMealId: MealId?,
     onSavedMealConsumed: () -> Unit,
     onManualAdd: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPicked: (Uri) -> Unit,
     onOpenDashboard: () -> Unit,
     onOpenHistory: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val capture by viewModel.capture.collectAsStateWithLifecycle()
+    // S-04: the system Photo Picker; the app needs no storage permission (doc 10 §4.5).
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri -> uri?.let(onPicked) }
+    LaunchedEffect(capture) {
+        when (capture) {
+            MealSource.PHOTO -> onTakePhoto()
+            MealSource.GALLERY -> picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            else -> return@LaunchedEffect
+        }
+        viewModel.captureOpened()
+    }
     val message by viewModel.message.collectAsStateWithLifecycle()
     val checking by viewModel.checkingAccess.collectAsStateWithLifecycle()
     val highlighted by viewModel.highlighted.collectAsStateWithLifecycle()
@@ -136,7 +152,7 @@ fun HomeScreen(
     val quickAdd = stringResource(R.string.quick_add_title)
     LaunchedEffect(message) {
         if (message == null || text == null) return@LaunchedEffect
-        val offerQuickAdd = message !is HomeMessage.MealSaved && message !is HomeMessage.AiReady
+        val offerQuickAdd = message !is HomeMessage.MealSaved
         val result = snackbar.showSnackbar(
             message = text,
             actionLabel = if (offerQuickAdd) quickAdd else null,
@@ -198,10 +214,6 @@ fun HomeScreen(
 @Composable
 private fun messageText(message: HomeMessage): String = when (message) {
     is HomeMessage.MealSaved -> stringResource(R.string.home_meal_saved)
-    is HomeMessage.AiReady -> {
-        val ready = pluralStringResource(R.plurals.home_ai_ready, message.picturesLeft, message.picturesLeft)
-        stringResource(if (message.source == MealSource.PHOTO) R.string.home_ai_camera_soon else R.string.home_ai_gallery_soon, ready)
-    }
     HomeMessage.TrialEnded -> stringResource(R.string.home_ai_trial_ended)
     HomeMessage.Waitlisted -> stringResource(R.string.home_ai_waitlisted)
     HomeMessage.AiPaused -> stringResource(R.string.home_ai_paused)

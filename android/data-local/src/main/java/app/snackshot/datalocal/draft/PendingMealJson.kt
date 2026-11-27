@@ -8,6 +8,7 @@ import app.snackshot.domain.meal.MealSource
 import app.snackshot.domain.meal.MealType
 import app.snackshot.domain.meal.PendingMeal
 import app.snackshot.domain.meal.Portion
+import app.snackshot.domain.meal.RecognitionFailure
 import app.snackshot.domain.nutrition.NutritionValues
 import java.time.Instant
 import java.time.ZoneOffset
@@ -50,6 +51,7 @@ internal object PendingMealJson {
         val capturedAt: Long,
         val zoneOffsetSeconds: Int,
         val failedAttempts: Int,
+        val lastFailure: String? = null,
     ) : PendingMealDto
 
     @Serializable
@@ -102,7 +104,7 @@ internal object PendingMealJson {
 
     private fun PendingMeal.toDto(): PendingMealDto = when (this) {
         is PendingMeal.AwaitingRecognition ->
-            AwaitingDto(source.name, imageRef, capturedAt.toEpochMilli(), zoneOffset.totalSeconds, failedAttempts)
+            AwaitingDto(source.name, imageRef, capturedAt.toEpochMilli(), zoneOffset.totalSeconds, failedAttempts, lastFailure?.name)
         is PendingMeal.Reviewing -> ReviewingDto(draft.toDto())
     }
 
@@ -113,6 +115,7 @@ internal object PendingMealJson {
             capturedAt = Instant.ofEpochMilli(capturedAt),
             zoneOffset = ZoneOffset.ofTotalSeconds(zoneOffsetSeconds),
             failedAttempts = failedAttempts,
+            lastFailure = lastFailure?.let { name -> RecognitionFailure.entries.firstOrNull { it.name == name } },
         )
         is ReviewingDto -> PendingMeal.Reviewing(draft.toDomain())
     }
