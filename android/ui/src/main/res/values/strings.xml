@@ -155,9 +155,44 @@
     <string name="quick_add_error_name_long">Up to 80 characters</string>
     <string name="quick_add_error_portion">Enter 1 to 5,000 g, or leave it blank</string>
 
+    <!-- S-16 Nutrition preferences (prototype s16_settings.html, nutrition views) -->
+    <string name="goals_title">Nutrition preferences</string>
+    <string name="goals_settings_support">Optional daily calorie and macro goals</string>
+    <string name="goals_intro">Goals are saved on this device only and never leave it. Set the ones you want; Snackshot works without them.</string>
+    <string name="goals_daily">Daily goals</string>
+    <string name="goals_calories">Calories</string>
+    <string name="goals_not_set">Not set</string>
+    <string name="goals_value_kcal">%1$s kcal</string>
+    <string name="goals_value_g">%1$d g</string>
+    <string name="goals_range_kcal">Range %1$s–%2$s kcal</string>
+    <string name="goals_range_g">Range %1$d–%2$d g</string>
+    <string name="goals_band_note">Dashboards show each macro goal as a personal range of ±10%.</string>
+    <string name="goals_clear_all">Clear all goals</string>
+    <string name="goals_clear_all_title">Clear all goals?</string>
+    <string name="goals_clear_all_body">Your calorie and macro goals are removed from this device. Your meals stay as they are.</string>
+    <string name="goals_clear">Clear goal</string>
+    <string name="goals_set">Set goal</string>
+    <string name="goals_minimum">Minimum</string>
+    <string name="goals_maximum">Maximum</string>
+    <string name="goals_kcal_per_day">kcal per day</string>
+    <string name="goals_g_per_day">g per day</string>
+    <string name="goals_decrease_min">Decrease minimum by 10 kcal</string>
+    <string name="goals_increase_min">Increase minimum by 10 kcal</string>
+    <string name="goals_decrease_max">Decrease maximum by 10 kcal</string>
+    <string name="goals_increase_max">Increase maximum by 10 kcal</string>
+    <string name="goals_decrease_grams">Decrease %1$s by 1 gram</string>
+    <string name="goals_increase_grams">Increase %1$s by 1 gram</string>
+    <string name="goals_target">Target %1$s kcal · middle of your range</string>
+    <string name="goals_shown_as">Shown as %1$d–%2$d g on your dashboard</string>
+    <string name="goals_about">About this goal</string>
+    <string name="goals_about_calories">Days between your minimum and maximum count as in range on your dashboard. The starting range is 2,300 kcal ±10%.</string>
+    <string name="goals_about_macro">%1$d g of %2$s is about %3$s kcal.</string>
+    <string name="goals_about_macro_share">%1$d g of %2$s is about %3$s kcal, or %4$d%% of your %5$s kcal target.</string>
+    <string name="goals_advice">For personalized nutrition advice, it\'s always best to consult a doctor or registered dietitian.</string>
+
     <!-- Placeholder tabs until their increments (I-2, I-5, I-9) -->
     <string name="dashboard_placeholder">Daily, weekly, monthly and yearly totals will appear here.</string>
     <string name="history_placeholder">Your logged meals will appear here.</string>
-    <string name="settings_placeholder">Health Connect, goals, AI recognition and other settings will appear here.</string>
+    <string name="settings_placeholder">Health Connect, AI recognition and other settings will appear here.</string>
     <string name="settings_build">Build: %1$s</string>
 </resources>

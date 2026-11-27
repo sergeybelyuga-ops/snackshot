@@ -2,6 +2,8 @@ package app.snackshot.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import app.snackshot.ui.goals.GoalDetailViewModel
+import app.snackshot.ui.goals.NutritionPreferencesViewModel
 import app.snackshot.ui.home.HomeViewModel
 import app.snackshot.ui.quickadd.QuickAddViewModel
 
@@ -15,6 +17,12 @@ interface ScreenViewModels {
 
     @Composable
     fun quickAdd(): QuickAddViewModel
+
+    @Composable
+    fun nutritionPreferences(): NutritionPreferencesViewModel
+
+    @Composable
+    fun goalDetail(): GoalDetailViewModel
 }
 
 object HiltScreenViewModels : ScreenViewModels {
@@ -23,4 +31,10 @@ object HiltScreenViewModels : ScreenViewModels {
 
     @Composable
     override fun quickAdd(): QuickAddViewModel = hiltViewModel()
+
+    @Composable
+    override fun nutritionPreferences(): NutritionPreferencesViewModel = hiltViewModel()
+
+    @Composable
+    override fun goalDetail(): GoalDetailViewModel = hiltViewModel()
 }
