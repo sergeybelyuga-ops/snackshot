@@ -2,10 +2,13 @@ package app.snackshot.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import app.snackshot.ui.capture.CameraViewModel
+import app.snackshot.ui.capture.RecognitionViewModel
 import app.snackshot.ui.goals.GoalDetailViewModel
 import app.snackshot.ui.goals.NutritionPreferencesViewModel
 import app.snackshot.ui.home.HomeViewModel
 import app.snackshot.ui.quickadd.QuickAddViewModel
+import app.snackshot.ui.review.MealReviewViewModel
 
 /**
  * Where screens get their ViewModels: Hilt in the app, plain constructors with fakes in tests.
@@ -23,6 +26,15 @@ interface ScreenViewModels {
 
     @Composable
     fun goalDetail(): GoalDetailViewModel
+
+    @Composable
+    fun camera(): CameraViewModel
+
+    @Composable
+    fun recognition(): RecognitionViewModel
+
+    @Composable
+    fun review(): MealReviewViewModel
 }
 
 object HiltScreenViewModels : ScreenViewModels {
@@ -37,4 +49,13 @@ object HiltScreenViewModels : ScreenViewModels {
 
     @Composable
     override fun goalDetail(): GoalDetailViewModel = hiltViewModel()
+
+    @Composable
+    override fun camera(): CameraViewModel = hiltViewModel()
+
+    @Composable
+    override fun recognition(): RecognitionViewModel = hiltViewModel()
+
+    @Composable
+    override fun review(): MealReviewViewModel = hiltViewModel()
 }

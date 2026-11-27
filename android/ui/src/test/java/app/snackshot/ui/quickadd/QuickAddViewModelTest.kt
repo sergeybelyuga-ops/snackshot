@@ -5,6 +5,7 @@ import app.snackshot.domain.meal.MealSource
 import app.snackshot.domain.meal.MealType
 import app.snackshot.domain.nutrition.NutritionValues
 import app.snackshot.ui.FakeMealRepository
+import app.snackshot.ui.FakePendingMeals
 import app.snackshot.ui.MutableClock
 import app.snackshot.ui.TEST_NOW
 import app.snackshot.ui.TEST_ZONE
@@ -38,7 +39,9 @@ class QuickAddViewModelTest {
 
     @After fun tearDown() = Dispatchers.resetMain()
 
-    private fun viewModel(h: SavedStateHandle = handle) = QuickAddViewModel(h, MealSaver(meals, clock), clock) { TEST_ZONE }
+    private fun viewModel(h: SavedStateHandle = handle) = QuickAddViewModel(h, MealSaver(meals, clock), clock, FakePendingMeals()) {
+        TEST_ZONE
+    }
 
     @Test
     fun `starts now, with the meal type suggested from the time`() {
